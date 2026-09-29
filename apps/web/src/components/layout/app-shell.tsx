@@ -1,5 +1,6 @@
 "use client";
 
+import { DemoBanner } from "@/components/demo/demo-banner";
 import { SwitchUserScreen } from "@/components/pin/switch-user";
 import { RealtimeBridge } from "@/components/realtime/realtime";
 import { RouteGate } from "@/components/common/permission-gate";
@@ -81,6 +82,7 @@ export function AppShell({
 			<div className="flex min-h-svh">
 				<AppSidebar />
 				<div className="flex min-w-0 flex-1 flex-col">
+					<DemoBanner />
 					<AppHeader />
 					{/* Bottom padding clears the mobile tab bar. */}
 					<main className="flex min-h-0 flex-1 flex-col pb-24 tablet:pb-0">

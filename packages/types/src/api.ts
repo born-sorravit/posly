@@ -32,4 +32,6 @@ export interface AuthUser {
 	provider: "PASSWORD" | "GOOGLE";
 	isVerified: boolean;
 	locale: string;
+	/** A shared demo account: some actions are refused and the data resets nightly. */
+	isDemo?: boolean;
 }

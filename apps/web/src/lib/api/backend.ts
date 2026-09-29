@@ -28,6 +28,8 @@ const KNOWN: [RegExp, (match: RegExpMatchArray) => string][] = [
 	[/^Incorrect email or password$/, () => "อีเมลหรือรหัสผ่านไม่ถูกต้อง"],
 	[/^An account with this email already exists$/, () => "อีเมลนี้มีบัญชีอยู่แล้ว"],
 	[/^Image uploads are not configured$/, () => "ยังไม่ได้ตั้งค่าการอัปโหลดรูป"],
+	// The demo guard and demo login already answer in Thai.
+	[/^บัญชีทดลอง/, (m) => m.input ?? ""],
 ];
 
 export const friendlyMessage = (status: number, message: string | undefined): string => {

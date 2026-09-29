@@ -8,6 +8,7 @@ import {
 import { OrdersService } from "@/modules/orders/orders.service";
 import { ReceiptMailService } from "@/modules/orders/receipt-mail.service";
 import { Throttle } from "@nestjs/throttler";
+import { DemoBlocked } from "@/shared/decorators/demo-blocked.decorator";
 import { CurrentMembership } from "@/shared/decorators/current-membership.decorator";
 import type { ResolvedMembership } from "@/shared/decorators/current-membership.decorator";
 import { RequirePermission } from "@/shared/decorators/require-permission.decorator";
@@ -81,6 +82,7 @@ export class OrdersController {
 	}
 
 	@Post(":orderId/receipt-email")
+	@DemoBlocked()
 	@HttpCode(200)
 	@Throttle({ default: { limit: 10, ttl: 60_000 } })
 	@RequirePermission(Permission.ORDERS_READ_OWN)

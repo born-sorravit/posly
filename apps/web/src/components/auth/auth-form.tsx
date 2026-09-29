@@ -1,5 +1,6 @@
 "use client";
 
+import { DemoDialog } from "@/components/demo/demo-dialog";
 import { useSession } from "@/components/providers/session-provider";
 import { Alert, AlertDescription } from "@posly/ui/components/alert";
 import { Button } from "@posly/ui/components/button";
@@ -13,6 +14,7 @@ import {
 	registerSchema,
 } from "@/lib/auth/schemas";
 import { friendlyMessage } from "@/lib/api/backend";
+import { env } from "@/lib/env";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -170,6 +172,17 @@ export function AuthForm({ mode }: { mode: Mode }) {
 					{isRegister ? t("signIn") : t("createAccount")}
 				</Link>
 			</p>
+
+			{!isRegister && env.demoEnabled ? (
+				<p className="-mt-2 text-center text-muted-foreground text-sm">
+					{t("tryDemo")}{" "}
+					<DemoDialog>
+						<button type="button" className="font-medium text-primary hover:underline">
+							{t("tryDemoLink")}
+						</button>
+					</DemoDialog>
+				</p>
+			) : null}
 		</div>
 	);
 }

@@ -32,6 +32,11 @@ import { MemberStatus } from "@/shared/enums/member-status.enum";
 import { AccessTokenPayload } from "@/modules/auth/strategies/jwt.strategy";
 import { AuthProvider } from "@/shared/enums/auth-provider.enum";
 import {
+	DEMO_ROLE_EMAILS,
+	type DemoRole,
+	isDemoEmail,
+} from "@/shared/utils/demo.util";
+import {
 	BadRequestException,
 	ConflictException,
 	ForbiddenException,
@@ -39,6 +44,8 @@ import {
 	HttpException,
 	HttpStatus,
 	Injectable,
+	NotFoundException,
+	ServiceUnavailableException,
 	UnauthorizedException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
@@ -383,7 +390,26 @@ export class AuthService {
 	 * has an account, so the form cannot be used to find out who is a customer. A Google-only
 	 * account gets the link too: resetting gives it a password alongside Google.
 	 */
+	/**
+	 * Signs a visitor in to one of the seeded demo accounts without a password. The accounts
+	 * are shared and recreated nightly; `DemoGuard` refuses what would spoil them for the next
+	 * visitor.
+	 */
+	async demoLogin(role: DemoRole, userAgent?: string): Promise<AuthSessionResponse> {
+		if (!this.configService.get<boolean>("demo.enabled", false)) {
+			throw new NotFoundException("Demo is not available");
+		}
+		const user = await this.usersRepository.findOne({
+			where: { email: DEMO_ROLE_EMAILS[role] },
+		});
+		// Not seeded yet, or the nightly reset is between removing and recreating.
+		if (!user) throw new ServiceUnavailableException("บัญชีทดลองยังไม่พร้อม");
+		return this.issueSession(user, userAgent);
+	}
+
 	async forgotPassword(dto: ForgotPasswordDto): Promise<void> {
+		// Nobody receives mail at the demo domain, and a reset would lock out every visitor.
+		if (isDemoEmail(dto.email)) return;
 		const user = await this.usersRepository.findOne({ where: { email: dto.email } });
 		if (!user) return;
 
@@ -496,6 +522,7 @@ export class AuthService {
 			provider: user.provider,
 			isVerified: user.isVerified,
 			locale: user.locale,
+			isDemo: isDemoEmail(user.email),
 		};
 	}
 

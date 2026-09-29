@@ -1,10 +1,12 @@
 "use client";
 
+import { DemoDialog } from "@/components/demo/demo-dialog";
 import { Brand } from "@/components/layout/brand";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { Button } from "@posly/ui/components/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@posly/ui/components/sheet";
 import { Link } from "@/i18n/navigation";
+import { env } from "@/lib/env";
 import { cn } from "@/lib/utils";
 import { ArrowRight, Menu } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -42,6 +44,11 @@ export function LandingHeader({ signedIn }: { signedIn: boolean }) {
 		</Button>
 	) : (
 		<>
+			{env.demoEnabled ? (
+				<DemoDialog>
+					<Button variant="outline">{t("demo")}</Button>
+				</DemoDialog>
+			) : null}
 			<Button asChild variant="ghost">
 				<Link href="/login">{t("login")}</Link>
 			</Button>
@@ -95,7 +102,7 @@ export function LandingHeader({ signedIn }: { signedIn: boolean }) {
 								</a>
 							))}
 						</nav>
-						<div className="mt-6 grid gap-2 [&>a]:w-full">{actions}</div>
+						<div className="mt-6 grid gap-2 [&>a]:w-full [&>button]:w-full">{actions}</div>
 					</SheetContent>
 				</Sheet>
 			</div>

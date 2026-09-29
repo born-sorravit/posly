@@ -1,5 +1,6 @@
 import { ChoosePlanDto, RedirectResponse } from "@/modules/billing/dto/billing.dto";
 import { BillingService } from "@/modules/billing/billing.service";
+import { DemoBlocked } from "@/shared/decorators/demo-blocked.decorator";
 import { CurrentMembership } from "@/shared/decorators/current-membership.decorator";
 import type { ResolvedMembership } from "@/shared/decorators/current-membership.decorator";
 import { Public } from "@/shared/decorators/public.decorator";
@@ -23,6 +24,7 @@ export class BillingController {
 	constructor(private readonly billing: BillingService) {}
 
 	@Post("checkout")
+	@DemoBlocked()
 	@HttpCode(200)
 	@ApiOperation({ summary: "Start Stripe Checkout for a paid plan" })
 	@ApiOkResponse({ type: RedirectResponse })
@@ -34,6 +36,7 @@ export class BillingController {
 	}
 
 	@Post("change")
+	@DemoBlocked()
 	@HttpCode(204)
 	@ApiOperation({
 		summary: "Switch a paying shop's plan (FREE cancels at period end)",
@@ -46,6 +49,7 @@ export class BillingController {
 	}
 
 	@Post("portal")
+	@DemoBlocked()
 	@HttpCode(200)
 	@ApiOperation({
 		summary: "Open Stripe's customer portal: card, invoices, cancelling",

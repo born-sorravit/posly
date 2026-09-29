@@ -3,6 +3,7 @@ import {
 	UploadTicketResponse,
 } from "@/modules/storage/dto/upload.dto";
 import { StorageService } from "@/modules/storage/storage.service";
+import { DemoBlocked } from "@/shared/decorators/demo-blocked.decorator";
 import { CurrentMembership } from "@/shared/decorators/current-membership.decorator";
 import type { ResolvedMembership } from "@/shared/decorators/current-membership.decorator";
 import { RequirePermission } from "@/shared/decorators/require-permission.decorator";
@@ -22,6 +23,7 @@ export class StorageController {
 	constructor(private readonly storageService: StorageService) {}
 
 	@Post()
+	@DemoBlocked()
 	@RequirePermission(Permission.PRODUCTS_WRITE)
 	@ApiOperation({
 		summary: "Get a presigned URL to upload an image straight to the bucket",

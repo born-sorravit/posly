@@ -158,6 +158,14 @@ export interface BillingConfig {
 	stripeWebhookSecret: string;
 }
 
+/**
+ * The public "try it" login on the landing page. Off by default, so an environment without
+ * the demo seed never offers a button that cannot work.
+ */
+export interface DemoConfig {
+	enabled: boolean;
+}
+
 export interface Configuration {
 	app: AppConfig;
 	database: DatabaseConfig;
@@ -168,6 +176,7 @@ export interface Configuration {
 	storage: StorageConfig;
 	mail: MailConfig;
 	billing: BillingConfig;
+	demo: DemoConfig;
 }
 
 export default (): Configuration => ({
@@ -235,5 +244,8 @@ export default (): Configuration => ({
 	billing: {
 		stripeSecretKey: process.env.STRIPE_SECRET_KEY ?? "",
 		stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
+	},
+	demo: {
+		enabled: toBool(process.env.DEMO_ENABLED, false),
 	},
 });

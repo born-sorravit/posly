@@ -2,6 +2,7 @@ import {
 	AuthSessionResponse,
 	AuthUserResponse,
 	ChangePasswordDto,
+	DemoLoginDto,
 	ForgotPasswordDto,
 	GoogleLoginDto,
 	LoginDto,
@@ -14,6 +15,7 @@ import {
 import { AuthService } from "@/modules/auth/auth.service";
 import { CurrentUser } from "@/shared/decorators/current-user.decorator";
 import type { AuthenticatedUser } from "@/shared/decorators/current-user.decorator";
+import { DemoBlocked } from "@/shared/decorators/demo-blocked.decorator";
 import { Public } from "@/shared/decorators/public.decorator";
 import { MessagedResponse } from "@/shared/interceptors/response.interceptor";
 import {
@@ -40,6 +42,17 @@ import { Throttle } from "@nestjs/throttler";
 const CREDENTIAL_THROTTLE = {
 	default: {
 		limit: Number.parseInt(process.env.AUTH_THROTTLE_LIMIT ?? "10", 10) || 10,
+		ttl: 60_000,
+	},
+};
+
+/**
+ * The demo login takes no secret, so it only needs to stop scripts, not guessing — and a
+ * room of prospects behind one office NAT should not trip it.
+ */
+const DEMO_THROTTLE = {
+	default: {
+		limit: Number.parseInt(process.env.DEMO_THROTTLE_LIMIT ?? "30", 10) || 30,
 		ttl: 60_000,
 	},
 };
@@ -101,6 +114,22 @@ export class AuthController {
 	}
 
 	@Public()
+	@Throttle(DEMO_THROTTLE)
+	@Post("demo")
+	@HttpCode(200)
+	@ApiOperation({
+		summary: "Start a session on a shared demo account",
+		description: "404 unless DEMO_ENABLED; 503 while the demo seed is missing.",
+	})
+	@ApiOkResponse({ type: AuthSessionResponse })
+	demo(
+		@Body() dto: DemoLoginDto,
+		@Headers("user-agent") userAgent?: string
+	): Promise<AuthSessionResponse> {
+		return this.authService.demoLogin(dto.role, userAgent);
+	}
+
+	@Public()
 	@Throttle(CREDENTIAL_THROTTLE)
 	@Post("google")
 	@HttpCode(200)
@@ -143,6 +172,7 @@ export class AuthController {
 	}
 
 	@Patch("me")
+	@DemoBlocked()
 	@ApiBearerAuth()
 	@ApiOperation({ summary: "Update the signed-in account" })
 	@ApiOkResponse({ type: AuthUserResponse })
@@ -171,6 +201,7 @@ export class AuthController {
 
 	@Throttle(CREDENTIAL_THROTTLE)
 	@Post("change-password")
+	@DemoBlocked()
 	@HttpCode(200)
 	@ApiBearerAuth()
 	@ApiOperation({ summary: "Change the password; every other session is revoked" })
