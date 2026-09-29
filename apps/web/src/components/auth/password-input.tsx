@@ -10,7 +10,7 @@ import { type ComponentProps, useState } from "react";
 const PASSWORD_ERRORS = {
 	tooShort: "passwordTooShort",
 	tooLong: "passwordTooLong",
-	common: "passwordCommon",
+	sequence: "passwordSequence",
 	personal: "passwordPersonal",
 } as const;
 

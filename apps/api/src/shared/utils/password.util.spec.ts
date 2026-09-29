@@ -18,17 +18,15 @@ describe("passwordProblem", () => {
 		expect(passwordProblem(`${thai24}า`)).toBe("tooLong");
 	});
 
-	it.each([
-		"password",
-		"Password123!",
-		"12345678",
-		"87654321",
-		"qwertyui",
-		"11111111",
-		"12341234",
-		"abcabcabc",
-		"iloveyou2024",
-	])("refuses %s as common", (pw) => expect(passwordProblem(pw)).toBe("common"));
+	it.each(["12345678", "87654321", "0123456789", "90123456"])(
+		"refuses %s as consecutive digits",
+		(pw) => expect(passwordProblem(pw)).toBe("sequence")
+	);
+
+	it.each(["password", "11111111", "qwertyui", "12341234", "13572468"])(
+		"allows %s",
+		(pw) => expect(passwordProblem(pw)).toBeNull()
+	);
 
 	it("refuses the email's name part or the person's name", () => {
 		expect(passwordProblem("somchai2024", { email: "somchai@gmail.com" })).toBe(
@@ -49,6 +47,7 @@ describe("passwordProblem", () => {
 describe("passwordStrength", () => {
 	it("rates by length and variety", () => {
 		expect(passwordStrength("12345678")).toBe(0);
+		expect(passwordStrength("11111111")).toBe(1);
 		expect(passwordStrength("kettlebl")).toBe(1);
 		expect(passwordStrength("Kettle-blue9")).toBe(3);
 		expect(passwordStrength("blue kettle morning")).toBe(3);

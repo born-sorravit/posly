@@ -26,7 +26,7 @@ const KNOWN: [RegExp, (match: RegExpMatchArray) => string][] = [
 	[/^(.+) is required for (.+)$/, (m) => `กรุณาเลือก${m[1]}ของ ${m[2]}`],
 	[/reset link has expired or was already used/i, () => "ลิงก์นี้หมดอายุหรือถูกใช้ไปแล้ว ขอลิงก์ใหม่ได้ที่หน้าลืมรหัสผ่าน"],
 	[/^Incorrect email or password$/, () => "อีเมลหรือรหัสผ่านไม่ถูกต้อง"],
-	[/^Password is too common$/, () => "รหัสผ่านนี้เดาง่ายเกินไป"],
+	[/^Password must not be consecutive digits$/, () => "รหัสผ่านห้ามเป็นตัวเลขเรียงกัน"],
 	[/^Password must not contain your name or email$/, () => "รหัสผ่านไม่ควรมีชื่อหรืออีเมลของคุณ"],
 	[/^Password must be at most \d+ bytes$/, () => "รหัสผ่านยาวเกินไป"],
 	[/^Invalid Google token$/, () => "เข้าสู่ระบบด้วย Google ไม่สำเร็จ ลองใหม่อีกครั้ง"],

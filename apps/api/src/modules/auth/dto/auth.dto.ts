@@ -28,7 +28,7 @@ export class RegisterDto {
 
 	@ApiProperty({
 		minLength: PASSWORD_MIN_LENGTH,
-		description: `At most ${PASSWORD_MAX_BYTES} bytes; not common, not the email or name.`,
+		description: `At most ${PASSWORD_MAX_BYTES} bytes; not consecutive digits, not the email or name.`,
 	})
 	@IsString()
 	@IsAcceptablePassword()
@@ -106,7 +106,7 @@ export class ChangePasswordDto {
 
 	@ApiProperty({
 		minLength: PASSWORD_MIN_LENGTH,
-		description: `At most ${PASSWORD_MAX_BYTES} bytes; not common.`,
+		description: `At most ${PASSWORD_MAX_BYTES} bytes; not consecutive digits.`,
 	})
 	@IsString()
 	@IsAcceptablePassword()
@@ -151,7 +151,7 @@ export class ResetPasswordDto {
 
 	@ApiProperty({
 		minLength: PASSWORD_MIN_LENGTH,
-		description: `At most ${PASSWORD_MAX_BYTES} bytes; not common.`,
+		description: `At most ${PASSWORD_MAX_BYTES} bytes; not consecutive digits.`,
 	})
 	@IsString()
 	@IsAcceptablePassword()
