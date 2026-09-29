@@ -1,5 +1,6 @@
 "use client";
 
+import { GoogleButton } from "@/components/auth/google-button";
 import { DemoDialog } from "@/components/demo/demo-dialog";
 import { useSession } from "@/components/providers/session-provider";
 import { Alert, AlertDescription } from "@posly/ui/components/alert";
@@ -23,17 +24,6 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 
 type Mode = "login" | "register";
-
-function GoogleIcon() {
-	return (
-		<svg viewBox="0 0 24 24" className="size-4" aria-hidden>
-			<path fill="#4285F4" d="M22.5 12.3c0-.8-.1-1.5-.2-2.3H12v4.3h5.9a5 5 0 0 1-2.2 3.3v2.7h3.6c2-1.9 3.2-4.7 3.2-8Z" />
-			<path fill="#34A853" d="M12 23c3 0 5.5-1 7.3-2.7l-3.6-2.7c-1 .7-2.2 1-3.7 1-2.9 0-5.3-1.9-6.2-4.5H2.1v2.8A11 11 0 0 0 12 23Z" />
-			<path fill="#FBBC05" d="M5.8 14.1a6.6 6.6 0 0 1 0-4.2V7.1H2.1a11 11 0 0 0 0 9.8l3.7-2.8Z" />
-			<path fill="#EA4335" d="M12 5.4c1.6 0 3 .6 4.2 1.6l3.1-3.1A11 11 0 0 0 2.1 7.1l3.7 2.8C6.7 7.3 9.1 5.4 12 5.4Z" />
-		</svg>
-	);
-}
 
 /**
  * Posts to the Next route handler, not to the API: the handler exchanges credentials for
@@ -60,13 +50,14 @@ export function AuthForm({ mode }: { mode: Mode }) {
 		formState: { errors, isSubmitting },
 	} = form;
 
-	const onSubmit = handleSubmit(async (values) => {
+	/** Shared by the form and the Google button: both post to a route handler that sets cookies. */
+	const signIn = async (path: string, body: unknown) => {
 		setServerError(null);
 
-		const response = await fetch(`/api/auth/${mode}`, {
+		const response = await fetch(`/api/auth/${path}`, {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify(values),
+			body: JSON.stringify(body),
 		}).catch(() => null);
 
 		if (!response) {
@@ -86,18 +77,30 @@ export function AuthForm({ mode }: { mode: Mode }) {
 		// onboarding. Sending everyone to onboarding would ask an invited cashier to open a shop.
 		router.replace(next?.startsWith("/") ? next : "/dashboard");
 		router.refresh();
-	});
+	};
+
+	const onSubmit = handleSubmit((values) => signIn(mode, values));
+
+	const [googlePending, setGooglePending] = useState(false);
+	const onGoogle = async (idToken: string) => {
+		setGooglePending(true);
+		await signIn("google", { idToken });
+		setGooglePending(false);
+	};
 
 	const fieldError = (field: string) =>
 		(errors as Record<string, { message?: string } | undefined>)[field]?.message;
 
 	return (
 		<div className="space-y-5">
-			{/* Needs NEXT_PUBLIC_GOOGLE_CLIENT_ID + Google Identity Services; /api/auth/google is ready. */}
-			<Button type="button" variant="outline" size="lg" className="h-11 w-full rounded-xl" disabled>
-				<GoogleIcon />
-				{t("google")}
-			</Button>
+			<div className="relative">
+				<GoogleButton mode={mode} label={t("google")} onCredential={onGoogle} />
+				{googlePending ? (
+					<div className="absolute inset-0 flex items-center justify-center rounded-full bg-background/70">
+						<Loader2 className="size-4 animate-spin text-primary" />
+					</div>
+				) : null}
+			</div>
 
 			<div className="flex items-center gap-3 text-muted-foreground text-xs">
 				<span className="h-px flex-1 bg-border" />

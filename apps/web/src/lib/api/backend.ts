@@ -26,6 +26,8 @@ const KNOWN: [RegExp, (match: RegExpMatchArray) => string][] = [
 	[/^(.+) is required for (.+)$/, (m) => `กรุณาเลือก${m[1]}ของ ${m[2]}`],
 	[/reset link has expired or was already used/i, () => "ลิงก์นี้หมดอายุหรือถูกใช้ไปแล้ว ขอลิงก์ใหม่ได้ที่หน้าลืมรหัสผ่าน"],
 	[/^Incorrect email or password$/, () => "อีเมลหรือรหัสผ่านไม่ถูกต้อง"],
+	[/^Invalid Google token$/, () => "เข้าสู่ระบบด้วย Google ไม่สำเร็จ ลองใหม่อีกครั้ง"],
+	[/^Google sign-in is not configured$/, () => "ยังไม่ได้เปิดการเข้าสู่ระบบด้วย Google"],
 	[/^An account with this email already exists$/, () => "อีเมลนี้มีบัญชีอยู่แล้ว"],
 	[/^Image uploads are not configured$/, () => "ยังไม่ได้ตั้งค่าการอัปโหลดรูป"],
 	// The demo guard and demo login already answer in Thai.
