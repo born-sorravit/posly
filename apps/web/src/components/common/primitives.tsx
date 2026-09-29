@@ -100,27 +100,33 @@ export function MoneyDisplay({
 /**
  * +14.2% / −3.1% versus the comparison period. Up is green, down is red, flat is muted.
  * `softDecline` mutes a drop too — for a day still in progress, where being behind
- * yesterday at 10 a.m. is ordinary, not an alarm.
+ * yesterday at 10 a.m. is ordinary, not an alarm. `pill` puts it on a tinted chip, for
+ * when it heads its own line.
  */
 export function StatTrend({
 	change,
 	label,
 	softDecline = false,
+	pill = false,
 	className,
 }: {
 	change: number;
 	label?: string;
 	softDecline?: boolean;
+	pill?: boolean;
 	className?: string;
 }) {
 	const up = change > 0;
 	const flat = change === 0;
+	const muted = flat || (!up && softDecline);
 	const Icon = up ? ArrowUpRight : ArrowDownRight;
 	return (
 		<span
 			className={cn(
 				"inline-flex flex-wrap items-center gap-1 font-medium text-xs",
-				flat || (!up && softDecline) ? "text-muted-foreground" : up ? "text-success" : "text-danger",
+				muted ? "text-muted-foreground" : up ? "text-success" : "text-danger",
+				pill && "rounded-md px-1.5 py-0.5",
+				pill && (muted ? "bg-muted" : up ? "bg-success/12" : "bg-danger/10"),
 				className
 			)}
 		>
@@ -251,17 +257,18 @@ export function MetricCard({
 			</div>
 			<div className="numeric font-semibold text-[28px] leading-none tracking-tight">{value}</div>
 			{previous !== undefined ? (
-				<div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-muted-foreground text-xs">
-					{note ? <span>{note}</span> : null}
-					{note ? <span aria-hidden>·</span> : null}
-					<span>
+				// Two lines, in the order they are read: which way (the chip), then against what.
+				<div className="flex flex-col items-start gap-1.5">
+					{change !== undefined && change !== null ? (
+						<StatTrend change={change} softDecline={softDecline} pill />
+					) : note ? (
+						<span className="rounded-md bg-muted px-1.5 py-0.5 font-medium text-muted-foreground text-xs">
+							{note}
+						</span>
+					) : null}
+					<span className="text-muted-foreground text-xs">
 						{changeLabel} <span className="numeric font-medium text-foreground/80">{previous}</span>
 					</span>
-					{/* No separator: the arrow already sets it apart, and a "·" strands itself at one
-					    end of the line whenever a narrow card wraps. */}
-					{change !== undefined && change !== null ? (
-						<StatTrend change={change} softDecline={softDecline} className="whitespace-nowrap" />
-					) : null}
 				</div>
 			) : change !== undefined && change !== null ? (
 				<StatTrend change={change} label={changeLabel} softDecline={softDecline} />
