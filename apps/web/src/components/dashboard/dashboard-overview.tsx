@@ -49,6 +49,11 @@ export function DashboardOverview() {
 	const data = dashboard.data;
 	const m = data?.metrics;
 	const vs = t(period === "today" ? "vsYesterday" : "vsPrevious");
+	// Before the first sale of the day every comparison reads -100%, which looks like
+	// something broke. It is only early: say so instead of flashing four red arrows.
+	const noSalesYet = period === "today" && m?.orders === 0;
+	const trendOf = (value: number | null | undefined) => (noSalesYet ? null : value);
+	const note = noSalesYet ? t("noSalesYet") : undefined;
 	const revenueTrend = data?.series.map((b) => b.revenue);
 	const ordersTrend = data?.series.map((b) => b.orders);
 	const averageTrend = data?.series.map((b) => (b.orders ? b.revenue / b.orders : 0));
@@ -99,7 +104,9 @@ export function DashboardOverview() {
 						{formatBaht(m.revenue)}
 					</p>
 					<div className="mt-1 flex items-center gap-3 text-sm">
-						{m.revenueChange !== null ? <StatTrend change={m.revenueChange} className="text-emerald-300" /> : null}
+						{trendOf(m.revenueChange) != null ? (
+							<StatTrend change={m.revenueChange as number} className="text-emerald-300" />
+						) : null}
 						<span className="text-white/60">
 							{formatNumber(m.orders)} {t("ordersUnit")}
 						</span>
@@ -139,8 +146,9 @@ export function DashboardOverview() {
 							icon={Coins}
 							label={period === "today" ? t("metrics.revenue") : t("metrics.revenueRange")}
 							value={formatBaht(m.revenue)}
-							change={m.revenueChange}
+							change={trendOf(m.revenueChange)}
 							changeLabel={vs}
+							note={note}
 							trend={revenueTrend}
 							className="hidden tablet:flex"
 						/>
@@ -150,8 +158,9 @@ export function DashboardOverview() {
 							icon={ShoppingBag}
 							label={t("metrics.orders")}
 							value={formatNumber(m.orders)}
-							change={m.ordersChange}
+							change={trendOf(m.ordersChange)}
 							changeLabel={vs}
+							note={note}
 							trend={ordersTrend}
 						/>
 						<MetricCard
@@ -160,8 +169,9 @@ export function DashboardOverview() {
 							icon={ReceiptText}
 							label={t("metrics.averageOrder")}
 							value={formatBaht(m.averageOrder)}
-							change={m.averageOrderChange}
+							change={trendOf(m.averageOrderChange)}
 							changeLabel={vs}
+							note={note}
 							trend={averageTrend}
 						/>
 						<MetricCard
@@ -172,8 +182,9 @@ export function DashboardOverview() {
 							// like a loss. Net profit lives on the reports page, over whole periods.
 							label={t("metrics.profit")}
 							value={formatBaht(m.grossProfit)}
-							change={m.grossProfitChange}
+							change={trendOf(m.grossProfitChange)}
 							changeLabel={vs}
+							note={note}
 							trend={revenueTrend}
 							className="col-span-2 tablet:col-span-1"
 						/>

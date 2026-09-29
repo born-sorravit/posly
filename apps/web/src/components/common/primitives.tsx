@@ -113,7 +113,7 @@ export function StatTrend({
 	return (
 		<span
 			className={cn(
-				"inline-flex items-center gap-1 font-medium text-xs",
+				"inline-flex flex-wrap items-center gap-1 font-medium text-xs",
 				flat ? "text-muted-foreground" : up ? "text-success" : "text-danger",
 				className
 			)}
@@ -202,6 +202,7 @@ export function MetricCard({
 	tone = "primary",
 	change,
 	changeLabel,
+	note,
 	tinted = false,
 	trend,
 	className,
@@ -215,6 +216,8 @@ export function MetricCard({
 	/** Null = no comparison available (the previous period had nothing). */
 	change?: number | null;
 	changeLabel?: string;
+	/** Shown in place of the comparison when there is none, e.g. before the first sale. */
+	note?: ReactNode;
 	tinted?: boolean;
 	className?: string;
 }) {
@@ -232,7 +235,11 @@ export function MetricCard({
 				<span className="font-medium text-muted-foreground text-sm">{label}</span>
 			</div>
 			<div className="numeric font-semibold text-[28px] leading-none tracking-tight">{value}</div>
-			{change !== undefined && change !== null ? <StatTrend change={change} label={changeLabel} /> : null}
+			{change !== undefined && change !== null ? (
+				<StatTrend change={change} label={changeLabel} />
+			) : note ? (
+				<span className="text-muted-foreground text-xs">{note}</span>
+			) : null}
 			{trend ? <Sparkline values={trend} tone={tone} className="-mx-1 -mb-1 mt-auto" /> : null}
 		</div>
 	);
