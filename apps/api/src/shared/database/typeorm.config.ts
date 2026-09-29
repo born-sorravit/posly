@@ -1,4 +1,5 @@
 import configuration, { loadEnv } from "@/config/configuration";
+import * as path from "node:path";
 import { DataSource, DataSourceOptions } from "typeorm";
 
 loadEnv();
@@ -16,9 +17,13 @@ const toInt = (value: string | undefined, fallback: number): number => {
  * The glob follows whichever copy of the code is executing: loading entities from `dist/`
  * while the caller imported the TypeScript class registers two classes for one table, and
  * TypeORM then reports "No metadata for X was found" under ts-jest.
+ *
+ * Resolved from this file, not the working directory: Railway runs the start and pre-deploy
+ * commands from the repo root, where a relative `dist/` glob matches nothing — no entities
+ * and, worse, no migrations, with no error.
  */
 const runningFromSource = __filename.endsWith(".ts");
-const root = runningFromSource ? "src" : "dist";
+const root = path.resolve(__dirname, "..", "..");
 const ext = runningFromSource ? "ts" : "js";
 
 export const dataSourceOptions: DataSourceOptions = {
