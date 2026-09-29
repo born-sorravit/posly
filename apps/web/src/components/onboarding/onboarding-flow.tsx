@@ -1,6 +1,5 @@
 "use client";
 
-import { BrandMark } from "@/components/layout/brand";
 import { Button } from "@posly/ui/components/button";
 import { Input } from "@posly/ui/components/input";
 import { Label } from "@posly/ui/components/label";
@@ -286,7 +285,8 @@ export function OnboardingFlow() {
 	return (
 		<div className="flex min-h-svh flex-col bg-background">
 			<header className="flex h-16 items-center justify-between px-4 tablet:px-8">
-				<BrandMark />
+				{/* Spacer: keeps the progress bar centred against the one on the right. */}
+				<span className="w-9" />
 				{index > 0 && index < STEPS.length - 1 ? (
 					<div className="flex items-center gap-1.5" aria-label={t("progress", { step: index, total: 3 })}>
 						{[1, 2, 3].map((n) => (
