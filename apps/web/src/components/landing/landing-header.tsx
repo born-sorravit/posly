@@ -66,7 +66,7 @@ export function LandingHeader({ signedIn }: { signedIn: boolean }) {
 			)}
 		>
 			<div className="mx-auto flex h-16 max-w-6xl items-center gap-6 px-4 tablet:px-6">
-				<Brand />
+				<Brand href="/" />
 				<nav className="hidden items-center gap-1 desktop:flex">
 					{LINKS.map(([key, href]) => (
 						<a
