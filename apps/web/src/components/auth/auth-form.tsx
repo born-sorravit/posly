@@ -96,7 +96,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
 			<div className="relative">
 				<GoogleButton mode={mode} label={t("google")} onCredential={onGoogle} />
 				{googlePending ? (
-					<div className="absolute inset-0 flex items-center justify-center rounded-full bg-background/70">
+					<div className="absolute inset-0 flex items-center justify-center rounded-xl bg-background/70">
 						<Loader2 className="size-4 animate-spin text-primary" />
 					</div>
 				) : null}
