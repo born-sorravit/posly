@@ -927,8 +927,8 @@
 	},
 	"auth": {
 		"tagline": "Posly · POS สำหรับร้านเล็ก",
-		"loginTitle": "ยินดีต้อนรับกลับ",
-		"loginHint": "เข้าสู่ระบบเพื่อเปิดร้านของคุณ",
+		"loginTitle": "เข้าสู่ระบบ Posly",
+		"loginHint": "เข้าสู่ระบบเพื่อจัดการร้านของคุณ",
 		"registerTitle": "สร้างบัญชี Posly",
 		"registerHint": "สมัครแล้วเริ่มขายได้ในไม่กี่นาที",
 		"google": "ดำเนินการต่อด้วย Google",
