@@ -12,6 +12,7 @@ import {
 	UpdateMemberDto,
 } from "@/modules/members/dto/member.dto";
 import { MembersService } from "@/modules/members/members.service";
+import { DemoBlocked } from "@/shared/decorators/demo-blocked.decorator";
 import { CurrentMembership } from "@/shared/decorators/current-membership.decorator";
 import type { ResolvedMembership } from "@/shared/decorators/current-membership.decorator";
 import { CurrentUser } from "@/shared/decorators/current-user.decorator";
@@ -55,6 +56,7 @@ export class MembersController {
 	}
 
 	@Post()
+	@DemoBlocked()
 	@RequirePermission(Permission.MEMBERS_MANAGE)
 	@ApiOperation({
 		summary: "Invite an employee; returns a one-time link to hand them",
@@ -68,6 +70,7 @@ export class MembersController {
 	}
 
 	@Post(":memberId/invite-link")
+	@DemoBlocked()
 	@HttpCode(200)
 	@RequirePermission(Permission.MEMBERS_MANAGE)
 	@ApiOperation({ summary: "Issue a new invite link; the old one stops working" })
@@ -92,6 +95,7 @@ export class MembersController {
 	}
 
 	@Put("me/pin")
+	@DemoBlocked()
 	@HttpCode(204)
 	@Throttle({ default: { limit: 10, ttl: 60_000 } })
 	@ApiOperation({ summary: "Set your own quick-switch PIN for this shop" })
@@ -103,6 +107,7 @@ export class MembersController {
 	}
 
 	@Delete("me/pin")
+	@DemoBlocked()
 	@HttpCode(204)
 	@ApiOperation({ summary: "Remove your own PIN" })
 	clearMyPin(@CurrentMembership() m: ResolvedMembership): Promise<void> {
@@ -110,6 +115,7 @@ export class MembersController {
 	}
 
 	@Delete(":memberId/pin")
+	@DemoBlocked()
 	@HttpCode(204)
 	@RequirePermission(Permission.MEMBERS_MANAGE)
 	@ApiOperation({ summary: "Clear someone's PIN (they forgot it)" })
@@ -131,6 +137,7 @@ export class MembersController {
 	}
 
 	@Put(":memberId/permissions")
+	@DemoBlocked()
 	@RequirePermission(Permission.MEMBERS_MANAGE)
 	@RequireFeature(Feature.ADVANCED_PERMISSION)
 	@ApiOperation({ summary: "Set one member's own permission list (Business plan)" })
@@ -144,6 +151,7 @@ export class MembersController {
 	}
 
 	@Patch(":memberId")
+	@DemoBlocked()
 	@RequirePermission(Permission.MEMBERS_MANAGE)
 	@ApiOkResponse({ type: MemberResponse })
 	update(
@@ -155,6 +163,7 @@ export class MembersController {
 	}
 
 	@Delete(":memberId")
+	@DemoBlocked()
 	@HttpCode(200)
 	@RequirePermission(Permission.MEMBERS_MANAGE)
 	@ApiOperation({

@@ -1,4 +1,5 @@
 import { BrandMark } from "@/components/layout/brand";
+import { DemoDialog } from "@/components/demo/demo-dialog";
 import { LandingHeader } from "@/components/landing/landing-header";
 import { DashboardMockup, PosMockup, SalesCard, ToastCards } from "@/components/landing/mockups";
 import { Float, Reveal, Stagger, StaggerItem, TiltIn } from "@/components/landing/motion";
@@ -6,6 +7,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@p
 import { Button } from "@posly/ui/components/button";
 import { Link } from "@/i18n/navigation";
 import { getPublicPlans } from "@/lib/api/public-plans";
+import { env } from "@/lib/env";
 import { formatBaht } from "@posly/utils/money";
 import { cn } from "@/lib/utils";
 import {
@@ -137,6 +139,7 @@ export async function LandingPage({ signedIn }: { signedIn: boolean }) {
 	const faqs = t.raw("faq.items") as { q: string; a: string }[];
 	const heroPoints = t.raw("hero.points") as string[];
 	const signupHref = signedIn ? "/dashboard" : "/register";
+	const showDemo = env.demoEnabled && !signedIn;
 	const plans = await getPublicPlans();
 
 	return (
@@ -179,9 +182,17 @@ export async function LandingPage({ signedIn }: { signedIn: boolean }) {
 										<ArrowRight />
 									</Link>
 								</Button>
-								<Button asChild size="lg" variant="outline" className="h-12 bg-card px-6 text-base">
-									<a href="#features">{t("hero.secondary")}</a>
-								</Button>
+								{showDemo ? (
+									<DemoDialog>
+										<Button size="lg" variant="outline" className="h-12 bg-card px-6 text-base">
+											{t("hero.demo")}
+										</Button>
+									</DemoDialog>
+								) : (
+									<Button asChild size="lg" variant="outline" className="h-12 bg-card px-6 text-base">
+										<a href="#features">{t("hero.secondary")}</a>
+									</Button>
+								)}
 							</Reveal>
 							<Reveal onLoad delay={0.32}>
 							<ul className="mt-6 flex flex-wrap justify-center gap-x-6 gap-y-2 text-muted-foreground text-sm">
@@ -407,6 +418,17 @@ export async function LandingPage({ signedIn }: { signedIn: boolean }) {
 										<ArrowRight />
 									</Link>
 								</Button>
+								{showDemo ? (
+									<DemoDialog>
+										<Button
+											size="lg"
+											variant="outline"
+											className="h-12 border-white/40 bg-transparent px-6 text-base text-white hover:bg-white/10 hover:text-white"
+										>
+											{t("cta.demo")}
+										</Button>
+									</DemoDialog>
+								) : null}
 								{signedIn ? null : (
 									<Button
 										asChild

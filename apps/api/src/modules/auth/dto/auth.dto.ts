@@ -1,4 +1,5 @@
 import { normaliseEmail, trimmed } from "@/shared/dto/transform.util";
+import { DEMO_ROLES, type DemoRole } from "@/shared/utils/demo.util";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Transform } from "class-transformer";
 import {
@@ -49,6 +50,12 @@ export class LoginDto {
 	@IsString()
 	@MinLength(1)
 	password: string;
+}
+
+export class DemoLoginDto {
+	@ApiProperty({ enum: DEMO_ROLES, example: "owner" })
+	@IsIn(DEMO_ROLES)
+	role: DemoRole;
 }
 
 export class GoogleLoginDto {
@@ -105,6 +112,8 @@ export class AuthUserResponse {
 	@ApiProperty() provider: string;
 	@ApiProperty() isVerified: boolean;
 	@ApiProperty() locale: string;
+	@ApiProperty({ description: "A shared demo account; some actions are refused." })
+	isDemo: boolean;
 }
 
 export class AuthSessionResponse {

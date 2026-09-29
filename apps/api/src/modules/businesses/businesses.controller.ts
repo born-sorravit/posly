@@ -5,6 +5,7 @@ import {
 	UpdateBusinessDto,
 } from "@/modules/businesses/dto/business.dto";
 import { BusinessesService } from "@/modules/businesses/businesses.service";
+import { DemoBlocked } from "@/shared/decorators/demo-blocked.decorator";
 import { CurrentMembership } from "@/shared/decorators/current-membership.decorator";
 import type { ResolvedMembership } from "@/shared/decorators/current-membership.decorator";
 import { CurrentUser } from "@/shared/decorators/current-user.decorator";
@@ -39,6 +40,7 @@ export class BusinessesController {
 	}
 
 	@Post()
+	@DemoBlocked()
 	@ApiOperation({ summary: "Create a business; the caller becomes its OWNER" })
 	@ApiOkResponse({ type: BusinessSummaryResponse })
 	create(
@@ -58,6 +60,7 @@ export class BusinessesController {
 	}
 
 	@Patch(":businessId")
+	@DemoBlocked()
 	@RequirePermission(Permission.BUSINESS_MANAGE)
 	@ApiOperation({ summary: "Update store information" })
 	@ApiOkResponse({ type: BusinessDetailResponse })

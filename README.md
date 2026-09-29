@@ -98,6 +98,20 @@ pnpm --filter @posly/api seed:demo -- --remove   # ลบร้านและ�
 | `boss@demo.posly` | Baan Bakery (CASHIER) |
 | `daeng@demo.posly` | ร้านป้าแดง มินิมาร์ท (OWNER) |
 
+### ปุ่ม "ทดลองใช้" บนหน้า landing
+
+ลูกค้าเลือกบทบาทแล้วเข้าได้ทันทีโดยไม่ต้องใส่รหัส (`POST /api/v1/auth/demo`): เจ้าของ → `nan`, ผู้จัดการ → `ton`, แคชเชียร์ → `mind`
+บัญชี demo ขายของ แก้สินค้า ลูกค้า สต็อก และค่าใช้จ่ายได้ตามปกติ แต่ route ที่มี `@DemoBlocked()` จะตอบ 403 ได้แก่ รหัสผ่าน/โปรไฟล์ สมาชิกและ PIN billing ข้อมูลร้าน/สาขา อัปโหลด และส่งใบเสร็จทางอีเมล
+
+เปิดใช้:
+
+1. รัน seed บน DB ปลายทางหนึ่งครั้ง
+2. ตั้ง `DEMO_ENABLED=true` ที่ API และ `NEXT_PUBLIC_DEMO_ENABLED=true` ที่ web (ต้อง redeploy web)
+3. สร้าง Railway Cron service ใน project เดียวกัน (repo เดียวกัน ใช้ build command จาก `apps/api/railway.json`) เพื่อรีเซ็ตทุกคืน:
+   - Cron schedule: `0 20 * * *` (UTC = ตี 3 เวลาไทย)
+   - Start command: `node apps/api/dist/shared/database/seeds/demo.seed.js --reset`
+   - Variables: `DATABASE_URL=${{Postgres.DATABASE_URL}}`, `DB_SSL=false`
+
 ## Deployment targets
 
 | ส่วน | บริการ |

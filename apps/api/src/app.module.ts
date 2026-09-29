@@ -22,6 +22,7 @@ import { MailModule } from "@/shared/mail/mail.service";
 import { DatabaseModule } from "@/shared/database/database.module";
 import { BusinessAccessGuard } from "@/shared/guards/business-access.guard";
 import { FeatureGuard } from "@/shared/guards/feature.guard";
+import { DemoGuard } from "@/shared/guards/demo.guard";
 import { JwtAuthGuard } from "@/shared/guards/jwt-auth.guard";
 import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
@@ -74,6 +75,8 @@ import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 		// business you may act in and with what permissions.
 		{ provide: APP_GUARD, useClass: ThrottlerGuard },
 		{ provide: APP_GUARD, useClass: JwtAuthGuard },
+		// Keeps the shared demo accounts from changing what the nightly reset cannot undo.
+		{ provide: APP_GUARD, useClass: DemoGuard },
 		{ provide: APP_GUARD, useClass: BusinessAccessGuard },
 		// Last: needs the membership the access guard resolved.
 		{ provide: APP_GUARD, useClass: FeatureGuard },

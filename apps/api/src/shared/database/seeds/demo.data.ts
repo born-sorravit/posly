@@ -2,6 +2,7 @@ import type { SampleCatalog, SampleGroup } from "@/modules/catalog/sample-catalo
 import { BusinessType } from "@/shared/enums/business-type.enum";
 import { MemberRole } from "@/shared/enums/member-role.enum";
 import { ModifierSelection } from "@/shared/enums/order.enum";
+import { DEMO_EMAIL_DOMAIN } from "@/shared/utils/demo.util";
 
 /**
  * Demo shops for trying Posly without typing a menu first. Three types, so the store
@@ -11,7 +12,7 @@ import { ModifierSelection } from "@/shared/enums/order.enum";
  * Every demo account uses `@demo.posly` and every demo shop name is prefixed in the
  * accounts table below, so `seed:demo --reset` can find and remove exactly what it made.
  */
-export const DEMO_EMAIL_DOMAIN = "demo.posly";
+export { DEMO_EMAIL_DOMAIN };
 export const DEMO_PASSWORD = "Demo1234!";
 
 export interface DemoAccount {

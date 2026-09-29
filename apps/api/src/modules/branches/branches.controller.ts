@@ -4,6 +4,7 @@ import {
 	UpdateBranchDto,
 } from "@/modules/branches/dto/branch.dto";
 import { BranchesService } from "@/modules/branches/branches.service";
+import { DemoBlocked } from "@/shared/decorators/demo-blocked.decorator";
 import { CurrentMembership } from "@/shared/decorators/current-membership.decorator";
 import type { ResolvedMembership } from "@/shared/decorators/current-membership.decorator";
 import { RequirePermission } from "@/shared/decorators/require-permission.decorator";
@@ -40,6 +41,7 @@ export class BranchesController {
 	}
 
 	@Post()
+	@DemoBlocked()
 	@RequirePermission(Permission.BRANCHES_MANAGE)
 	@ApiOperation({ summary: "Add a branch" })
 	@ApiOkResponse({ type: BranchResponse })
@@ -51,6 +53,7 @@ export class BranchesController {
 	}
 
 	@Patch(":branchId")
+	@DemoBlocked()
 	@RequirePermission(Permission.BRANCHES_MANAGE)
 	@ApiOperation({ summary: "Update a branch" })
 	@ApiOkResponse({ type: BranchResponse })

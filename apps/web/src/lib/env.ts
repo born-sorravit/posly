@@ -8,4 +8,6 @@ export const env = {
 	apiBaseUrl: process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3001/api/v1",
 	siteUrl: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
 	googleClientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "",
+	/** Shows the "try the demo" buttons; the API must have DEMO_ENABLED and the demo seed. */
+	demoEnabled: process.env.NEXT_PUBLIC_DEMO_ENABLED === "true",
 } as const;
