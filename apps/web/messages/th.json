@@ -228,7 +228,12 @@
 			"labelPlaceholder": "โต๊ะ / คิว",
 			"labelPlaceholderShop": "ชื่อหรือคิว (ไม่บังคับ)",
 			"heading": "ป้ายออเดอร์"
-		}
+		},
+		"hasOptions": "มีตัวเลือก",
+		"closeCart": "ปิดตะกร้า",
+		"editOptions": "แก้ไขตัวเลือก",
+		"updateFor": "อัปเดตรายการ · {price}",
+		"edit": "แก้ไข"
 	},
 	"checkout": {
 		"title": "ชำระเงิน",
@@ -255,7 +260,25 @@
 		"newOrderLabel": "ออเดอร์ใหม่",
 		"paidTotal": "ยอดชำระ",
 		"changeDue": "เงินทอน",
-		"receiptPreview": "ตัวอย่างใบเสร็จ"
+		"receiptPreview": "ตัวอย่างใบเสร็จ",
+		"payWith": "ชำระด้วย {method}",
+		"discount": "ส่วนลด",
+		"vat": "ภาษีมูลค่าเพิ่ม",
+		"cardHint": "รูดหรือแตะบัตรที่เครื่องรับบัตรของร้าน เมื่อเครื่องขึ้นว่าสำเร็จแล้วกดยืนยัน",
+		"otherHint": "รับเงินด้วยช่องทางอื่น เช่น โอนเงินหรือคูปอง แล้วกดยืนยันเมื่อได้รับครบ",
+		"methodHint": {
+			"CASH": "คำนวณเงินทอนให้",
+			"PROMPTPAY": "QR ตามยอดชำระ",
+			"CARD": "ผ่านเครื่องรับบัตร",
+			"OTHER": "โอน คูปอง และอื่นๆ"
+		},
+		"methodShort": {
+			"CASH": "เงินสด",
+			"PROMPTPAY": "PromptPay",
+			"CARD": "บัตร",
+			"OTHER": "อื่นๆ"
+		},
+		"processing": "กำลังบันทึกการชำระเงิน…"
 	},
 	"paymentMethod": {
 		"CASH": "เงินสด",
@@ -1669,7 +1692,8 @@
 		"upgrade": "ดูแพ็กเกจ",
 		"tapToTick": "แตะรายการเพื่อติ๊กว่าทำเสร็จ",
 		"items": "{count} รายการ",
-		"polling": "อัปเดตทุก 4 วินาที"
+		"polling": "อัปเดตทุก 4 วินาที",
+		"more": "ดูเพิ่ม"
 	},
 	"receiptMail": {
 		"button": "ส่งใบเสร็จ",

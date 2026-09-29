@@ -45,6 +45,46 @@ describe("cart", () => {
 		expect(useCartStore.getState().lines[0].unitPrice).toBe(9500);
 	});
 
+	it("re-picks a line's options in place, repricing from the base price", () => {
+		const { add } = useCartStore.getState();
+		add(americano, [{ groupName: "ขนาด", optionName: "L", priceDelta: 2000 }]);
+		const key = useCartStore.getState().lines[0].key;
+		useCartStore.getState().increment(key);
+
+		const next = useCartStore.getState().updateLine(key, [{ groupName: "ขนาด", optionName: "M", priceDelta: 1000 }], "หวานน้อย");
+		const [line] = useCartStore.getState().lines;
+		expect(useCartStore.getState().lines).toHaveLength(1);
+		expect(line.key).toBe(next);
+		expect(line.unitPrice).toBe(americano.price + 1000);
+		expect(line.quantity).toBe(2);
+		expect(line.note).toBe("หวานน้อย");
+		expect(useCartStore.getState().activeKey).toBe(next);
+	});
+
+	it("merges a re-picked line into an identical one", () => {
+		const { add } = useCartStore.getState();
+		add(americano);
+		add(americano, [{ groupName: "ขนาด", optionName: "L", priceDelta: 2000 }]);
+		add(americano, [{ groupName: "ขนาด", optionName: "L", priceDelta: 2000 }]);
+		const large = useCartStore.getState().lines[1].key;
+
+		useCartStore.getState().updateLine(large, [], null);
+		const { lines } = useCartStore.getState();
+		expect(lines).toHaveLength(1);
+		expect(lines[0].quantity).toBe(3);
+		expect(lines[0].unitPrice).toBe(americano.price);
+	});
+
+	it("selects a line without changing it", () => {
+		const { add } = useCartStore.getState();
+		add(americano);
+		add(americano, [{ groupName: "ขนาด", optionName: "L", priceDelta: 2000 }]);
+		const first = useCartStore.getState().lines[0].key;
+		useCartStore.getState().setActive(first);
+		expect(useCartStore.getState().activeKey).toBe(first);
+		expect(useCartStore.getState().lines.map((l) => l.quantity)).toEqual([1, 1]);
+	});
+
 	it("drops a line when its quantity reaches zero", () => {
 		const { add } = useCartStore.getState();
 		add(americano);

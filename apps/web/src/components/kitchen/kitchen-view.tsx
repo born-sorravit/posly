@@ -10,13 +10,14 @@ import { useKitchenBoard, useKitchenMutations } from "@/hooks/use-posly";
 import { useRealtime } from "@/components/realtime/realtime";
 import { useNow } from "@/hooks/use-now";
 import { useFeature } from "@/hooks/use-workspace";
+import { TABLET_UP, useMediaQuery } from "@/hooks/use-media-query";
 import type { KitchenStatus, KitchenTicketDto } from "@/lib/api/posly";
 import { formatClock } from "@posly/utils/format";
 import { cn } from "@/lib/utils";
-import { ArrowRight, Bell, BellOff, Check, History, RotateCcw, Undo2, WifiOff } from "lucide-react";
+import { ArrowRight, Bell, BellOff, Check, ChevronDown, History, RotateCcw, Undo2, WifiOff } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useTranslations } from "next-intl";
-import { useEffect, useRef, useSyncExternalStore } from "react";
+import { type ReactNode, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 
 const COLUMNS = ["NEW", "PREPARING", "READY"] as const;
@@ -27,8 +28,9 @@ const ACTION: Record<(typeof COLUMNS)[number], "start" | "ready" | "serve"> = {
 	PREPARING: "ready",
 	READY: "serve",
 };
+// There is no info token: chart-4 is the theme's sky blue.
 const TONE: Record<(typeof COLUMNS)[number], string> = {
-	NEW: "bg-info",
+	NEW: "bg-chart-4",
 	PREPARING: "bg-warning",
 	READY: "bg-success",
 };
@@ -112,10 +114,12 @@ function Ticket({ ticket, now }: { ticket: KitchenTicketDto; now: Date }) {
 			animate={{ opacity: 1, y: 0, scale: 1 }}
 			exit={{ opacity: 0, scale: 0.96 }}
 			transition={{ duration: 0.2 }}
-			className="surface overflow-hidden rounded-2xl"
+			className="surface relative overflow-hidden rounded-2xl"
 		>
-			<header className="flex items-center gap-2 border-b px-4 py-3">
-				<span className="numeric font-bold text-lg tracking-tight">#{ticket.number}</span>
+			{/* Which column it is in, at a glance across the room. */}
+			<span aria-hidden className={cn("absolute inset-y-4 left-0 w-[3px] rounded-r-full opacity-50", TONE[column])} />
+			<header className="flex items-center gap-2 px-4 pt-3.5 pb-2">
+				<span className="numeric font-bold text-base tracking-tight">#{ticket.number}</span>
 				<span className="numeric text-muted-foreground text-xs" suppressHydrationWarning>
 					{formatClock(ticket.createdAt)}
 				</span>
@@ -124,15 +128,15 @@ function Ticket({ ticket, now }: { ticket: KitchenTicketDto; now: Date }) {
 				</span>
 			</header>
 			{ticket.serviceType || ticket.label || ticket.customerName ? (
-				<div className="flex flex-wrap items-center gap-1.5 px-4 pt-3">
+				<div className="flex flex-wrap items-center gap-1.5 px-4 pb-1">
 					{ticket.serviceType ? (
 						<span
 							className={cn(
-								"flex items-center gap-1 rounded-full px-2.5 py-1 font-semibold text-xs",
+								"flex items-center gap-1 rounded-full px-2 py-0.5 font-semibold text-[11px]",
 								ticket.serviceType === "DINE_IN"
-									? "bg-info/15 text-info"
+									? "bg-chart-4/15 text-sky-700 dark:text-chart-4"
 									: ticket.serviceType === "TAKEAWAY"
-										? "bg-warning/15 text-warning"
+										? "bg-warning/15 text-amber-700 dark:text-warning"
 										: "bg-primary/15 text-primary"
 							)}
 						>
@@ -140,13 +144,13 @@ function Ticket({ ticket, now }: { ticket: KitchenTicketDto; now: Date }) {
 							{tTag(ticket.serviceType)}
 						</span>
 					) : null}
-					{ticket.label ? <span className="font-bold text-lg leading-none">{ticket.label}</span> : null}
+					{ticket.label ? <span className="font-bold text-sm leading-none">{ticket.label}</span> : null}
 					{ticket.customerName ? (
 						<span className="ml-auto text-muted-foreground text-xs">{ticket.customerName}</span>
 					) : null}
 				</div>
 			) : null}
-			<ul className="px-2 py-2" data-tour="kitchen-ticket">
+			<ul className="px-2 pb-2" data-tour="kitchen-ticket">
 				{ticket.lines.map((line) => {
 					const ticked = line.preparedAt !== null;
 					return (
@@ -156,26 +160,28 @@ function Ticket({ ticket, now }: { ticket: KitchenTicketDto; now: Date }) {
 								onClick={() =>
 									setPrepared.mutate({ orderId: ticket.id, itemId: line.id, prepared: !ticked }, { onError })
 								}
-								className="flex w-full items-start gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-muted/60 active:bg-muted"
+								className="flex w-full items-start gap-2.5 rounded-xl px-2 py-2 text-left transition-colors hover:bg-muted/60 active:bg-muted"
 							>
 								<span
 									className={cn(
-										"mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-lg border-2 transition-colors",
+										"mt-px flex size-5 shrink-0 items-center justify-center rounded-md border-2 transition-colors",
 										ticked ? "border-success bg-success text-white" : "border-muted-foreground/30"
 									)}
 								>
-									{ticked ? <Check className="size-4" /> : null}
+									{ticked ? <Check className="size-3.5" strokeWidth={3} /> : null}
 								</span>
 								<span className={cn("min-w-0 flex-1", ticked && "text-muted-foreground line-through")}>
 									<span className="flex items-baseline gap-2">
-										<span className="numeric font-bold text-base">{line.quantity}×</span>
-										<span className="font-medium text-base">{line.name}</span>
+										<span className="numeric shrink-0 rounded-md bg-muted px-1.5 font-semibold text-xs leading-5">
+											{line.quantity}×
+										</span>
+										<span className="font-medium text-sm leading-5">{line.name}</span>
 									</span>
 									{line.modifiers.length > 0 ? (
-										<span className="block text-muted-foreground text-sm">{line.modifiers.join(" · ")}</span>
+										<span className="mt-0.5 block text-muted-foreground text-xs">{line.modifiers.join(" · ")}</span>
 									) : null}
 									{line.note ? (
-										<span className="mt-1 inline-block rounded-md bg-warning/15 px-1.5 py-0.5 font-medium text-sm text-warning">
+										<span className="mt-1 inline-block rounded-md bg-warning/15 px-1.5 py-0.5 font-medium text-amber-700 text-xs dark:text-warning">
 											{line.note}
 										</span>
 									) : null}
@@ -185,33 +191,105 @@ function Ticket({ ticket, now }: { ticket: KitchenTicketDto; now: Date }) {
 					);
 				})}
 			</ul>
-			<footer className="flex items-center gap-2 border-t bg-muted/30 px-3 py-2.5">
-				<span className="text-muted-foreground text-xs">{t("by", { name: ticket.employeeName })}</span>
-				<span className="numeric ml-auto text-muted-foreground text-xs">
-					{done}/{ticket.lines.length}
-				</span>
-				{prev ? (
+			<footer className="space-y-2.5 border-t px-4 py-3">
+				{/* How far the ticket is: fills as lines are ticked. */}
+				<div className="flex items-center gap-2">
+					<div className="h-1 flex-1 overflow-hidden rounded-full bg-muted">
+						<div
+							className="h-full rounded-full bg-success transition-[width] duration-300"
+							style={{ width: `${ticket.lines.length ? (done / ticket.lines.length) * 100 : 0}%` }}
+						/>
+					</div>
+					<span className="numeric text-muted-foreground text-xs">
+						{done}/{ticket.lines.length}
+					</span>
+				</div>
+				<div className="flex items-center gap-2">
+					<span className="min-w-0 flex-1 truncate text-muted-foreground text-xs">
+						{t("by", { name: ticket.employeeName })}
+					</span>
+					{prev ? (
+						<Button
+							variant="ghost"
+							size="icon-sm"
+							aria-label={t("back")}
+							title={t("back")}
+							onClick={() => setStatus.mutate({ orderId: ticket.id, status: prev }, { onError })}
+						>
+							<Undo2 />
+						</Button>
+					) : null}
 					<Button
-						variant="ghost"
-						size="icon-sm"
-						aria-label={t("back")}
-						title={t("back")}
-						onClick={() => setStatus.mutate({ orderId: ticket.id, status: prev }, { onError })}
+						size="sm"
+						className={cn("h-8 rounded-lg", column === "PREPARING" ? "brand-gradient" : "")}
+						variant={column === "PREPARING" ? "default" : "outline"}
+						onClick={() => setStatus.mutate({ orderId: ticket.id, status: NEXT[column] }, { onError })}
 					>
-						<Undo2 />
+						{t(ACTION[column])}
+						<ArrowRight />
 					</Button>
-				) : null}
-				<Button
-					size="sm"
-					className={cn(column === "PREPARING" ? "brand-gradient" : "")}
-					variant={column === "PREPARING" ? "default" : "outline"}
-					onClick={() => setStatus.mutate({ orderId: ticket.id, status: NEXT[column] }, { onError })}
-				>
-					{t(ACTION[column])}
-					<ArrowRight />
-				</Button>
+				</div>
 			</footer>
 		</motion.article>
+	);
+}
+
+/**
+ * A column's scrolling list that says it scrolls: the edge fades where more is hidden, and a
+ * "more below" pill jumps down. Neither shows when everything fits. The fade is a mask on the
+ * list itself, so it works on the column's translucent background.
+ */
+function ScrollColumn({ children }: { children: ReactNode }) {
+	const t = useTranslations("kitchen");
+	const scroller = useRef<HTMLDivElement>(null);
+	const content = useRef<HTMLDivElement>(null);
+	const [edges, setEdges] = useState({ above: false, below: false });
+
+	useEffect(() => {
+		const el = scroller.current;
+		if (!el) return;
+		const update = () => {
+			const above = el.scrollTop > 4;
+			const below = el.scrollTop + el.clientHeight < el.scrollHeight - 4;
+			setEdges((current) => (current.above === above && current.below === below ? current : { above, below }));
+		};
+		update();
+		el.addEventListener("scroll", update, { passive: true });
+		// Tickets arrive and leave without a scroll; re-measure when the list changes size.
+		const observer = new ResizeObserver(update);
+		observer.observe(el);
+		if (content.current) observer.observe(content.current);
+		return () => {
+			el.removeEventListener("scroll", update);
+			observer.disconnect();
+		};
+	}, []);
+
+	const fade = 48;
+	const mask = `linear-gradient(to bottom, ${edges.above ? "transparent" : "black"} 0, black ${edges.above ? fade : 0}px, black calc(100% - ${edges.below ? fade : 0}px), ${edges.below ? "transparent" : "black"} 100%)`;
+
+	return (
+		<div className="relative min-h-0 flex-1">
+			<div
+				ref={scroller}
+				className="-mx-1 h-full overflow-y-auto px-1 pb-1"
+				style={{ maskImage: mask, WebkitMaskImage: mask }}
+			>
+				<div ref={content} className="space-y-3">
+					{children}
+				</div>
+			</div>
+			{edges.below ? (
+				<button
+					type="button"
+					onClick={() => scroller.current?.scrollBy({ top: scroller.current.clientHeight * 0.8, behavior: "smooth" })}
+					className="-translate-x-1/2 absolute bottom-2 left-1/2 flex h-8 items-center gap-1 rounded-full bg-popover px-3 font-medium text-muted-foreground text-xs shadow-md ring-1 ring-border transition-colors hover:text-foreground"
+				>
+					<ChevronDown className="size-3.5" />
+					{t("more")}
+				</button>
+			) : null}
+		</div>
 	);
 }
 
@@ -281,6 +359,9 @@ export function KitchenView() {
 	// Per device, read after hydration: the server has no idea what this tablet chose.
 	const sound = useSyncExternalStore(subscribeSound, readSound, () => false);
 	const audio = useRef<AudioContext | null>(null);
+	const wide = useMediaQuery(TABLET_UP);
+	// Only the columns someone folded or unfolded by hand; the rest follow "has tickets".
+	const [openColumns, setOpenColumns] = useState<Partial<Record<(typeof COLUMNS)[number], boolean>>>({});
 	const seen = useRef<Set<string> | null>(null);
 
 	// A chime for tickets this screen has not seen before — never for the first load.
@@ -309,7 +390,9 @@ export function KitchenView() {
 
 	const open = board.data?.open ?? [];
 	return (
-		<div className="flex min-h-0 flex-1 flex-col gap-4 px-4 py-4 desktop:px-6">
+		// From tablet up the board is exactly the screen below the top bar, so each column scrolls
+		// on its own and the headings stay put; a phone stacks the columns and scrolls the page.
+		<div className="flex min-h-0 flex-1 flex-col gap-4 px-4 py-4 tablet:h-[calc(100svh-4rem-var(--demo-banner-h,0px))] tablet:flex-none desktop:px-6">
 			<div className="flex flex-wrap items-center gap-3">
 				<h1 className="font-semibold text-2xl tracking-tight">{t("title")}</h1>
 				{board.isError ? (
@@ -345,32 +428,71 @@ export function KitchenView() {
 				</div>
 			</div>
 
-			<div className="grid min-h-0 flex-1 gap-4 tablet:grid-cols-3">
+			<div className="grid min-h-0 flex-1 content-start gap-4 tablet:grid-cols-3 tablet:grid-rows-[minmax(0,1fr)] tablet:content-stretch">
 				{COLUMNS.map((column) => {
 					const tickets = open.filter((ticket) => ticket.status === column);
+					// A phone stacks the columns, so each folds away; an empty one starts folded.
+					const expanded = wide || (openColumns[column] ?? tickets.length > 0);
+					const heading = (
+						<>
+							<span className={cn("size-2.5 rounded-full", TONE[column])} />
+							{t(`columns.${column}`)}
+							<span className="numeric ml-auto rounded-full bg-card px-2.5 py-0.5 text-sm shadow-xs">
+								{tickets.length}
+							</span>
+						</>
+					);
+					const body = board.isPending ? (
+						<Skeleton className="h-40 rounded-2xl" />
+					) : tickets.length === 0 ? (
+						<p className="px-2 py-10 text-center text-muted-foreground text-sm">{t(`empty.${column}`)}</p>
+					) : (
+						<AnimatePresence initial={false} mode="popLayout">
+							{tickets.map((ticket) => (
+								<Ticket key={ticket.id} ticket={ticket} now={now} />
+							))}
+						</AnimatePresence>
+					);
 					return (
 						<section key={column} className="flex min-h-0 flex-col rounded-3xl bg-muted/40 p-3">
 							{/* The tour points at the first column's heading: the whole board is taller than the screen. */}
-							<h2 className="mb-3 flex items-center gap-2 px-1 font-semibold" data-tour="kitchen-columns">
-								<span className={cn("size-2.5 rounded-full", TONE[column])} />
-								{t(`columns.${column}`)}
-								<span className="numeric ml-auto rounded-full bg-card px-2.5 py-0.5 text-sm shadow-xs">
-									{tickets.length}
-								</span>
-							</h2>
-							<div className="-mx-1 min-h-0 flex-1 space-y-3 overflow-y-auto px-1 pb-1">
-								{board.isPending ? (
-									<Skeleton className="h-40 rounded-2xl" />
-								) : tickets.length === 0 ? (
-									<p className="px-2 py-10 text-center text-muted-foreground text-sm">{t(`empty.${column}`)}</p>
-								) : (
-									<AnimatePresence initial={false} mode="popLayout">
-										{tickets.map((ticket) => (
-											<Ticket key={ticket.id} ticket={ticket} now={now} />
-										))}
-									</AnimatePresence>
-								)}
-							</div>
+							{wide ? (
+								<h2 className="mb-3 flex items-center gap-2 px-1 font-semibold" data-tour="kitchen-columns">
+									{heading}
+								</h2>
+							) : (
+								<h2 data-tour="kitchen-columns">
+									<button
+										type="button"
+										aria-expanded={expanded}
+										onClick={() => setOpenColumns((current) => ({ ...current, [column]: !expanded }))}
+										className="flex w-full items-center gap-2 rounded-xl px-1 py-0.5 text-left font-semibold"
+									>
+										{heading}
+										<motion.span animate={{ rotate: expanded ? 180 : 0 }} transition={{ duration: 0.2 }}>
+											<ChevronDown className="size-4 text-muted-foreground" />
+										</motion.span>
+									</button>
+								</h2>
+							)}
+							{wide ? (
+								<ScrollColumn>{body}</ScrollColumn>
+							) : (
+								<AnimatePresence initial={false}>
+									{expanded ? (
+										<motion.div
+											key="body"
+											initial={{ height: 0, opacity: 0 }}
+											animate={{ height: "auto", opacity: 1 }}
+											exit={{ height: 0, opacity: 0 }}
+											transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+											className="overflow-hidden"
+										>
+											<div className="space-y-3 pt-3">{body}</div>
+										</motion.div>
+									) : null}
+								</AnimatePresence>
+							)}
 						</section>
 					);
 				})}

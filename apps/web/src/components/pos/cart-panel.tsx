@@ -24,6 +24,7 @@ import {
 	Minus,
 	Plus,
 	ShoppingBasket,
+	SlidersHorizontal,
 	StickyNote,
 	Trash2,
 	TriangleAlert,
@@ -104,8 +105,9 @@ function NoteEditor({ line, onDone }: { line: CartLine; onDone: () => void }) {
 	);
 }
 
-export function CartItem({ line, active }: { line: CartLine; active: boolean }) {
+export function CartItem({ line, active, onEdit }: { line: CartLine; active: boolean; onEdit?: () => void }) {
 	const t = useTranslations("pos");
+	const setActive = useCartStore((state) => state.setActive);
 	const increment = useCartStore((state) => state.increment);
 	const decrement = useCartStore((state) => state.decrement);
 	const remove = useCartStore((state) => state.remove);
@@ -129,9 +131,12 @@ export function CartItem({ line, active }: { line: CartLine; active: boolean }) 
 			animate={{ opacity: 1, y: 0 }}
 			exit={{ opacity: 0, x: 24, transition: { duration: 0.15 } }}
 			transition={{ duration: 0.18 }}
+			// Tapping anywhere on the line selects it: the highlight and the +/- keys follow.
+			onClick={() => setActive(line.key)}
 			className={cn(
-				"flex gap-3 rounded-2xl p-2.5 transition-colors",
-				active ? "bg-accent/60" : "hover:bg-muted/60"
+				// Inset: the list scrolls, and an outer ring on the first line was clipped at its top.
+				"flex cursor-pointer gap-3 rounded-2xl p-2.5 ring-1 ring-inset transition-colors",
+				active ? "bg-accent/60 ring-primary/40" : "ring-transparent hover:bg-muted/60"
 			)}
 		>
 			<ProductThumb art={line.art} name={line.name} className="size-12" rounded="rounded-xl" />
@@ -139,9 +144,7 @@ export function CartItem({ line, active }: { line: CartLine; active: boolean }) 
 				<div className="flex items-start justify-between gap-2">
 					<div className="min-w-0">
 						<p className="truncate font-medium text-sm leading-tight">{line.name}</p>
-						<p className="truncate text-muted-foreground text-xs">
-							{detail || formatBaht(line.unitPrice)}
-						</p>
+						<p className="mt-1 truncate text-muted-foreground text-xs">{detail || formatBaht(line.unitPrice)}</p>
 					</div>
 					<p className="numeric shrink-0 font-semibold text-sm">
 						{formatBaht(multiply(line.unitPrice, line.quantity))}
@@ -162,6 +165,23 @@ export function CartItem({ line, active }: { line: CartLine; active: boolean }) 
 							<Plus className="size-3.5" />
 						</QtyButton>
 					</div>
+					<div className="flex items-center gap-1">
+					{onEdit ? (
+						// A real button beside the quantity, not a pencil on the small option text.
+						<Button
+							variant="outline"
+							size="sm"
+							className="h-8 gap-1.5 rounded-lg px-2.5 text-xs"
+							onClick={(event) => {
+								event.stopPropagation();
+								setActive(line.key);
+								onEdit();
+							}}
+						>
+							<SlidersHorizontal className="size-3.5" />
+							{t("edit")}
+						</Button>
+					) : null}
 					<DropdownMenu>
 						<DropdownMenuTrigger asChild>
 							<Button variant="ghost" size="icon-sm" aria-label={t("itemActions")}>
@@ -169,6 +189,12 @@ export function CartItem({ line, active }: { line: CartLine; active: boolean }) 
 							</Button>
 						</DropdownMenuTrigger>
 						<DropdownMenuContent align="end" className="w-44">
+							{onEdit ? (
+								<DropdownMenuItem onClick={onEdit}>
+									<SlidersHorizontal className="size-4" />
+									{t("editOptions")}
+								</DropdownMenuItem>
+							) : null}
 							<DropdownMenuItem onClick={() => setEditingNote(true)}>
 								<StickyNote className="size-4" />
 								{t("note")}
@@ -179,6 +205,7 @@ export function CartItem({ line, active }: { line: CartLine; active: boolean }) 
 							</DropdownMenuItem>
 						</DropdownMenuContent>
 					</DropdownMenu>
+					</div>
 				</div>
 				{short ? (
 					<p className="text-danger text-xs">{t("stockShort", { count: line.quantity + (remaining ?? 0) })}</p>
@@ -202,11 +229,16 @@ export function CartPanel({
 	totals,
 	vatBasisPoints,
 	onCheckout,
+	canEdit,
+	onEditLine,
 	className,
 }: {
 	totals: CartTotals;
 	vatBasisPoints: number;
 	onCheckout: () => void;
+	/** Whether a line's options can be re-picked (its product is on the menu with options). */
+	canEdit?: (line: CartLine) => boolean;
+	onEditLine?: (line: CartLine) => void;
 	className?: string;
 }) {
 	const t = useTranslations("pos");
@@ -250,10 +282,15 @@ export function CartPanel({
 						className="py-12"
 					/>
 				) : (
-					<ul className="grid gap-1 pb-2">
+					<ul className="grid gap-1 pt-1 pb-2">
 						<AnimatePresence initial={false}>
 							{lines.map((line) => (
-								<CartItem key={line.key} line={line} active={line.key === activeKey} />
+								<CartItem
+									key={line.key}
+									line={line}
+									active={line.key === activeKey}
+									onEdit={onEditLine && canEdit?.(line) ? () => onEditLine(line) : undefined}
+								/>
 							))}
 						</AnimatePresence>
 					</ul>

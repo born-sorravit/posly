@@ -1,8 +1,7 @@
 "use client";
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@posly/ui/components/tooltip";
-import { usePathname } from "@/i18n/navigation";
-import { cn } from "@/lib/utils";
+import { Button } from "@posly/ui/components/button";
 import { Maximize, Minimize } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useSyncExternalStore } from "react";
@@ -30,19 +29,15 @@ const subscribe = (onChange: () => void) => {
 };
 
 /**
- * Full screen for the whole app, for a till that should show nothing but the POS: a small
- * round button floating at the bottom right, out of the header's way.
- *
- * On the POS the bottom right is the cart's pay button, so there it sits at the bottom right
- * of the product grid instead, clear of the cart panel (340px, 392px on desktop). Phones get
- * no button — they have a tab bar there and little use for it.
+ * Full screen for the whole app, for a till that should show nothing but the POS. An icon in
+ * the top bar beside theme and notifications: the same place on every screen, and never over
+ * a product card or the cart's pay button the way a floating corner button was. Phones get no
+ * button — little use for it, and no room in their top bar.
  *
  * The state is read from the document, so leaving with Esc or the browser's own control keeps
  * the icon right. Hidden where the browser has no fullscreen (Safari on iPhone).
  */
 export function FullscreenToggle() {
-	const pathname = usePathname();
-	const onPos = pathname === "/pos" || pathname.startsWith("/pos/");
 	const t = useTranslations("header");
 	const canFullscreen = useSyncExternalStore(subscribe, supported, () => false);
 	const isFullscreen = useSyncExternalStore(subscribe, current, () => false);
@@ -66,20 +61,18 @@ export function FullscreenToggle() {
 	return (
 		<Tooltip>
 			<TooltipTrigger asChild>
-				<button
-					type="button"
+				<Button
+					variant="ghost"
+					size="icon-lg"
 					aria-label={label}
 					aria-pressed={isFullscreen}
 					onClick={toggle}
-					className={cn(
-						"surface fixed bottom-5 z-40 hidden size-11 items-center justify-center rounded-full text-muted-foreground backdrop-blur transition-[color,transform,right] hover:scale-105 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 tablet:flex",
-						onPos ? "right-[calc(340px+1.25rem)] desktop:right-[calc(392px+1.25rem)]" : "right-5"
-					)}
+					className="hidden text-muted-foreground hover:text-foreground tablet:inline-flex"
 				>
-					{isFullscreen ? <Minimize className="size-[18px]" /> : <Maximize className="size-[18px]" />}
-				</button>
+					{isFullscreen ? <Minimize className="size-5" /> : <Maximize className="size-5" />}
+				</Button>
 			</TooltipTrigger>
-			<TooltipContent side="left">{label}</TooltipContent>
+			<TooltipContent side="bottom">{label}</TooltipContent>
 		</Tooltip>
 	);
 }

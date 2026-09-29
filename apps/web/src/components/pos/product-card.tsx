@@ -40,7 +40,7 @@ export const ProductCard = memo(function ProductCard({
 			disabled={soldOut || allInCart}
 			onClick={() => onSelect(product)}
 			className={cn(
-				"surface surface-hover group touch-target relative flex flex-col gap-2 rounded-2xl p-2 text-left",
+				"surface surface-hover group touch-target @container relative flex flex-col gap-2 rounded-2xl p-2 text-left",
 				"hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 disabled:active:scale-100",
 				"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
 			)}
@@ -77,7 +77,25 @@ export const ProductCard = memo(function ProductCard({
 			<div className="flex items-end justify-between gap-2 px-1 pb-0.5">
 				<div className="min-w-0">
 					<p className="truncate font-medium text-sm leading-snug">{product.name}</p>
-					<p className="numeric font-semibold text-sm">{formatBaht(product.price)}</p>
+					<p className="flex min-w-0 items-baseline gap-1.5 text-sm">
+						<span className="numeric shrink-0 font-semibold">{formatBaht(product.price)}</span>
+						{/* On the price line, so the picture stays clear and the card no taller: a
+						    choice (size, sweetness…) comes before it goes in the cart. */}
+						{hasOptions ? (
+							// Words where the card has room for them, a small icon where it does not,
+							// so it never truncates to "มีตัวเ…".
+							// 9.5rem is where "฿80 · มีตัวเลือก" fits beside the add button (phones, 1024,
+							// 1440 and up); the grid is narrower beside the cart at 768 and 1280.
+							<span
+								className="flex min-w-0 items-center gap-1 text-muted-foreground text-xs"
+								title={t("hasOptions")}
+							>
+								<span aria-hidden>·</span>
+								<SlidersHorizontal className="size-3 shrink-0 @min-[9.5rem]:hidden" aria-hidden />
+								<span className="sr-only @min-[9.5rem]:not-sr-only @min-[9.5rem]:truncate">{t("hasOptions")}</span>
+							</span>
+						) : null}
+					</p>
 				</div>
 				<span
 					className={cn(
@@ -86,7 +104,9 @@ export const ProductCard = memo(function ProductCard({
 					)}
 					aria-hidden
 				>
-					{hasOptions ? <SlidersHorizontal className="size-3.5" /> : <Plus className="size-4" />}
+					{/* One action for every card: it adds. The price line says whether a choice
+					    comes first. */}
+					<Plus className="size-4" />
 				</span>
 			</div>
 		</button>

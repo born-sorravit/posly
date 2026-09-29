@@ -12,7 +12,7 @@ import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@posly/ui/com
 import { useCategories, useCheckout, useProducts } from "@/hooks/use-posly";
 import { useActiveBusiness } from "@/hooks/use-workspace";
 import { formatBaht, type Satang } from "@posly/utils/money";
-import { computeTotals, remainingStock, useCartStore } from "@/stores/cart-store";
+import { type CartLine, computeTotals, remainingStock, useCartStore } from "@/stores/cart-store";
 import type { OrderItemModifier, PaymentMethod, Product } from "@posly/types/domain";
 import { PackageSearch, ShoppingBasket } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
@@ -46,6 +46,8 @@ export function PosScreen() {
 	const [category, setCategory] = useState<string>(ALL);
 	const [query, setQuery] = useState("");
 	const [customising, setCustomising] = useState<Product | null>(null);
+	// The cart line whose options are being re-picked; null when the dialog adds a new one.
+	const [editingLine, setEditingLine] = useState<CartLine | null>(null);
 	const [checkoutOpen, setCheckoutOpen] = useState(false);
 	const [cartOpen, setCartOpen] = useState(false);
 	// One clientOrderId per checkout session: retries replay it, the next order gets a new one.
@@ -71,16 +73,18 @@ export function PosScreen() {
 
 	const products = useMemo(() => {
 		const q = query.trim().toLowerCase();
-		const visible = new Set(categories.map((c) => c.id));
+		// Only once the categories are in: before that an empty list would read as "every
+		// category hidden" and empty the till, and a failed load should not hide the menu.
+		const visible = categoriesQuery.data ? new Set(categories.map((c) => c.id)) : null;
 		return (productsQuery.data ?? []).filter(
 			(p) =>
 				p.isActive &&
 				// A hidden category hides its products from the till too.
-				(!p.categoryId || visible.has(p.categoryId)) &&
+				(!p.categoryId || !visible || visible.has(p.categoryId)) &&
 				(category === ALL || p.categoryId === category) &&
 				(!q || p.name.toLowerCase().includes(q) || p.sku?.toLowerCase().includes(q) || p.barcode === q)
 		);
-	}, [category, query, categories, productsQuery.data]);
+	}, [category, query, categories, categoriesQuery.data, productsQuery.data]);
 
 	// Keep the cart's ceilings in step with the latest shelf counts from the API.
 	const syncStock = useCartStore((state) => state.syncStock);
@@ -109,10 +113,28 @@ export function PosScreen() {
 		[add, warnLimit]
 	);
 
+	const updateLine = useCartStore((state) => state.updateLine);
 	const confirmModifiers = (product: Product, modifiers: OrderItemModifier[], note: string | null) => {
-		if (add(product, modifiers, note) === "limit") warnLimit(product.name, product.stock ?? 0);
+		if (editingLine) updateLine(editingLine.key, modifiers, note);
+		else if (add(product, modifiers, note) === "limit") warnLimit(product.name, product.stock ?? 0);
 		setCustomising(null);
+		setEditingLine(null);
 	};
+
+	// Lines whose product is still on the menu with options can be re-picked from the cart.
+	const productFor = useCallback(
+		(line: CartLine) => productsQuery.data?.find((p) => p.id === line.productId && p.modifierGroups.length > 0),
+		[productsQuery.data]
+	);
+	const editLine = useCallback(
+		(line: CartLine) => {
+			const product = productFor(line);
+			if (!product) return;
+			setEditingLine(line);
+			setCustomising(product);
+		},
+		[productFor]
+	);
 
 	const inCart = useMemo(() => {
 		const counts = new Map<string, number>();
@@ -216,6 +238,8 @@ export function PosScreen() {
 			totals={totals}
 			vatBasisPoints={business.vatBasisPoints}
 			onCheckout={openCheckout}
+			canEdit={(line) => Boolean(productFor(line))}
+			onEditLine={editLine}
 			className="h-full"
 		/>
 	);
@@ -223,7 +247,7 @@ export function PosScreen() {
 	return (
 		// Phone: the header (4rem) and the fixed bottom nav (4rem + safe area) are both on screen,
 		// and the shell's bottom padding is cancelled so the page itself never scrolls.
-		<div className="-mb-24 flex h-[calc(100svh-8rem-env(safe-area-inset-bottom))] overflow-hidden tablet:mb-0 tablet:h-[calc(100svh-4rem)]">
+		<div className="-mb-24 flex h-[calc(100svh-8rem-env(safe-area-inset-bottom)-var(--demo-banner-h,0px))] overflow-hidden tablet:mb-0 tablet:h-[calc(100svh-4rem-var(--demo-banner-h,0px))]">
 			<section className="flex min-w-0 flex-1 flex-col">
 				<div className="space-y-3 px-4 pt-4 pb-3 desktop:px-6">
 					<div data-tour="pos-search">
@@ -251,7 +275,8 @@ export function PosScreen() {
 				</div>
 
 				<div className="min-h-0 flex-1 overflow-y-auto px-4 pb-24 tablet:pb-6 desktop:px-6">
-					{productsQuery.isPending ? (
+					{/* Both: the menu is filtered by category visibility, so it is not ready without them. */}
+					{productsQuery.isPending || categoriesQuery.isPending ? (
 						<div className="grid grid-cols-2 gap-3 tablet:grid-cols-3 desktop:grid-cols-4">
 							{Array.from({ length: 8 }, (_, i) => (
 								// biome-ignore lint/suspicious/noArrayIndexKey: static placeholders
@@ -308,7 +333,21 @@ export function PosScreen() {
 			</AnimatePresence>
 
 			<Sheet open={cartOpen} onOpenChange={setCartOpen}>
-				<SheetContent side="bottom" className="h-[88svh] gap-0 rounded-t-3xl p-0">
+				{/* No corner ✕: it sat on the cart's own clear button. The handle closes it, as do a tap
+				    outside and Esc. */}
+				<SheetContent
+					side="bottom"
+					showCloseButton={false}
+					className="gap-0 rounded-t-3xl p-0 data-[side=bottom]:max-h-[88svh]"
+				>
+					<button
+						type="button"
+						onClick={() => setCartOpen(false)}
+						aria-label={t("closeCart")}
+						className="flex h-6 w-full shrink-0 items-center justify-center"
+					>
+						<span className="h-1 w-10 rounded-full bg-muted-foreground/30" />
+					</button>
 					<SheetTitle className="sr-only">{t("currentOrder")}</SheetTitle>
 					<SheetDescription className="sr-only">{t("currentOrder")}</SheetDescription>
 					{cart}
@@ -317,7 +356,12 @@ export function PosScreen() {
 
 			<ModifierDialog
 				product={customising}
-				onOpenChange={(open) => !open && setCustomising(null)}
+				editing={editingLine ? { modifiers: editingLine.modifiers, note: editingLine.note } : undefined}
+				onOpenChange={(open) => {
+					if (open) return;
+					setCustomising(null);
+					setEditingLine(null);
+				}}
 				onConfirm={confirmModifiers}
 			/>
 

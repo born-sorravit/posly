@@ -478,7 +478,8 @@ const DOT: Record<Tone | "neutral", string> = {
 	success: "bg-success",
 	warning: "bg-warning",
 	danger: "bg-danger",
-	info: "bg-info",
+	// There is no info token; chart-4 is the sky blue the badges use for "info".
+	info: "bg-chart-4",
 	primary: "bg-primary",
 	neutral: "bg-muted-foreground/60",
 };

@@ -61,6 +61,13 @@ interface CartState {
 	decrement: (key: string) => void;
 	remove: (key: string) => void;
 	setNote: (key: string, note: string | null) => void;
+	/** Makes a line the one +/- and the highlight act on, without changing it. */
+	setActive: (key: string) => void;
+	/**
+	 * Re-picks a line's options (and note) in place. If that makes it identical to another
+	 * line, the two merge, quantities added. Returns the line's key afterwards.
+	 */
+	updateLine: (key: string, modifiers: OrderItemModifier[], note: string | null) => string;
 	setDiscount: (discount: Discount | null) => void;
 	/** The customer this sale is for (plan §22); cleared with the cart. */
 	customer: { id: string; name: string } | null;
@@ -171,6 +178,27 @@ export const useCartStore = create<CartState>((set, get) => ({
 			const lines = state.lines.filter((line) => line.key !== key);
 			return { lines, activeKey: lines.at(-1)?.key ?? null };
 		}),
+
+	setActive: (key) => set({ activeKey: key }),
+
+	updateLine: (key, modifiers, note) => {
+		const line = get().lines.find((l) => l.key === key);
+		if (!line) return key;
+		const nextKey = lineKey(line.productId, modifiers, note);
+		// The line keeps only its total unit price; take the old options off to find the base.
+		const base = line.unitPrice - sum(...line.modifiers.map((m) => m.priceDelta));
+		const unitPrice = sum(base, ...modifiers.map((m) => m.priceDelta));
+		set((state) => {
+			const twin = nextKey !== key ? state.lines.find((l) => l.key === nextKey) : undefined;
+			const lines = twin
+				? state.lines
+						.filter((l) => l.key !== key)
+						.map((l) => (l.key === nextKey ? { ...l, quantity: l.quantity + line.quantity } : l))
+				: state.lines.map((l) => (l.key === key ? { ...l, key: nextKey, modifiers, note, unitPrice } : l));
+			return { lines, activeKey: nextKey };
+		});
+		return nextKey;
+	},
 
 	setNote: (key, note) =>
 		set((state) => ({

@@ -3,6 +3,7 @@
 import { SidebarBody, SidebarToggle } from "@/components/layout/app-sidebar";
 import { useCommandMenu } from "@/components/layout/command-menu";
 import { NotificationsButton } from "@/components/layout/notifications-button";
+import { FullscreenToggle } from "@/components/layout/fullscreen-toggle";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { PageTourButton } from "@/components/tour/product-tour";
 import { UserMenu } from "@/components/layout/user-menu";
@@ -85,6 +86,7 @@ export function AppHeader() {
 				</div>
 
 				<PageTourButton />
+				<FullscreenToggle />
 				<ThemeToggle />
 
 				<div className="hidden tablet:block">

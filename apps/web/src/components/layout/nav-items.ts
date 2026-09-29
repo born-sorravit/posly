@@ -49,8 +49,8 @@ export const NAV_PERMISSION: Record<NavKey, string> = {
 		(
 			[
 				["pos", "/pos"],
-				["orders", "/orders"],
 				["kitchen", "/kitchen"],
+				["orders", "/orders"],
 				["products", "/products"],
 				["categories", "/categories"],
 				["modifiers", "/modifiers"],
@@ -87,8 +87,8 @@ export const NAV_SECTIONS: NavSection[] = [
 		items: [
 			{ key: "overview", href: "/dashboard", icon: LayoutGrid },
 			{ key: "pos", href: "/pos", icon: ShoppingCart },
-			{ key: "orders", href: "/orders", icon: ReceiptText },
 			{ key: "kitchen", href: "/kitchen", icon: ChefHat },
+			{ key: "orders", href: "/orders", icon: ReceiptText },
 		],
 	},
 	{

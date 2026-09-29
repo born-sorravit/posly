@@ -7,7 +7,6 @@ import { RouteGate } from "@/components/common/permission-gate";
 import { AppHeader } from "@/components/layout/app-header";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { CommandMenu } from "@/components/layout/command-menu";
-import { FullscreenToggle } from "@/components/layout/fullscreen-toggle";
 import { ProductTour } from "@/components/tour/product-tour";
 import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav";
 import { WorkspaceProvider } from "@/components/providers/workspace-provider";
@@ -91,7 +90,6 @@ export function AppShell({
 				</div>
 				<MobileBottomNav />
 				<CommandMenu />
-				<FullscreenToggle />
 				<ProductTour />
 				<SwitchUserScreen />
 				<RealtimeBridge />

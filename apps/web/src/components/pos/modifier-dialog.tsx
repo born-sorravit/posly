@@ -62,16 +62,35 @@ function OptionPill({
 	);
 }
 
+/** A cart line being re-picked: what it has now, to start the choices from. */
+export interface EditingLine {
+	modifiers: OrderItemModifier[];
+	note: string | null;
+}
+
+/** The line's own choices, grouped the way the dialog keeps them. */
+const fromLine = (groups: ModifierGroup[], modifiers: OrderItemModifier[]): Selection =>
+	Object.fromEntries(
+		groups.map((g) => [
+			g.id,
+			g.options.filter((o) => modifiers.some((m) => m.optionId === o.id)).map((o) => o.id),
+		])
+	);
+
 function ModifierBody({
 	product,
+	editing,
 	onConfirm,
 }: {
 	product: Product;
+	editing?: EditingLine;
 	onConfirm: (modifiers: OrderItemModifier[], note: string | null) => void;
 }) {
 	const t = useTranslations("pos");
-	const [selection, setSelection] = useState<Selection>(() => defaults(product.modifierGroups));
-	const [note, setNote] = useState("");
+	const [selection, setSelection] = useState<Selection>(() =>
+		editing ? fromLine(product.modifierGroups, editing.modifiers) : defaults(product.modifierGroups)
+	);
+	const [note, setNote] = useState(editing?.note ?? "");
 
 	const chosen: OrderItemModifier[] = useMemo(
 		() =>
@@ -159,7 +178,7 @@ function ModifierBody({
 					className="brand-gradient h-13 w-full rounded-xl font-semibold text-base"
 					onClick={() => onConfirm(chosen, note.trim() || null)}
 				>
-					{t("addFor", { price: formatBaht(price) })}
+					{editing ? t("updateFor", { price: formatBaht(price) }) : t("addFor", { price: formatBaht(price) })}
 				</Button>
 			</div>
 		</div>
@@ -172,10 +191,13 @@ function ModifierBody({
  */
 export function ModifierDialog({
 	product,
+	editing,
 	onOpenChange,
 	onConfirm,
 }: {
 	product: Product | null;
+	/** Set when re-picking a line already in the cart rather than adding a new one. */
+	editing?: EditingLine;
 	onOpenChange: (open: boolean) => void;
 	onConfirm: (product: Product, modifiers: OrderItemModifier[], note: string | null) => void;
 }) {
@@ -185,8 +207,10 @@ export function ModifierDialog({
 
 	const body = product ? (
 		<ModifierBody
-			key={product.id}
+			// A new key per line edited, so its choices load fresh rather than the last ones.
+			key={`${product.id}:${editing ? JSON.stringify(editing) : "new"}`}
 			product={product}
+			editing={editing}
 			onConfirm={(modifiers, note) => onConfirm(product, modifiers, note)}
 		/>
 	) : null;

@@ -12,12 +12,12 @@ import { Receipt } from "@/components/receipt/receipt";
 import { usePrintReceipt } from "@/components/receipt/print-receipt";
 import { useActiveBusiness } from "@/hooks/use-workspace";
 import type { PaymentMethod } from "@posly/types/domain";
-import { Check, Delete, Printer, ShoppingCart } from "lucide-react";
+import { Check, Delete, Loader2, Printer, ShoppingCart } from "lucide-react";
 import { SendReceiptButton } from "@/components/receipt/send-receipt";
 import { AnimatePresence, motion } from "motion/react";
 import { useTranslations } from "next-intl";
 import { QRCodeSVG } from "qrcode.react";
-import { useEffect, useState } from "react";
+import { type ReactNode, createContext, useContext, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 export interface CompletedPayment {
@@ -32,7 +32,11 @@ export interface CompletedPayment {
 
 const METHODS: PaymentMethod[] = ["CASH", "PROMPTPAY", "CARD", "OTHER"];
 
-function MethodCard({
+/**
+ * One way to pay, as a row: icon, name and what it does. Rows rather than tiles, so a long name
+ * ("บัตรเครดิต/เดบิต") fits and the four read as a list to pick from.
+ */
+function MethodRow({
 	method,
 	selected,
 	onSelect,
@@ -42,6 +46,8 @@ function MethodCard({
 	onSelect: () => void;
 }) {
 	const t = useTranslations("paymentMethod");
+	const tHint = useTranslations("checkout.methodHint");
+	const tShort = useTranslations("checkout.methodShort");
 	const Icon = PAYMENT_ICON[method];
 	return (
 		<button
@@ -50,15 +56,89 @@ function MethodCard({
 			aria-checked={selected}
 			onClick={onSelect}
 			className={cn(
-				"touch-target flex h-20 flex-col items-center justify-center gap-1.5 rounded-2xl font-medium text-sm ring-1 transition-colors",
-				selected
-					? "bg-primary text-primary-foreground shadow-md ring-primary"
-					: "bg-card text-foreground ring-border hover:bg-muted"
+				// A phone lays the four out in one row, icon over name; from tablet up, a list.
+				"touch-target flex w-full flex-col items-center gap-1.5 rounded-2xl p-2 text-center ring-1 transition-colors",
+				"tablet:flex-row tablet:gap-3 tablet:p-2.5 tablet:text-left",
+				selected ? "bg-primary/10 ring-2 ring-primary" : "bg-card ring-border hover:bg-muted"
 			)}
 		>
-			<Icon className="size-5" />
-			{t(method)}
+			<span
+				className={cn(
+					"flex size-10 shrink-0 items-center justify-center rounded-xl transition-colors",
+					selected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+				)}
+			>
+				<Icon className="size-5" />
+			</span>
+			<span className="min-w-0 tablet:flex-1">
+				{/* A phone's tile is a quarter of the width: the short name ("บัตร"), full from tablet up. */}
+				<span className="block truncate font-medium text-xs tablet:hidden">{tShort(method)}</span>
+				<span className="hidden truncate font-medium text-sm tablet:block">{t(method)}</span>
+				<span className="hidden truncate text-muted-foreground text-xs tablet:block">{tHint(method)}</span>
+			</span>
+			{selected ? <Check className="hidden size-4 shrink-0 text-primary tablet:block" /> : null}
 		</button>
+	);
+}
+
+/**
+ * Every method's pane has the same frame: what is being taken, the working area in the middle,
+ * and the one confirming action pinned at the bottom — same place, same size, whichever method.
+ */
+function PaneShell({
+	title,
+	children,
+	action,
+	center = false,
+}: {
+	title: ReactNode;
+	children: ReactNode;
+	action: ReactNode;
+	center?: boolean;
+}) {
+	return (
+		<div className="flex h-full min-h-0 flex-1 flex-col">
+			<p className="px-5 pt-4 font-semibold text-base tablet:px-6 tablet:pt-6 tablet:text-lg">{title}</p>
+			<div
+				className={cn(
+					"pane-body flex min-h-0 flex-1 flex-col overflow-y-auto px-5 py-4 transition-opacity tablet:px-6 tablet:py-5",
+					center && "items-center justify-center text-center"
+				)}
+			>
+				{children}
+			</div>
+			{/* Pinned: on a phone the dialog scrolls as one, and the button must not scroll away. */}
+			<div className="sticky bottom-0 z-10 border-t bg-popover px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] tablet:static tablet:bg-muted/30 tablet:px-6 tablet:pt-4 tablet:pb-4">
+				{action}
+			</div>
+		</div>
+	);
+}
+
+/** Whether the API is taking the payment; every pane's confirm button reads it. */
+const PayingContext = createContext(false);
+
+/**
+ * The one confirming action, same in every pane. While the API answers it keeps its full colour
+ * (the rest of the pane dims) and says what is happening, so a slow network reads as working,
+ * not as a tap that did nothing.
+ */
+function ConfirmButton({ label, onClick, disabled = false }: { label: string; onClick?: () => void; disabled?: boolean }) {
+	const t = useTranslations("checkout");
+	const paying = useContext(PayingContext);
+	return (
+		<Button
+			disabled={disabled || paying}
+			onClick={onClick}
+			aria-busy={paying}
+			className={cn(
+				"brand-gradient h-14 w-full rounded-2xl font-semibold text-base",
+				paying && "disabled:opacity-100"
+			)}
+		>
+			{paying ? <Loader2 className="size-5 animate-spin" /> : <Check className="size-5" />}
+			{paying ? t("processing") : label}
+		</Button>
 	);
 }
 
@@ -73,6 +153,7 @@ function CashPane({
 	onConfirm: (received: Satang) => void;
 }) {
 	const t = useTranslations("checkout");
+	const tMethod = useTranslations("paymentMethod");
 	const [typed, setTyped] = useState("");
 	const quick = quickCashAmounts(total);
 	const received = typed ? fromBaht(Number.parseFloat(typed) || 0) : total;
@@ -88,10 +169,28 @@ function CashPane({
 		});
 
 	return (
-		<div className="flex h-full flex-col gap-4">
-			<div>
-				<p className="mb-2 font-medium text-muted-foreground text-sm">{t("receivedAmount")}</p>
-				<div className="grid grid-cols-2 gap-2 tablet:grid-cols-4">
+		<PaneShell
+			title={t("payWith", { method: tMethod("CASH") })}
+			action={
+				<ConfirmButton disabled={!enough} onClick={() => onConfirm(received)} label={t("confirm")} />
+			}
+		>
+			<div className="flex flex-col gap-3 tablet:gap-4">
+				{/* What was handed over, and what goes back: the two numbers the cashier reads. */}
+				<div className="grid grid-cols-2 gap-3">
+					<div className="rounded-2xl bg-muted/60 px-4 py-3 tablet:p-4">
+						<p className="text-muted-foreground text-xs">{t("receivedAmount")}</p>
+						<p className="numeric mt-1 font-semibold text-xl tracking-tight tablet:text-2xl">{formatBaht(received)}</p>
+					</div>
+					<div className={cn("rounded-2xl px-4 py-3 ring-1 tablet:p-4", enough ? "bg-success/10 ring-success/30" : "bg-danger/10 ring-danger/30")}>
+						<p className={cn("text-xs", enough ? "text-success" : "text-danger")}>{t("change")}</p>
+						<p className={cn("numeric mt-1 font-bold text-xl tracking-tight tablet:text-2xl", enough ? "text-success" : "text-danger")}>
+							{formatBaht(change)}
+						</p>
+					</div>
+				</div>
+
+				<div className="grid grid-cols-4 gap-2">
 					{quick.map((amount) => {
 						const active = typed === "" ? amount === total : received === amount;
 						return (
@@ -100,8 +199,8 @@ function CashPane({
 								type="button"
 								onClick={() => setTyped(String(amount / 100))}
 								className={cn(
-									"touch-target numeric h-12 rounded-xl font-semibold ring-1 transition-colors",
-									active ? "bg-accent text-accent-foreground ring-primary" : "bg-card ring-border hover:bg-muted"
+									"touch-target numeric h-11 rounded-xl font-semibold text-sm ring-1 transition-colors",
+									active ? "bg-primary/10 text-primary ring-2 ring-primary" : "bg-card ring-border hover:bg-muted"
 								)}
 							>
 								{formatBaht(amount)}
@@ -109,9 +208,7 @@ function CashPane({
 						);
 					})}
 				</div>
-			</div>
 
-			<div className="grid flex-1 grid-cols-[1fr_auto] gap-4">
 				<div className="grid grid-cols-3 gap-2">
 					{KEYS.map((key) => (
 						<button
@@ -119,35 +216,14 @@ function CashPane({
 							type="button"
 							onClick={() => press(key)}
 							aria-label={key === "del" ? t("delete") : key}
-							className="touch-target numeric flex h-12 items-center justify-center rounded-xl bg-muted font-semibold text-lg transition-colors hover:bg-accent active:scale-95"
+							className="touch-target numeric flex h-11 items-center justify-center rounded-xl bg-muted/70 font-semibold text-lg transition-colors hover:bg-muted active:scale-95 tablet:h-12"
 						>
 							{key === "del" ? <Delete className="size-5" /> : key}
 						</button>
 					))}
 				</div>
-				<div className="flex w-36 flex-col justify-between gap-3 rounded-2xl bg-muted/60 p-4 tablet:w-44">
-					<div>
-						<p className="text-muted-foreground text-xs">{t("receivedAmount")}</p>
-						<p className="numeric font-semibold text-xl">{formatBaht(received)}</p>
-					</div>
-					<div>
-						<p className="text-muted-foreground text-xs">{t("change")}</p>
-						<p className={cn("numeric font-bold text-3xl tracking-tight", enough ? "text-success" : "text-danger")}>
-							{formatBaht(change)}
-						</p>
-					</div>
-				</div>
 			</div>
-
-			<Button
-				disabled={!enough}
-				onClick={() => onConfirm(received)}
-				className="brand-gradient h-14 w-full rounded-2xl font-semibold text-base"
-			>
-				<Check className="size-5" />
-				{t("confirm")}
-			</Button>
-		</div>
+		</PaneShell>
 	);
 }
 
@@ -172,12 +248,19 @@ function PromptPayPane({
 		return () => window.clearInterval(id);
 	}, []);
 
+	const title = t("payWith", { method: "PromptPay" });
 	if (!promptPayId) {
 		return (
-			<div className="flex h-full flex-col items-center justify-center gap-2 text-center">
+			<PaneShell
+				title={title}
+				center
+				action={
+					<ConfirmButton disabled label={t("received")} />
+				}
+			>
 				<p className="font-medium">{t("promptPayMissing")}</p>
-				<p className="text-muted-foreground text-sm">{t("promptPayMissingHint")}</p>
-			</div>
+				<p className="mt-1 text-muted-foreground text-sm">{t("promptPayMissingHint")}</p>
+			</PaneShell>
 		);
 	}
 
@@ -185,55 +268,56 @@ function PromptPayPane({
 	const ss = String(secondsLeft % 60).padStart(2, "0");
 
 	return (
-		<div className="flex h-full flex-col items-center gap-4">
-			<div className="flex w-full max-w-xs flex-col items-center gap-3 rounded-3xl bg-white p-5 shadow-sm ring-1 ring-black/5">
+		<PaneShell
+			title={title}
+			center
+			action={
+				<ConfirmButton onClick={onConfirm} label={t("received")} />
+			}
+		>
+			{/* White whatever the theme: a banking app scans dark-on-light. */}
+			<div className="flex w-full max-w-[17rem] flex-col items-center gap-3 rounded-3xl bg-white p-5 shadow-sm ring-1 ring-black/5">
 				<p className="flex items-center gap-2 font-semibold text-[#0f3d68] text-sm">
-					<span className="rounded bg-[#0f3d68] px-1.5 py-0.5 font-bold text-[10px] text-white">
-						PromptPay
-					</span>
+					<span className="rounded bg-[#0f3d68] px-1.5 py-0.5 font-bold text-[10px] text-white">PromptPay</span>
 					{t("scanToPay")}
 				</p>
 				<QRCodeSVG
 					value={promptPayPayload(promptPayId, total)}
-					size={208}
+					size={192}
 					level="M"
 					marginSize={0}
-					className="h-auto w-full max-w-52"
+					className="h-auto w-full max-w-48"
 				/>
 				<p className="numeric font-bold text-2xl text-[#111827]">{formatBaht(total)}</p>
-				<p className="numeric text-[#64748b] text-xs">
-					{t("expiresIn")} {mm}:{ss}
-				</p>
 			</div>
-			<p className="text-center text-muted-foreground text-sm">{t("promptPayHint")}</p>
-			<Button
-				onClick={onConfirm}
-				className="mt-auto h-14 w-full rounded-2xl bg-success font-semibold text-base text-success-foreground hover:bg-success/90"
-			>
-				<Check className="size-5" />
-				{t("received")}
-			</Button>
-		</div>
+			<p className="numeric mt-3 text-muted-foreground text-xs">
+				{t("expiresIn")} {mm}:{ss}
+			</p>
+			<p className="mt-1 max-w-xs text-muted-foreground text-sm">{t("promptPayHint")}</p>
+		</PaneShell>
 	);
 }
 
-function SimplePane({ onConfirm, method }: { onConfirm: () => void; method: PaymentMethod }) {
+function SimplePane({ onConfirm, method, total }: { onConfirm: () => void; method: PaymentMethod; total: Satang }) {
 	const t = useTranslations("checkout");
 	const tMethod = useTranslations("paymentMethod");
 	const Icon = PAYMENT_ICON[method];
 	return (
-		<div className="flex h-full flex-col items-center justify-center gap-4 text-center">
-			<span className="flex size-16 items-center justify-center rounded-2xl bg-accent text-primary">
-				<Icon className="size-7" />
+		<PaneShell
+			title={t("payWith", { method: tMethod(method) })}
+			center
+			action={
+				<ConfirmButton onClick={onConfirm} label={t("confirm")} />
+			}
+		>
+			<span className="flex size-16 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+				<Icon className="size-8" />
 			</span>
-			<p className="max-w-xs text-muted-foreground text-sm">
-				{t("manualHint", { method: tMethod(method) })}
+			<p className="numeric mt-4 font-bold text-3xl tracking-tight">{formatBaht(total)}</p>
+			<p className="mt-2 max-w-xs text-pretty text-muted-foreground text-sm">
+				{t(method === "CARD" ? "cardHint" : "otherHint")}
 			</p>
-			<Button onClick={onConfirm} className="brand-gradient mt-auto h-14 w-full rounded-2xl font-semibold text-base">
-				<Check className="size-5" />
-				{t("confirm")}
-			</Button>
-		</div>
+		</PaneShell>
 	);
 }
 
@@ -387,7 +471,15 @@ function CheckoutSession({
 				onOpenChange(next);
 			}}
 		>
-			<DialogContent className="max-h-[94svh] gap-0 overflow-y-auto rounded-3xl p-0 sm:max-w-3xl">
+			<DialogContent
+				className={cn(
+					"max-h-[94svh] gap-0 overflow-y-auto rounded-3xl p-0 sm:max-w-[min(48rem,calc(100%-2rem))]",
+					// A phone gets the whole screen: a floating card left the keypad under the button.
+					"max-tablet:top-0 max-tablet:left-0 max-tablet:h-svh max-tablet:max-h-svh max-tablet:w-full max-tablet:max-w-none max-tablet:translate-x-0 max-tablet:translate-y-0 max-tablet:rounded-none max-tablet:ring-0",
+					// One size whichever method is picked, so switching does not make it jump.
+					!done && "tablet:h-[min(640px,94svh)] tablet:overflow-hidden desktop:max-w-4xl"
+				)}
+			>
 				<DialogTitle className="sr-only">{t("title")}</DialogTitle>
 				<DialogDescription className="sr-only">{t("description")}</DialogDescription>
 
@@ -400,37 +492,55 @@ function CheckoutSession({
 						<motion.div
 							key="pay"
 							exit={{ opacity: 0 }}
-							className="grid tablet:grid-cols-[260px_1fr]"
+							className="grid h-full min-h-0 grid-rows-[auto_1fr] tablet:grid-cols-[280px_1fr] tablet:grid-rows-1"
 						>
-							<aside className="flex flex-col gap-5 border-b bg-muted/40 p-6 tablet:border-r tablet:border-b-0">
-								<div>
-									<p className="font-semibold text-lg">{t("title")}</p>
-									<p className="text-muted-foreground text-sm">{t("newOrderLabel")}</p>
-								</div>
+							<aside className="flex min-h-0 flex-col gap-4 border-b bg-muted/40 px-5 pt-5 pb-4 tablet:gap-5 tablet:border-r tablet:border-b-0 tablet:p-6">
 								<div>
 									<p className="text-muted-foreground text-sm">{t("amountDue")}</p>
-									<p className="numeric font-bold text-4xl tracking-tight">{formatBaht(totals.total)}</p>
-									<p className="mt-1 text-muted-foreground text-xs">
-										{t("itemCount", { count: totals.itemCount })}
-									</p>
+									<p className="numeric mt-1 font-bold text-3xl tracking-tight tablet:text-4xl">{formatBaht(totals.total)}</p>
+									{/* The breakdown is for the counter screen; a phone keeps the space for the keypad. */}
+									<dl className="mt-3 hidden space-y-1 text-muted-foreground text-xs tablet:block">
+										<div className="flex justify-between">
+											<dt>{t("itemCount", { count: totals.itemCount })}</dt>
+											<dd className="numeric">{formatBaht(totals.subtotal)}</dd>
+										</div>
+										{totals.discount > 0 ? (
+											<div className="flex justify-between">
+												<dt>{t("discount")}</dt>
+												<dd className="numeric">−{formatBaht(totals.discount)}</dd>
+											</div>
+										) : null}
+										{totals.vat > 0 ? (
+											<div className="flex justify-between">
+												<dt>{t("vat")}</dt>
+												<dd className="numeric">{formatBaht(totals.vat)}</dd>
+											</div>
+										) : null}
+									</dl>
 								</div>
-								<div role="radiogroup" aria-label={t("method")} className="grid grid-cols-4 gap-2 tablet:grid-cols-2">
-									{METHODS.map((m) => (
-										<MethodCard key={m} method={m} selected={m === method} onSelect={() => !pending && setMethod(m)} />
-									))}
+								<div className="space-y-2">
+									<p className="hidden font-medium text-muted-foreground text-xs tablet:block">{t("method")}</p>
+									<div role="radiogroup" aria-label={t("method")} className="grid grid-cols-4 gap-2 tablet:grid-cols-1">
+										{METHODS.map((m) => (
+											<MethodRow key={m} method={m} selected={m === method} onSelect={() => !pending && setMethod(m)} />
+										))}
+									</div>
 								</div>
 							</aside>
 
 							{/* A disabled fieldset freezes every button in the pane while the API answers. */}
-							<fieldset disabled={pending} className="min-h-[420px] p-6 disabled:opacity-70">
+							<PayingContext.Provider value={pending}>
+							{/* Disabled while paying, so nothing else can be tapped; the pane dims, the button does not. */}
+							<fieldset disabled={pending} className="flex min-h-0 min-w-0 flex-col [&:disabled_.pane-body]:opacity-60">
 								{method === "CASH" ? (
 									<CashPane total={totals.total} onConfirm={(received) => void complete(received)} />
 								) : method === "PROMPTPAY" ? (
 									<PromptPayPane total={totals.total} promptPayId={promptPayId} onConfirm={() => void complete(null)} />
 								) : (
-									<SimplePane method={method} onConfirm={() => void complete(null)} />
+									<SimplePane method={method} total={totals.total} onConfirm={() => void complete(null)} />
 								)}
 							</fieldset>
+							</PayingContext.Provider>
 						</motion.div>
 					)}
 				</AnimatePresence>
