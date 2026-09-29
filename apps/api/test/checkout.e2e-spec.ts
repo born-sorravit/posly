@@ -227,4 +227,23 @@ describe("checkout", () => {
 			paymentBreakdown.reduce((s: number, p: { amount: number }) => s + p.amount, 0)
 		).toBe(metrics.revenue);
 	});
+
+	it("returns the comparison period's figures beside each change", async () => {
+		const res = await api(app)
+			.get(`/api/v1/businesses/${owner.businessId}/dashboard?range=today`)
+			.set("Authorization", `Bearer ${owner.token}`)
+			.expect(200);
+		const { metrics } = res.body.data;
+		// Every sale in this suite is from today, so yesterday-by-now is empty: the figures
+		// are zero, and a change over zero stays null rather than "+100%".
+		expect(metrics).toMatchObject({
+			previousRevenue: 0,
+			previousOrders: 0,
+			previousAverageOrder: 0,
+			previousGrossProfit: 0,
+			previousEstimatedProfit: 0,
+			revenueChange: null,
+			ordersChange: null,
+		});
+	});
 });

@@ -97,14 +97,20 @@ export function MoneyDisplay({
 	return <span className={cn("numeric", className)}>{formatBaht(amount, { signed })}</span>;
 }
 
-/** +14.2% / −3.1% versus the comparison period. Up is green, down is red, flat is muted. */
+/**
+ * +14.2% / −3.1% versus the comparison period. Up is green, down is red, flat is muted.
+ * `softDecline` mutes a drop too — for a day still in progress, where being behind
+ * yesterday at 10 a.m. is ordinary, not an alarm.
+ */
 export function StatTrend({
 	change,
 	label,
+	softDecline = false,
 	className,
 }: {
 	change: number;
 	label?: string;
+	softDecline?: boolean;
 	className?: string;
 }) {
 	const up = change > 0;
@@ -114,7 +120,7 @@ export function StatTrend({
 		<span
 			className={cn(
 				"inline-flex flex-wrap items-center gap-1 font-medium text-xs",
-				flat ? "text-muted-foreground" : up ? "text-success" : "text-danger",
+				flat || (!up && softDecline) ? "text-muted-foreground" : up ? "text-success" : "text-danger",
 				className
 			)}
 		>
@@ -202,6 +208,8 @@ export function MetricCard({
 	tone = "primary",
 	change,
 	changeLabel,
+	previous,
+	softDecline = false,
 	note,
 	tinted = false,
 	trend,
@@ -216,7 +224,14 @@ export function MetricCard({
 	/** Null = no comparison available (the previous period had nothing). */
 	change?: number | null;
 	changeLabel?: string;
-	/** Shown in place of the comparison when there is none, e.g. before the first sale. */
+	/**
+	 * The comparison period's own figure, formatted. With it the line reads
+	 * "{changeLabel} ฿7,720 · ↘ 98.9%" — the amount gives the percentage its scale.
+	 */
+	previous?: ReactNode;
+	/** See StatTrend. */
+	softDecline?: boolean;
+	/** Shown in place of the percentage when there is none, e.g. before the first sale. */
 	note?: ReactNode;
 	tinted?: boolean;
 	className?: string;
@@ -235,8 +250,21 @@ export function MetricCard({
 				<span className="font-medium text-muted-foreground text-sm">{label}</span>
 			</div>
 			<div className="numeric font-semibold text-[28px] leading-none tracking-tight">{value}</div>
-			{change !== undefined && change !== null ? (
-				<StatTrend change={change} label={changeLabel} />
+			{previous !== undefined ? (
+				<div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-muted-foreground text-xs">
+					{note ? <span>{note}</span> : null}
+					{note ? <span aria-hidden>·</span> : null}
+					<span>
+						{changeLabel} <span className="numeric font-medium text-foreground/80">{previous}</span>
+					</span>
+					{/* No separator: the arrow already sets it apart, and a "·" strands itself at one
+					    end of the line whenever a narrow card wraps. */}
+					{change !== undefined && change !== null ? (
+						<StatTrend change={change} softDecline={softDecline} className="whitespace-nowrap" />
+					) : null}
+				</div>
+			) : change !== undefined && change !== null ? (
+				<StatTrend change={change} label={changeLabel} softDecline={softDecline} />
 			) : note ? (
 				<span className="text-muted-foreground text-xs">{note}</span>
 			) : null}
