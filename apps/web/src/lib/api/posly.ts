@@ -264,6 +264,8 @@ export interface RosterEntry {
 	role: MemberRole;
 	hasPin: boolean;
 	isYou: boolean;
+	/** Only ever true on your own entry: you have left yourself off the switch screen. */
+	hiddenFromSwitch: boolean;
 }
 
 export type NotificationKind =
@@ -476,6 +478,8 @@ export const api = {
 		setMyPin: (id: string, pin: string, password?: string) =>
 			backend.put(`${b(id)}/members/me/pin`, { pin, ...(password ? { password } : {}) }),
 		clearMyPin: (id: string) => backend.delete(`${b(id)}/members/me/pin`),
+		setSwitchHidden: (id: string, hidden: boolean) =>
+			backend.put(`${b(id)}/members/me/switch-visibility`, { hidden }),
 		clearPin: (id: string, memberId: string) => backend.delete(`${b(id)}/members/${memberId}/pin`),
 		roles: (id: string, signal?: AbortSignal) =>
 			backend.get<{ roles: Record<"MANAGER" | "CASHIER" | "STAFF", string[]>; assignable: string[] }>(

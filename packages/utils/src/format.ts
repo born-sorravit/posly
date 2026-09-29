@@ -92,3 +92,19 @@ export const nameInitial = (name: string): string => {
 	const letter = [...bare.replace(/^[เแโใไ]+/, "")][0] ?? [...bare][0];
 	return letter ? letter.toUpperCase() : "?";
 };
+
+/**
+ * A stable slot in a palette of `size` colours for a name, so one person keeps one colour on
+ * every screen and in every shop, and a shop's people look different from one another. The
+ * polite "คุณ" is ignored, so "คุณแนน" and "แนน" match.
+ */
+export const nameColorIndex = (name: string, size: number): number => {
+	const key = name.trim().replace(/^คุณ\s*/, "").toLowerCase();
+	// FNV-1a: spreads short Thai names over a small palette better than a plain *31 sum.
+	let hash = 0x811c9dc5;
+	for (const char of key) {
+		hash ^= char.codePointAt(0) ?? 0;
+		hash = Math.imul(hash, 0x01000193) >>> 0;
+	}
+	return size > 0 ? hash % size : 0;
+};

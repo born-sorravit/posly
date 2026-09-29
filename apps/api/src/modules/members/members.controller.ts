@@ -10,6 +10,7 @@ import {
 	SetPermissionsDto,
 	SetPinDto,
 	UpdateMemberDto,
+	SwitchVisibilityDto,
 } from "@/modules/members/dto/member.dto";
 import { MembersService } from "@/modules/members/members.service";
 import { DemoBlocked } from "@/shared/decorators/demo-blocked.decorator";
@@ -104,6 +105,17 @@ export class MembersController {
 		@Body() dto: SetPinDto
 	): Promise<void> {
 		return this.membersService.setMyPin(m, dto);
+	}
+
+	@Put("me/switch-visibility")
+	@DemoBlocked()
+	@HttpCode(204)
+	@ApiOperation({ summary: "Show or hide yourself on this shop's switch screen" })
+	setSwitchVisibility(
+		@CurrentMembership() m: ResolvedMembership,
+		@Body() dto: SwitchVisibilityDto
+	): Promise<void> {
+		return this.membersService.setSwitchVisibility(m, dto.hidden);
 	}
 
 	@Delete("me/pin")

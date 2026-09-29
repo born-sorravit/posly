@@ -41,17 +41,6 @@ import { DataSource, IsNull } from "typeorm";
 
 const INVITE_TTL_DAYS = 7;
 
-/** One digit throughout, or a straight run up or down: the first PINs anyone tries. */
-export const isWeakPin = (pin: string): boolean => {
-	const digits = [...pin].map(Number);
-	const steps = digits.slice(1).map((d, i) => d - digits[i]);
-	return (
-		steps.every((s) => s === 0) ||
-		steps.every((s) => s === 1) ||
-		steps.every((s) => s === -1)
-	);
-};
-
 const hashToken = (token: string) =>
 	createHash("sha256").update(token).digest("hex");
 
@@ -123,16 +112,34 @@ export class MembersService {
 			order: { createdAt: "ASC" },
 		});
 		const withPin = await this.membersWithPin(membership.businessId);
-		return members
-			.filter((m) => m.userId !== null)
-			.sort(bySeniority)
-			.map((m) => ({
-				id: m.id,
-				name: m.displayName,
-				role: m.role,
-				hasPin: withPin.has(m.id),
-				isYou: m.id === membership.memberId,
-			}));
+		return (
+			members
+				// Your own entry stays, so the screen can offer the switch back on.
+				.filter(
+					(m) =>
+						m.userId !== null &&
+						(!m.hiddenFromSwitch || m.id === membership.memberId)
+				)
+				.sort(bySeniority)
+				.map((m) => ({
+					id: m.id,
+					name: m.displayName,
+					role: m.role,
+					hasPin: withPin.has(m.id),
+					isYou: m.id === membership.memberId,
+					hiddenFromSwitch: m.id === membership.memberId && m.hiddenFromSwitch,
+				}))
+		);
+	}
+
+	async setSwitchVisibility(
+		membership: ResolvedMembership,
+		hidden: boolean
+	): Promise<void> {
+		await this.memberRepository.update(
+			{ id: membership.memberId },
+			{ hiddenFromSwitch: hidden }
+		);
 	}
 
 	/**
@@ -141,9 +148,6 @@ export class MembersService {
 	 * be able to plant one for later.
 	 */
 	async setMyPin(membership: ResolvedMembership, dto: SetPinDto): Promise<void> {
-		if (isWeakPin(dto.pin)) {
-			throw new BadRequestException("PIN is too easy to guess");
-		}
 		const member = await this.memberRepository.findOneOrFail({
 			where: { id: membership.memberId },
 		});

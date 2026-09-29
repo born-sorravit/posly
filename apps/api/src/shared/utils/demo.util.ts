@@ -15,5 +15,12 @@ export const DEMO_ROLE_EMAILS: Record<DemoRole, string> = {
 	cashier: `mind@${DEMO_EMAIL_DOMAIN}`,
 };
 
+/**
+ * Every demo member's quick-switch PIN, so visitors can try handing the till over. The web
+ * shows it on the switch screen for a demo session (apps/web/src/lib/demo.ts); keep the two in
+ * step. Wrong guesses are not counted for demo accounts, so nobody can lock the shared shop.
+ */
+export const DEMO_PIN = "2580";
+
 export const isDemoEmail = (email: string | null | undefined): boolean =>
 	!!email && email.toLowerCase().endsWith(`@${DEMO_EMAIL_DOMAIN}`);

@@ -52,13 +52,14 @@ describe("PIN quick switch", () => {
 		await app.close();
 	});
 
-	it("sets a PIN only with the account password, and refuses easy ones", async () => {
+	it("sets a PIN only with the account password", async () => {
 		const set = (body: object) =>
 			api(app).put(`${base}/members/me/pin`).set(auth(cashier.token)).send(body);
 		await set({ pin: "4071" }).expect(403);
 		await set({ pin: "4071", password: "wrong-password" }).expect(403);
-		await set({ pin: "1234", password: "Passw0rd!x" }).expect(400);
-		await set({ pin: "0000", password: "Passw0rd!x" }).expect(400);
+		// Runs and repeats are allowed: the shop chooses, and five wrong tries still lock.
+		await set({ pin: "0000", password: "Passw0rd!x" }).expect(204);
+		await set({ pin: "1234", password: "Passw0rd!x" }).expect(204);
 		await set({ pin: "12a4", password: "Passw0rd!x" }).expect(400);
 		await set({ pin: "4071", password: "Passw0rd!x" }).expect(204);
 
@@ -112,6 +113,80 @@ describe("PIN quick switch", () => {
 			.send({ pin: "5820", password: "Passw0rd!x" })
 			.expect(204);
 		await pinLogin(owner.token, cashier.memberId, "5820").expect(200);
+	});
+
+	it("does not count wrong PINs for a shared demo account, so it never locks", async () => {
+		const demo = await join("CASHIER");
+		await api(app)
+			.put(`${base}/members/me/pin`)
+			.set(auth(demo.token))
+			.send({ pin: "2580", password: "Passw0rd!x" })
+			.expect(204);
+		// Registering on the demo domain is refused, so turn this account into one directly.
+		await app
+			.get(DataSource)
+			.query(`UPDATE "user" SET email = $1 WHERE email = $2`, [
+				`e2e-${randomUUID()}@demo.posly`,
+				demo.email,
+			]);
+
+		for (let i = 0; i < 6; i++) {
+			const wrong = await pinLogin(owner.token, demo.memberId, "9999").expect(401);
+			expect(wrong.body.details).toBeUndefined();
+		}
+		await pinLogin(owner.token, demo.memberId, "2580").expect(200);
+	});
+
+	it("leaves a hidden member off the switch screen and refuses their PIN", async () => {
+		const manager = await join("MANAGER");
+		await api(app)
+			.put(`${base}/members/me/pin`)
+			.set(auth(manager.token))
+			.send({ pin: "3691", password: "Passw0rd!x" })
+			.expect(204);
+		await pinLogin(owner.token, manager.memberId, "3691").expect(200);
+
+		await api(app)
+			.put(`${base}/members/me/switch-visibility`)
+			.set(auth(manager.token))
+			.send({ hidden: true })
+			.expect(204);
+		const others = await api(app)
+			.get(`${base}/members/roster`)
+			.set(auth(owner.token))
+			.expect(200);
+		expect(others.body.data.map((r: { id: string }) => r.id)).not.toContain(
+			manager.memberId
+		);
+		// Knowing the PIN is not enough once hidden.
+		await pinLogin(owner.token, manager.memberId, "3691").expect(401);
+		// They still see themselves, flagged, so they can switch it back on.
+		const own = await api(app)
+			.get(`${base}/members/roster`)
+			.set(auth(manager.token))
+			.expect(200);
+		expect(own.body.data.find((r: { isYou: boolean }) => r.isYou)).toMatchObject({
+			id: manager.memberId,
+			hiddenFromSwitch: true,
+		});
+
+		await api(app)
+			.put(`${base}/members/me/switch-visibility`)
+			.set(auth(manager.token))
+			.send({ hidden: false })
+			.expect(204);
+		await pinLogin(owner.token, manager.memberId, "3691").expect(200);
+	});
+
+	it("refuses to register an address on the demo domain", async () => {
+		await api(app)
+			.post("/api/v1/auth/register")
+			.send({
+				email: `x-${randomUUID()}@demo.posly`,
+				password: "Passw0rd!x",
+				name: "X",
+			})
+			.expect(400);
 	});
 
 	it("only works from a till already signed in to the same shop", async () => {

@@ -126,7 +126,7 @@ export function IosInstallDialog({ open, onOpenChange }: { open: boolean; onOpen
 	const t = useTranslations("pwa");
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="gap-5 p-6 sm:max-w-sm">
+			<DialogContent className="gap-6 p-6 sm:max-w-md">
 				<DialogHeader>
 					<DialogTitle>{t("iosTitle")}</DialogTitle>
 					<DialogDescription>{t("iosHint")}</DialogDescription>

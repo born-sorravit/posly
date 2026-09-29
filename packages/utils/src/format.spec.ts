@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatPercent, nameInitial } from "./format";
+import { formatPercent, nameColorIndex, nameInitial } from "./format";
 
 describe("formatPercent", () => {
 	it("keeps one decimal below 100%", () => {
@@ -37,4 +37,19 @@ describe("nameInitial", () => {
 		["คุณ", "ค"],
 		["", "?"],
 	])("%s → %s", (name, initial) => expect(nameInitial(name)).toBe(initial));
+});
+
+describe("nameColorIndex", () => {
+	it("is stable, in range, and ignores คุณ and spacing", () => {
+		const i = nameColorIndex("คุณแนน", 8);
+		expect(i).toBeGreaterThanOrEqual(0);
+		expect(i).toBeLessThan(8);
+		expect(nameColorIndex("คุณแนน", 8)).toBe(i);
+		expect(nameColorIndex("  แนน ", 8)).toBe(i);
+	});
+
+	it("spreads a shop's names over the palette", () => {
+		const names = ["คุณแนน", "ต้น", "มายด์", "บอส", "ป้าแดง", "Somchai", "Malee", "พนักงานใหม่"];
+		expect(new Set(names.map((n) => nameColorIndex(n, 8))).size).toBeGreaterThanOrEqual(5);
+	});
 });

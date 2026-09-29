@@ -23,6 +23,7 @@ import {
 	type DemoShop,
 } from "@/shared/database/seeds/demo.data";
 import { dataSourceOptions } from "@/shared/database/typeorm.config";
+import { DEMO_PIN } from "@/shared/utils/demo.util";
 import { AuditAction } from "@/shared/enums/audit-action.enum";
 import { AuthProvider } from "@/shared/enums/auth-provider.enum";
 import { ExpenseCategory } from "@/shared/enums/expense-category.enum";
@@ -228,6 +229,7 @@ async function createShop(
 		)
 	);
 
+	const pinHash = await hash(DEMO_PIN, 10);
 	const members = await m.save(
 		shop.members.map((member) => {
 			const user = users.get(member.account) as User;
@@ -238,6 +240,7 @@ async function createShop(
 				displayName: member.displayName,
 				role: member.role,
 				status: MemberStatus.ACTIVE,
+				pinHash,
 			});
 		})
 	);
@@ -658,7 +661,9 @@ const run = async (): Promise<void> => {
 			);
 		}
 
-		logger.log(`Password for every demo account: ${DEMO_PASSWORD}`);
+		logger.log(
+			`Password for every demo account: ${DEMO_PASSWORD} · PIN: ${DEMO_PIN}`
+		);
 		for (const account of DEMO_ACCOUNTS) {
 			const shops = DEMO_SHOPS.filter((s) =>
 				s.members.some((m) => m.account === account.key)

@@ -161,7 +161,8 @@ export async function LandingPage({ signedIn }: { signedIn: boolean }) {
 									{t("hero.eyebrow")}
 								</p>
 							</Reveal>
-							<Reveal onLoad delay={0.08}>
+							{/* No entrance animation: the headline is the page's largest paint, and one that starts
+							    at opacity 0 waits for the JavaScript before it can count. */}
 							<h1 className="mt-6 text-balance font-bold text-4xl leading-[1.15] tracking-tight tablet:text-5xl desktop:text-6xl">
 								{t("hero.titleA")}
 								<br />
@@ -169,12 +170,9 @@ export async function LandingPage({ signedIn }: { signedIn: boolean }) {
 									{t("hero.titleB")}
 								</span>
 							</h1>
-							</Reveal>
-							<Reveal onLoad delay={0.16}>
 							<p className="mx-auto mt-6 max-w-2xl text-pretty text-lg text-muted-foreground leading-relaxed">
 								{t("hero.subtitle")}
 							</p>
-							</Reveal>
 							<Reveal onLoad delay={0.24} className="mt-8 flex flex-col justify-center gap-3 tablet:flex-row">
 								<Button asChild size="lg" className="brand-gradient h-12 px-6 text-base">
 									<Link href={signupHref}>

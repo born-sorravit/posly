@@ -386,6 +386,34 @@ export function ProductCardSkeleton() {
 	);
 }
 
+/**
+ * The loading shape of a `DataTable` given a `mobileRow`: on a phone, list rows (a round avatar,
+ * two lines, a badge); from tablet up, the table's own skeleton.
+ */
+export function ListSkeleton({ rows = 6 }: { rows?: number }) {
+	return (
+		<>
+			<ul className="divide-y divide-border/50 tablet:hidden">
+				{Array.from({ length: rows }, (_, i) => (
+					// biome-ignore lint/suspicious/noArrayIndexKey: static placeholder rows
+					<li key={i} className="flex items-center gap-3 px-4 py-3">
+						<Skeleton className="size-10 shrink-0 rounded-full" />
+						<div className="min-w-0 flex-1 space-y-2">
+							<Skeleton className="h-3.5 w-2/5" />
+							<Skeleton className="h-3 w-3/5" />
+						</div>
+						<Skeleton className="h-6 w-16 shrink-0 rounded-lg" />
+						<Skeleton className="size-5 shrink-0 rounded-md" />
+					</li>
+				))}
+			</ul>
+			<div className="hidden tablet:block">
+				<TableSkeleton rows={rows} />
+			</div>
+		</>
+	);
+}
+
 export function TableSkeleton({ rows = 6 }: { rows?: number }) {
 	return (
 		<div className="space-y-3 p-2">

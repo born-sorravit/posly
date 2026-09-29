@@ -28,17 +28,33 @@ import {
 } from "lucide-react";
 import { SetPinDialog, useSwitchUser } from "@/components/pin/switch-user";
 import { useRoster } from "@/hooks/use-posly";
-import { nameInitial } from "@posly/utils/format";
+import { nameColorIndex, nameInitial } from "@posly/utils/format";
 import { TABLET_UP, useMediaQuery } from "@/hooks/use-media-query";
 import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@posly/ui/components/sheet";
 import { Fragment, useState } from "react";
 import { useTranslations } from "next-intl";
 
+/**
+ * One colour per person, picked from the name: role already has its badge, and colouring by
+ * role would make every cashier the same circle. All deep enough for white text in both themes.
+ */
+const AVATAR_COLORS = [
+	"from-indigo-500 to-violet-600",
+	"from-sky-500 to-blue-600",
+	"from-teal-500 to-emerald-600",
+	"from-rose-500 to-pink-600",
+	"from-amber-500 to-orange-600",
+	"from-fuchsia-500 to-purple-600",
+	"from-cyan-500 to-teal-600",
+	"from-lime-600 to-green-700",
+] as const;
+
 export function UserAvatar({ name, className }: { name: string; className?: string }) {
 	return (
 		<span
 			className={cn(
-				"flex size-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary/90 to-primary/60 font-medium text-primary-foreground text-sm",
+				"flex size-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br font-medium text-sm text-white",
+				AVATAR_COLORS[nameColorIndex(name, AVATAR_COLORS.length)],
 				className
 			)}
 			aria-hidden

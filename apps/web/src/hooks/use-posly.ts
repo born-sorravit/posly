@@ -526,6 +526,10 @@ export function usePinMutations() {
 			onSettled: () => void refresh(),
 		}),
 		clearMine: useMutation({ mutationFn: () => api.members.clearMyPin(id), onSettled: () => void refresh() }),
+		setHidden: useMutation({
+			mutationFn: (hidden: boolean) => api.members.setSwitchHidden(id, hidden),
+			onSettled: () => void refresh(),
+		}),
 		clear: useMutation({
 			mutationFn: (memberId: string) => api.members.clearPin(id, memberId),
 			onSettled: () => void refresh(),

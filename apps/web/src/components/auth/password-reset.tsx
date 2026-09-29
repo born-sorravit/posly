@@ -8,7 +8,7 @@ import { Label } from "@posly/ui/components/label";
 import { Link } from "@/i18n/navigation";
 import { BackendError } from "@/lib/api/backend";
 import { api } from "@/lib/api/posly";
-import { CheckCircle2, KeyRound, Loader2, MailCheck, TriangleAlert } from "lucide-react";
+import { CheckCircle2, Clock3, KeyRound, Loader2, MailCheck, TriangleAlert } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -99,6 +99,26 @@ export function ForgotPasswordForm() {
 					{t("backToLogin")}
 				</Link>
 			</p>
+		</div>
+	);
+}
+
+/**
+ * What `/forgot-password` shows until reset-by-email opens: the form would promise a link that
+ * never arrives. Points at the ways in that do work.
+ */
+export function ForgotPasswordSoon() {
+	const t = useTranslations("auth");
+	return (
+		<div className="space-y-6">
+			<Heading icon={Clock3} title={t("forgotTitle")} hint={t("forgotSoonHint")} />
+			<p className="flex justify-center">
+				<span className="rounded-full bg-muted px-2.5 py-1 font-medium text-muted-foreground text-xs">{t("soon")}</span>
+			</p>
+			<p className="text-center text-muted-foreground text-sm">{t("forgotSoonGoogle")}</p>
+			<Button asChild size="lg" className="brand-gradient h-11 w-full rounded-xl">
+				<Link href="/login">{t("backToLogin")}</Link>
+			</Button>
 		</div>
 	);
 }

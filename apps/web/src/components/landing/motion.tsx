@@ -91,8 +91,10 @@ export function TiltIn({ children, className }: { children: ReactNode; className
 		<div ref={ref} className={cn("[perspective:1600px]", className)}>
 			<motion.div
 				style={{ rotateX, scale, transformOrigin: "50% 0%" }}
-				initial={{ opacity: 0, y: 60 }}
-				animate={{ opacity: 1, y: 0, transition: { duration: 1, ease: EASE, delay: 0.35 } }}
+				// Rises into place but is never invisible: on a wide screen this picture is the largest
+				// paint, and fading it in from 0 held LCP until the JavaScript had run.
+				initial={{ y: 60 }}
+				animate={{ y: 0, transition: { duration: 1, ease: EASE, delay: 0.35 } }}
 			>
 				{children}
 			</motion.div>

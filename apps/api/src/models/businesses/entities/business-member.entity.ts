@@ -104,6 +104,13 @@ export class BusinessMember extends BaseEntity {
 	@Column({ name: "pin_locked_until", type: "timestamptz", nullable: true })
 	pinLockedUntil: Date | null;
 
+	/**
+	 * Left off the till's switch screen, and refused by PIN handover. For an owner who does not
+	 * work the counter: a PIN that can be watched being typed there should not open their shop.
+	 */
+	@Column({ name: "hidden_from_switch", type: "boolean", default: false })
+	hiddenFromSwitch: boolean;
+
 	/** Notifications created after this are unread for this member; null = none read yet. */
 	@Column({ name: "notifications_read_at", type: "timestamptz", nullable: true })
 	notificationsReadAt: Date | null;

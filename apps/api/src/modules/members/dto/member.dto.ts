@@ -5,6 +5,7 @@ import { Permission } from "@/shared/enums/permission.enum";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Transform } from "class-transformer";
 import {
+	IsBoolean,
 	ArrayMaxSize,
 	IsArray,
 	IsEnum,
@@ -110,6 +111,17 @@ export class RosterEntryResponse {
 	@ApiProperty({ enum: MemberRole }) role: MemberRole;
 	@ApiProperty() hasPin: boolean;
 	@ApiProperty() isYou: boolean;
+	@ApiProperty({
+		description:
+			"Only on your own entry: whether you have left yourself off the switch screen",
+	})
+	hiddenFromSwitch: boolean;
+}
+
+export class SwitchVisibilityDto {
+	@ApiProperty({ description: "true leaves you off this shop's switch screen" })
+	@IsBoolean()
+	hidden: boolean;
 }
 
 export class AcceptInviteDto {

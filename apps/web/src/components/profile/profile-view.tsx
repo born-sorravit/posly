@@ -3,15 +3,21 @@
 import { PasswordInput, PasswordStrength, passwordErrorKey } from "@/components/auth/password-input";
 import { PageContainer, PageHeader, SectionTitle, Surface } from "@/components/common/primitives";
 import { UserAvatar } from "@/components/layout/user-menu";
+import { SetPinDialog, SwitchVisibilityToggle } from "@/components/pin/switch-user";
 import { useSession } from "@/components/providers/session-provider";
+import { useRoster } from "@/hooks/use-posly";
+import { useActiveBusiness } from "@/hooks/use-workspace";
+import { cn } from "@/lib/utils";
+import { useRouter } from "@/i18n/navigation";
 import { friendlyMessage } from "@/lib/api/backend";
 import { api } from "@/lib/api/posly";
 import { Alert, AlertDescription } from "@posly/ui/components/alert";
 import { Button } from "@posly/ui/components/button";
+import { useQueryClient } from "@tanstack/react-query";
 import { Input } from "@posly/ui/components/input";
 import { Label } from "@posly/ui/components/label";
 import { PASSWORD_MAX_BYTES, passwordProblem } from "@posly/utils/password";
-import { FlaskConical, Loader2 } from "lucide-react";
+import { FlaskConical, KeyRound, Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
@@ -39,13 +45,9 @@ export function ProfileView() {
 	return (
 		<PageContainer className="max-w-3xl">
 			<PageHeader title={t("title")} description={t("description")} />
-			{demo ? (
-				<Alert className="rounded-2xl border-primary/30 bg-primary/5">
-					<FlaskConical className="size-4" />
-					<AlertDescription>{t("demoNotice")}</AlertDescription>
-				</Alert>
-			) : null}
+			{demo ? <DemoNotice /> : null}
 			<DetailsSection key={user.name} disabled={demo} />
+			<PinSection disabled={demo} />
 			{user.provider === "GOOGLE" ? (
 				<Surface className="space-y-2">
 					<SectionTitle className="mb-0">{t("password.title")}</SectionTitle>
@@ -55,6 +57,81 @@ export function ProfileView() {
 				<PasswordSection disabled={demo} />
 			)}
 		</PageContainer>
+	);
+}
+
+/**
+ * The quick-switch PIN for the shop that is open: per shop, unlike the rest of this page, so it
+ * says which shop. Setting it still happens in the PIN dialog; showing yourself on the switch
+ * screen is a switch here, applied at once.
+ */
+function PinSection({ disabled }: { disabled: boolean }) {
+	const t = useTranslations("profile.pin");
+	const { business } = useActiveBusiness();
+	const me = useRoster().data?.find((p) => p.isYou);
+	const hasPin = me?.hasPin ?? false;
+	const [editing, setEditing] = useState(false);
+
+	return (
+		<Surface className="space-y-5">
+			<div className="space-y-1">
+				<SectionTitle className="mb-0">{t("title")}</SectionTitle>
+				<p className="text-muted-foreground text-sm">{t("hint", { shop: business.name })}</p>
+			</div>
+			<div className="flex items-center gap-4 rounded-xl bg-muted/50 p-4">
+				<span
+					className={cn(
+						"flex size-10 shrink-0 items-center justify-center rounded-full",
+						hasPin ? "bg-success/12 text-success" : "bg-muted text-muted-foreground"
+					)}
+				>
+					<KeyRound className="size-5" />
+				</span>
+				<div className="min-w-0 flex-1">
+					<p className="font-medium text-sm">{hasPin ? t("set") : t("notSet")}</p>
+					<p className="text-muted-foreground text-xs">{hasPin ? t("setHint") : t("notSetHint")}</p>
+				</div>
+				<Button variant="outline" disabled={disabled || !me} onClick={() => setEditing(true)} className="shrink-0">
+					{hasPin ? t("change") : t("create")}
+				</Button>
+			</div>
+			{hasPin ? (
+				<div className="border-t pt-5">
+					<SwitchVisibilityToggle disabled={disabled} />
+				</div>
+			) : null}
+			<SetPinDialog open={editing} onOpenChange={setEditing} hasPin={hasPin} />
+		</Surface>
+	);
+}
+
+/** Why every field below is locked, and the way out: sign up for a real account. */
+function DemoNotice() {
+	const t = useTranslations("profile");
+	const { signOut } = useSession();
+	const router = useRouter();
+	const queryClient = useQueryClient();
+	return (
+		<div className="flex flex-col gap-4 rounded-2xl border border-primary/40 bg-primary/10 p-4 tablet:flex-row tablet:items-center tablet:p-5">
+			<span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md shadow-primary/30">
+				<FlaskConical className="size-5" />
+			</span>
+			<div className="min-w-0 flex-1">
+				<p className="font-semibold">{t("demoTitle")}</p>
+				<p className="mt-0.5 text-muted-foreground text-sm">{t("demoNotice")}</p>
+			</div>
+			<Button
+				className="brand-gradient shrink-0"
+				onClick={async () => {
+					await signOut();
+					queryClient.clear();
+					router.push("/register");
+					router.refresh();
+				}}
+			>
+				{t("demoSignup")}
+			</Button>
+		</div>
 	);
 }
 

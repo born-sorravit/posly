@@ -4,16 +4,18 @@ import { StatusBadge } from "@/components/common/primitives";
 import { UserAvatar } from "@/components/layout/user-menu";
 import { useSession } from "@/components/providers/session-provider";
 import { Button } from "@posly/ui/components/button";
+import { Switch } from "@posly/ui/components/switch";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@posly/ui/components/dialog";
 import { Input } from "@posly/ui/components/input";
 import { Label } from "@posly/ui/components/label";
 import { usePinMutations, useRoster } from "@/hooks/use-posly";
+import { DEMO_PIN } from "@/lib/demo";
 import { useActiveBusiness } from "@/hooks/use-workspace";
 import { formatClock } from "@posly/utils/format";
 import { cn } from "@/lib/utils";
 import type { RosterEntry } from "@/lib/api/posly";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Delete, KeyRound, Loader2, X } from "lucide-react";
+import { ArrowLeft, Check, Delete, FlaskConical, KeyRound, Loader2, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
@@ -28,13 +30,6 @@ export const useSwitchUser = create<{ open: boolean; setOpen: (open: boolean) =>
 
 const PIN_MIN = 4;
 const PIN_MAX = 6;
-
-/** Same rule as the API: one digit throughout, or a straight run up or down. */
-export const isWeakPin = (pin: string) => {
-	const digits = [...pin].map(Number);
-	const steps = digits.slice(1).map((d, i) => d - digits[i]);
-	return steps.every((s) => s === 0) || steps.every((s) => s === 1) || steps.every((s) => s === -1);
-};
 
 /** A phone-style keypad: big targets for a busy counter, and the keyboard works too. */
 function PinPad({
@@ -70,10 +65,16 @@ function PinPad({
 		return () => window.removeEventListener("keydown", onKey);
 	}, [press, onSubmit, value.length]);
 
+	const ready = value.length >= PIN_MIN && !busy;
+	// Round keys on a faint tint, like a phone's lock screen: big enough for a thumb at a busy
+	// counter, quiet enough that the dots above stay the focus.
+	const key =
+		"numeric flex size-[4.5rem] items-center justify-center rounded-full text-[1.75rem] font-medium transition tablet:size-20 active:scale-95";
+
 	return (
-		<div className="flex flex-col items-center gap-6">
+		<div className="flex flex-col items-center gap-5">
 			<motion.div
-				className="flex h-5 items-center gap-3"
+				className="flex h-4 items-center gap-4"
 				animate={error ? { x: [0, -10, 10, -6, 6, 0] } : { x: 0 }}
 				transition={{ duration: 0.35 }}
 				key={error ?? "ok"}
@@ -84,8 +85,12 @@ function PinPad({
 						// biome-ignore lint/suspicious/noArrayIndexKey: positions, not items
 						key={i}
 						className={cn(
-							"size-3.5 rounded-full transition-colors",
-							i < value.length ? (error ? "bg-danger" : "bg-primary") : "bg-muted-foreground/25"
+							"size-3.5 rounded-full border-2 transition-all duration-150",
+							i < value.length
+								? error
+									? "scale-110 border-danger bg-danger"
+									: "scale-110 border-primary bg-primary"
+								: "border-muted-foreground/40 bg-transparent"
 						)}
 					/>
 				))}
@@ -93,13 +98,13 @@ function PinPad({
 			<p className={cn("h-5 text-center text-sm", error ? "text-danger" : "text-muted-foreground")} role="status">
 				{error ?? t("enterPin")}
 			</p>
-			<div className="grid grid-cols-3 gap-3">
+			<div className="mt-2 grid grid-cols-3 gap-x-6 gap-y-4 tablet:gap-x-7">
 				{["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((d) => (
 					<button
 						key={d}
 						type="button"
 						onClick={() => press(d)}
-						className="numeric flex size-18 items-center justify-center rounded-2xl bg-muted/70 font-semibold text-2xl transition active:scale-95 hover:bg-muted"
+						className={cn(key, "bg-foreground/[0.06] ring-1 ring-foreground/[0.06] hover:bg-foreground/10 active:bg-foreground/15")}
 					>
 						{d}
 					</button>
@@ -108,24 +113,34 @@ function PinPad({
 					type="button"
 					onClick={() => press("back")}
 					aria-label={t("backspace")}
-					className="flex size-18 items-center justify-center rounded-2xl text-muted-foreground transition active:scale-95 hover:bg-muted"
+					className={cn(
+						key,
+						"text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground",
+						value.length === 0 && "pointer-events-none opacity-0"
+					)}
 				>
-					<Delete className="size-6" />
+					<Delete className="size-7" />
 				</button>
 				<button
 					type="button"
 					onClick={() => press("0")}
-					className="numeric flex size-18 items-center justify-center rounded-2xl bg-muted/70 font-semibold text-2xl transition active:scale-95 hover:bg-muted"
+					className={cn(key, "bg-foreground/[0.06] ring-1 ring-foreground/[0.06] hover:bg-foreground/10 active:bg-foreground/15")}
 				>
 					0
 				</button>
 				<button
 					type="button"
-					disabled={value.length < PIN_MIN || busy}
+					disabled={!ready}
 					onClick={onSubmit}
-					className="brand-gradient flex size-18 items-center justify-center rounded-2xl font-semibold text-primary-foreground text-sm transition active:scale-95 disabled:opacity-40"
+					aria-label={t("ok")}
+					className={cn(
+						key,
+						ready
+							? "brand-gradient text-primary-foreground shadow-lg shadow-primary/30"
+							: "text-muted-foreground/40 ring-1 ring-foreground/[0.06]"
+					)}
 				>
-					{busy ? <Loader2 className="size-5 animate-spin" /> : t("ok")}
+					{busy ? <Loader2 className="size-7 animate-spin" /> : <Check className="size-8" strokeWidth={2.5} />}
 				</button>
 			</div>
 		</div>
@@ -149,6 +164,7 @@ export function SwitchUserScreen() {
 	const [pin, setPin] = useState("");
 	const [error, setError] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
+	const demo = useSession().user?.isDemo === true;
 
 	const close = () => {
 		setOpen(false);
@@ -176,6 +192,7 @@ export function SwitchUserScreen() {
 				return;
 			}
 			const body = (await response.json().catch(() => null)) as {
+				message?: string;
 				details?: { attemptsLeft?: number; lockedUntil?: string };
 			} | null;
 			setPin("");
@@ -187,6 +204,9 @@ export function SwitchUserScreen() {
 						? t("wrong", { count: body.details.attemptsLeft })
 						: t("lockedNow")
 				);
+			} else if (response.status === 401 && body?.message === "Wrong PIN") {
+				// A demo account: wrong guesses are not counted, so there is no "tries left".
+				setError(t("wrongPlain"));
 			} else {
 				setError(t("failed"));
 			}
@@ -217,6 +237,10 @@ export function SwitchUserScreen() {
 					aria-modal
 					aria-labelledby="switch-title"
 					className="fixed inset-0 z-[90] flex flex-col bg-background/95 backdrop-blur-xl"
+					style={{
+						backgroundImage:
+							"radial-gradient(ellipse 50% 40% at 50% 30%, color-mix(in oklab, var(--primary) 12%, transparent), transparent 70%)",
+					}}
 					initial={{ opacity: 0 }}
 					animate={{ opacity: 1 }}
 					exit={{ opacity: 0 }}
@@ -239,15 +263,21 @@ export function SwitchUserScreen() {
 						{picked ? (
 							<>
 								<div className="flex flex-col items-center gap-3 text-center">
-									<UserAvatar name={picked.name} className="size-16 text-2xl" />
-									<div>
-										<p id="switch-title" className="font-semibold text-xl">
+									<UserAvatar
+										name={picked.name}
+										className="size-20 text-3xl shadow-lg shadow-black/25 ring-4 ring-foreground/10"
+									/>
+									<div className="space-y-1.5">
+										<p id="switch-title" className="font-semibold text-2xl tracking-tight">
 											{picked.name}
 										</p>
-										<p className="text-muted-foreground text-sm">{tRole(picked.role)}</p>
+										<span className="inline-flex rounded-full bg-foreground/[0.06] px-2.5 py-0.5 text-muted-foreground text-xs">
+											{tRole(picked.role)}
+										</span>
 									</div>
 								</div>
 								<PinPad value={pin} onChange={setPin} onSubmit={submit} busy={busy} error={error} />
+								{demo ? <DemoPinHint /> : null}
 							</>
 						) : (
 							<>
@@ -257,14 +287,17 @@ export function SwitchUserScreen() {
 									</h2>
 									<p className="mt-1 text-muted-foreground">{t("subtitle")}</p>
 								</div>
+								{demo ? <DemoPinHint /> : null}
 								{roster.isPending ? (
 									<Loader2 className="size-6 animate-spin text-muted-foreground" />
 								) : people.length === 0 ? (
 									<p className="max-w-sm text-center text-muted-foreground text-sm">{t("nobody")}</p>
 								) : (
-									<ul className="grid w-full max-w-3xl grid-cols-2 gap-3 tablet:grid-cols-4">
+									// Centred, however many there are: a shop of two should not sit in the left half of
+									// a four-column grid. Two to a row on a phone, fixed-width cards from tablet up.
+									<ul className="flex w-full max-w-3xl flex-wrap justify-center gap-3">
 										{people.map((p) => (
-											<li key={p.id}>
+											<li key={p.id} className="w-[calc(50%-0.375rem)] tablet:w-44">
 												<button
 													type="button"
 													disabled={!p.hasPin}
@@ -293,6 +326,48 @@ export function SwitchUserScreen() {
 	);
 }
 
+/** The demo shop's PIN, on the screen that asks for it: visitors have no other way to know it. */
+function DemoPinHint() {
+	const t = useTranslations("pin");
+	return (
+		<p className="flex items-center gap-2 rounded-full bg-primary/10 px-4 py-2 text-primary text-sm">
+			<FlaskConical className="size-4" />
+			{t.rich("demoHint", {
+				pin: () => <span className="numeric font-semibold tracking-widest">{DEMO_PIN}</span>,
+			})}
+		</p>
+	);
+}
+
+/**
+ * Whether you appear on this shop's switch screen. Its own control, applied at once: it is not
+ * part of setting a PIN, and finding it should not mean opening the PIN form.
+ */
+export function SwitchVisibilityToggle({ disabled = false }: { disabled?: boolean }) {
+	const t = useTranslations("pin");
+	const { setHidden } = usePinMutations();
+	const me = useRoster().data?.find((p) => p.isYou);
+	const shown = !(me?.hiddenFromSwitch ?? false);
+	return (
+		<label className={cn("flex items-start gap-4", disabled ? "cursor-not-allowed" : "cursor-pointer")}>
+			<span className="min-w-0 flex-1">
+				<span className="block font-medium text-sm">{t("showOnSwitch")}</span>
+				<span className="mt-0.5 block text-muted-foreground text-xs">{t("showOnSwitchHint")}</span>
+			</span>
+			<Switch
+				checked={shown}
+				disabled={disabled || !me || setHidden.isPending}
+				onCheckedChange={(on) =>
+					setHidden.mutate(!on, {
+						onSuccess: () => toast.success(on ? t("shownNow") : t("hiddenNow")),
+						onError: (err) => toast.error(err.message),
+					})
+				}
+			/>
+		</label>
+	);
+}
+
 /** Setting your own PIN: typed twice, and your password when the account has one. */
 export function SetPinDialog({ open, onOpenChange, hasPin }: { open: boolean; onOpenChange: (open: boolean) => void; hasPin: boolean }) {
 	const t = useTranslations("pin");
@@ -303,9 +378,8 @@ export function SetPinDialog({ open, onOpenChange, hasPin }: { open: boolean; on
 	const [again, setAgain] = useState("");
 	const needsPassword = user?.provider !== "GOOGLE";
 	const format = pin.length >= PIN_MIN && pin.length <= PIN_MAX;
-	const weak = format && isWeakPin(pin);
 	const mismatch = again.length > 0 && again !== pin;
-	const valid = format && !weak && again === pin && (!needsPassword || password.length > 0);
+	const valid = format && again === pin && (!needsPassword || password.length > 0);
 
 	const done = () => {
 		setPassword("");
@@ -316,7 +390,7 @@ export function SetPinDialog({ open, onOpenChange, hasPin }: { open: boolean; on
 
 	return (
 		<Dialog open={open} onOpenChange={(o) => (o ? onOpenChange(true) : done())}>
-			<DialogContent className="gap-5 p-6 sm:max-w-sm">
+			<DialogContent className="gap-6 p-6 sm:max-w-md">
 				<DialogHeader>
 					<DialogTitle className="flex items-center gap-2">
 						<KeyRound className="size-5 text-primary" />
@@ -377,10 +451,10 @@ export function SetPinDialog({ open, onOpenChange, hasPin }: { open: boolean; on
 							/>
 						</div>
 					</div>
-					<p className={cn("text-xs", weak || mismatch ? "text-danger" : "text-muted-foreground")}>
-						{weak ? t("weak") : mismatch ? t("mismatch") : t("rule")}
+					<p className={cn("text-xs", mismatch ? "text-danger" : "text-muted-foreground")}>
+						{mismatch ? t("mismatch") : t("digits")}
 					</p>
-					<DialogFooter className="-mx-6 -mb-6 px-6 py-4">
+					<DialogFooter className="-mx-6 -mb-6 mt-2 px-6 py-4">
 						{hasPin ? (
 							<Button
 								type="button"

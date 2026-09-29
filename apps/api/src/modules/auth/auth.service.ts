@@ -105,6 +105,11 @@ export class AuthService {
 		dto: RegisterDto,
 		userAgent?: string
 	): Promise<AuthSessionResponse> {
+		// The demo domain belongs to the seed. Without this, the gap in the nightly reset —
+		// accounts removed, not yet recreated — would let anyone claim nan@demo.posly.
+		if (isDemoEmail(dto.email)) {
+			throw new BadRequestException("This email address cannot be used");
+		}
 		const rounds = this.configService.get<number>("security.bcryptRounds", 10);
 		const user = this.usersRepository.create({
 			email: dto.email,
@@ -257,9 +262,11 @@ export class AuthService {
 				pinHash: true,
 				pinFailedAttempts: true,
 				pinLockedUntil: true,
+				hiddenFromSwitch: true,
 			},
 		});
-		if (!target?.userId || !target.pinHash) {
+		// Hidden from the switch screen means no handover at all, not just an unlisted name.
+		if (!target?.userId || !target.pinHash || target.hiddenFromSwitch) {
 			throw new UnauthorizedException("PIN is not set for this person");
 		}
 		if (target.pinLockedUntil && target.pinLockedUntil.getTime() > Date.now()) {
@@ -273,6 +280,14 @@ export class AuthService {
 		}
 
 		if (!(await compare(dto.pin, target.pinHash))) {
+			// The demo shop is shared: counting wrong guesses would let one visitor lock it for all.
+			const targetUser = await this.usersRepository.findOne({
+				where: { id: target.userId },
+				select: { id: true, email: true },
+			});
+			if (isDemoEmail(targetUser?.email)) {
+				throw new UnauthorizedException({ message: "Wrong PIN" });
+			}
 			// Counted in one statement, so two tills guessing at once cannot both slip under it.
 			// TypeORM's postgres driver answers an UPDATE … RETURNING with [rows, affected].
 			const [rows] = (await this.dataSource.query(

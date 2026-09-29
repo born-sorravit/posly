@@ -138,9 +138,12 @@ export function AuthForm({ mode }: { mode: Mode }) {
 					<div className="flex items-baseline justify-between gap-3">
 						<Label htmlFor="password">{t("password")}</Label>
 						{isRegister ? null : (
-							<Link href="/forgot-password" className="text-primary text-xs hover:underline">
+							// Reset by email is not open yet (no mail provider): say so rather than link to a
+							// form whose link would never arrive. ForgotPasswordForm is kept for when it is.
+							<span className="flex items-center gap-1.5 text-muted-foreground text-xs">
 								{t("forgot")}
-							</Link>
+								<span className="rounded-full bg-muted px-1.5 py-0.5 font-medium text-[11px]">{t("soon")}</span>
+							</span>
 						)}
 					</div>
 					<PasswordInput
