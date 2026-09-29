@@ -41,10 +41,9 @@ The two apps point at each other, so one of them has to go first with a placehol
 
 ## Things that are easy to get wrong
 
-- **pnpm on Render** comes from `corepack enable` in `buildCommand`, pinned by `packageManager`
-  in the root `package.json`. If the first build fails at that step, set `ENABLE_COREPACK=1` or
-  swap it for `npm i -g pnpm@<version>`.
-
+- **pnpm on Render** runs as `corepack pnpm …` in `buildCommand`, pinned by `packageManager`
+  in the root `package.json`. Never `corepack enable` there: `/usr/bin` is read-only and the build
+  fails with `EROFS: read-only file system, unlink '/usr/bin/pnpm'`.
 - **Free Render instances sleep** after ~15 minutes idle; the first request after that takes
   ~30–60 s. A shop opening in the morning will see one slow load. The paid starter plan does
   not sleep.

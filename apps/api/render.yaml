@@ -25,15 +25,17 @@ services:
         - apps/api/**
         - pnpm-lock.yaml
         - pnpm-workspace.yaml
-    # corepack reads `packageManager` from the root package.json, so Render uses the same
-    # pnpm as everyone else. `--prod=false` is load-bearing: NODE_ENV=production below also
-    # applies during the build, pnpm then skips devDependencies, and `nest build` dies with
-    # "nest: not found". `--filter @posly/api...` installs only this app, not the Next apps.
-    buildCommand: corepack enable && pnpm install --frozen-lockfile --prod=false --filter @posly/api... && pnpm run build
+    # `corepack pnpm` runs the pnpm pinned by `packageManager` in the root package.json.
+    # Not `corepack enable`: that writes a link into /usr/bin, which is read-only on Render
+    # (EROFS), and the /usr/bin/pnpm already there may be a different version.
+    # `--prod=false` is load-bearing: NODE_ENV=production below also applies during the
+    # build, pnpm then skips devDependencies, and `nest build` dies with "nest: not found".
+    # `--filter @posly/api...` installs only this app, not the Next apps.
+    buildCommand: corepack pnpm install --frozen-lockfile --prod=false --filter @posly/api... && corepack pnpm run build
     # Migrations read ./dist, so they follow the build. They are idempotent, so running
     # them on every start is safe — and it means a deploy can never run new code on an old
-    # schema.
-    startCommand: pnpm run migration:run && node dist/main
+    # schema. Plain node, no package manager: nothing to resolve or download at boot.
+    startCommand: node ./node_modules/typeorm/cli.js migration:run -d ./dist/shared/database/typeorm.config.js && node dist/main
 
     envVars:
       # --- App -------------------------------------------------------------
@@ -41,6 +43,9 @@ services:
         value: production
       - key: NODE_VERSION
         value: "24"
+      # Build logs are not a TTY, but never let corepack wait on "download pnpm? [Y/n]".
+      - key: COREPACK_ENABLE_DOWNLOAD_PROMPT
+        value: "0"
       # An explicit heap ceiling well under the free instance's 512 MB.
       - key: NODE_OPTIONS
         value: "--max-old-space-size=384"
