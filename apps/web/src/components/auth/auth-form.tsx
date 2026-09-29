@@ -1,6 +1,7 @@
 "use client";
 
 import { GoogleButton } from "@/components/auth/google-button";
+import { PasswordInput, PasswordStrength, passwordErrorKey } from "@/components/auth/password-input";
 import { DemoDialog } from "@/components/demo/demo-dialog";
 import { useSession } from "@/components/providers/session-provider";
 import { Alert, AlertDescription } from "@posly/ui/components/alert";
@@ -21,7 +22,7 @@ import { AlertCircle, Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 
 type Mode = "login" | "register";
 
@@ -47,8 +48,10 @@ export function AuthForm({ mode }: { mode: Mode }) {
 	const {
 		register,
 		handleSubmit,
+		control,
 		formState: { errors, isSubmitting },
 	} = form;
+	const [password, email, name] = useWatch({ control, name: ["password", "email", "name" as "email"] });
 
 	/** Shared by the form and the Google button: both post to a route handler that sets cookies. */
 	const signIn = async (path: string, body: unknown) => {
@@ -139,16 +142,16 @@ export function AuthForm({ mode }: { mode: Mode }) {
 							</Link>
 						)}
 					</div>
-					<Input
+					<PasswordInput
 						id="password"
-						type="password"
 						autoComplete={isRegister ? "new-password" : "current-password"}
 						className="h-11 rounded-xl"
 						{...register("password")}
 					/>
+					{isRegister ? <PasswordStrength password={password ?? ""} email={email} name={name} /> : null}
 					{fieldError("password") ? (
 						<p className="text-danger text-xs">
-							{isRegister ? t("passwordTooShort") : t("passwordRequired")}
+							{isRegister ? t(passwordErrorKey(fieldError("password"))) : t("passwordRequired")}
 						</p>
 					) : isRegister ? (
 						<p className="text-muted-foreground text-xs">{t("passwordHint")}</p>

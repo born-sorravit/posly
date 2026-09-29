@@ -1,5 +1,7 @@
 "use client";
 
+import { PasswordInput, PasswordStrength, passwordErrorKey } from "@/components/auth/password-input";
+import { passwordProblem } from "@posly/utils/password";
 import { Button } from "@posly/ui/components/button";
 import { Input } from "@posly/ui/components/input";
 import { Label } from "@posly/ui/components/label";
@@ -108,9 +110,9 @@ export function ResetPasswordForm({ token }: { token: string }) {
 	const [confirm, setConfirm] = useState("");
 	const [state, setState] = useState<"form" | "done" | "expired">("form");
 	const [pending, setPending] = useState(false);
-	const tooShort = password.length > 0 && password.length < 8;
+	const problem = password ? passwordProblem(password) : null;
 	const mismatch = confirm.length > 0 && confirm !== password;
-	const valid = password.length >= 8 && confirm === password;
+	const valid = password.length > 0 && !problem && confirm === password;
 
 	const save = async () => {
 		setPending(true);
@@ -158,9 +160,8 @@ export function ResetPasswordForm({ token }: { token: string }) {
 			>
 				<div className="space-y-1.5">
 					<Label htmlFor="new-password">{t("newPassword")}</Label>
-					<Input
+					<PasswordInput
 						id="new-password"
-						type="password"
 						autoComplete="new-password"
 						// biome-ignore lint/a11y/noAutofocus: the page exists for this field
 						autoFocus
@@ -168,15 +169,18 @@ export function ResetPasswordForm({ token }: { token: string }) {
 						onChange={(e) => setPassword(e.target.value)}
 						className="h-11 rounded-xl"
 					/>
-					<p className={tooShort ? "text-danger text-xs" : "text-muted-foreground text-xs"}>
-						{tooShort ? t("passwordTooShort") : t("passwordHint")}
-					</p>
+					<PasswordStrength password={password} />
+					{/* "Too short" only once they have typed enough to judge; the rest as soon as it applies. */}
+					{problem && (problem !== "tooShort" || password.length >= 4) ? (
+						<p className="text-danger text-xs">{t(passwordErrorKey(problem))}</p>
+					) : (
+						<p className="text-muted-foreground text-xs">{t("passwordHint")}</p>
+					)}
 				</div>
 				<div className="space-y-1.5">
 					<Label htmlFor="confirm-password">{t("confirmPassword")}</Label>
-					<Input
+					<PasswordInput
 						id="confirm-password"
-						type="password"
 						autoComplete="new-password"
 						value={confirm}
 						onChange={(e) => setConfirm(e.target.value)}

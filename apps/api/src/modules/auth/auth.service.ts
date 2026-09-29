@@ -31,6 +31,7 @@ import { BusinessMember } from "@/models/businesses/entities/business-member.ent
 import { MemberStatus } from "@/shared/enums/member-status.enum";
 import { AccessTokenPayload } from "@/modules/auth/strategies/jwt.strategy";
 import { AuthProvider } from "@/shared/enums/auth-provider.enum";
+import { PASSWORD_MESSAGES, passwordProblem } from "@/shared/utils/password.util";
 import {
 	DEMO_ROLE_EMAILS,
 	type DemoRole,
@@ -371,6 +372,7 @@ export class AuthService {
 				"The new password must be different from the current one"
 			);
 		}
+		this.assertNotPersonal(dto.newPassword, user);
 
 		const rounds = this.configService.get<number>("security.bcryptRounds", 10);
 		await this.usersRepository.update(user.id, {
@@ -461,6 +463,12 @@ export class AuthService {
 			throw new GoneException("This reset link has expired or was already used");
 		}
 
+		// Checked before claiming, so a refused password does not use up the link.
+		const owner = await this.usersRepository.findOne({
+			where: { id: reset.userId },
+		});
+		if (owner) this.assertNotPersonal(dto.newPassword, owner);
+
 		// Claim the link first: of two submissions racing, only one updates this row.
 		const claimed = await resets.update(
 			{ id: reset.id, usedAt: IsNull() },
@@ -524,6 +532,19 @@ export class AuthService {
 			locale: user.locale,
 			isDemo: isDemoEmail(user.email),
 		};
+	}
+
+	/** The DTO cannot see the account, so the name-and-email rule is applied here. */
+	private assertNotPersonal(
+		password: string,
+		user: Pick<User, "email" | "name">
+	): void {
+		if (
+			passwordProblem(password, { email: user.email, name: user.name }) ===
+			"personal"
+		) {
+			throw new BadRequestException(PASSWORD_MESSAGES.personal);
+		}
 	}
 
 	/** SHA-256 is right here, not bcrypt: the input is already 48 random bytes. */

@@ -1,5 +1,10 @@
 import { normaliseEmail, trimmed } from "@/shared/dto/transform.util";
 import { DEMO_ROLES, type DemoRole } from "@/shared/utils/demo.util";
+import {
+	IsAcceptablePassword,
+	PASSWORD_MAX_BYTES,
+	PASSWORD_MIN_LENGTH,
+} from "@/shared/utils/password.util";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Transform } from "class-transformer";
 import {
@@ -21,10 +26,12 @@ export class RegisterDto {
 	@Transform(normaliseEmail)
 	email: string;
 
-	@ApiProperty({ minLength: 8, maxLength: 128 })
+	@ApiProperty({
+		minLength: PASSWORD_MIN_LENGTH,
+		description: `At most ${PASSWORD_MAX_BYTES} bytes; not common, not the email or name.`,
+	})
 	@IsString()
-	@MinLength(8)
-	@MaxLength(128)
+	@IsAcceptablePassword()
 	password: string;
 
 	@ApiProperty({ example: "คุณแนน" })
@@ -97,10 +104,12 @@ export class ChangePasswordDto {
 	@MinLength(1)
 	currentPassword: string;
 
-	@ApiProperty({ minLength: 8, maxLength: 128 })
+	@ApiProperty({
+		minLength: PASSWORD_MIN_LENGTH,
+		description: `At most ${PASSWORD_MAX_BYTES} bytes; not common.`,
+	})
 	@IsString()
-	@MinLength(8)
-	@MaxLength(128)
+	@IsAcceptablePassword()
 	newPassword: string;
 }
 
@@ -140,10 +149,12 @@ export class ResetPasswordDto {
 	@MaxLength(128)
 	token: string;
 
-	@ApiProperty({ minLength: 8 })
+	@ApiProperty({
+		minLength: PASSWORD_MIN_LENGTH,
+		description: `At most ${PASSWORD_MAX_BYTES} bytes; not common.`,
+	})
 	@IsString()
-	@MinLength(8)
-	@MaxLength(128)
+	@IsAcceptablePassword()
 	newPassword: string;
 }
 
