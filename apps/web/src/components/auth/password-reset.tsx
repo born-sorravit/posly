@@ -1,7 +1,7 @@
 "use client";
 
 import { PasswordInput, PasswordStrength, passwordErrorKey } from "@/components/auth/password-input";
-import { passwordProblem } from "@posly/utils/password";
+import { PASSWORD_MAX_BYTES, passwordProblem } from "@posly/utils/password";
 import { Button } from "@posly/ui/components/button";
 import { Input } from "@posly/ui/components/input";
 import { Label } from "@posly/ui/components/label";
@@ -78,6 +78,7 @@ export function ForgotPasswordForm() {
 				<div className="space-y-1.5">
 					<Label htmlFor="email">{t("email")}</Label>
 					<Input
+						maxLength={255}
 						id="email"
 						type="email"
 						autoComplete="email"
@@ -161,6 +162,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
 				<div className="space-y-1.5">
 					<Label htmlFor="new-password">{t("newPassword")}</Label>
 					<PasswordInput
+						maxLength={PASSWORD_MAX_BYTES}
 						id="new-password"
 						autoComplete="new-password"
 						// biome-ignore lint/a11y/noAutofocus: the page exists for this field
@@ -180,6 +182,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
 				<div className="space-y-1.5">
 					<Label htmlFor="confirm-password">{t("confirmPassword")}</Label>
 					<PasswordInput
+						maxLength={PASSWORD_MAX_BYTES}
 						id="confirm-password"
 						autoComplete="new-password"
 						value={confirm}

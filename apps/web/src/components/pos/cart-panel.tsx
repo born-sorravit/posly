@@ -85,6 +85,7 @@ function NoteEditor({ line, onDone }: { line: CartLine; onDone: () => void }) {
 	return (
 		<div className="flex gap-1.5">
 			<input
+				maxLength={200}
 				// biome-ignore lint/a11y/noAutofocus: opened by an explicit "add note" action
 				autoFocus
 				value={value}

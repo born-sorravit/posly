@@ -181,14 +181,14 @@ export function GeneralSettings() {
 				</div>
 				<div className="grid gap-4 tablet:grid-cols-2">
 					<Field label={t("name")} htmlFor="s-name">
-						<Input id="s-name" value={name} onChange={(e) => setName(e.target.value)} disabled={!editable} className="h-11 rounded-xl" />
+						<Input id="s-name" maxLength={120} value={name} onChange={(e) => setName(e.target.value)} disabled={!editable} className="h-11 rounded-xl" />
 					</Field>
 					<Field label={t("phone")} htmlFor="s-phone">
-						<Input id="s-phone" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={!editable} className="h-11 rounded-xl" />
+						<Input id="s-phone" maxLength={30} value={phone} onChange={(e) => setPhone(e.target.value)} disabled={!editable} className="h-11 rounded-xl" />
 					</Field>
 				</div>
 				<Field label={t("address")} htmlFor="s-address">
-					<Textarea id="s-address" value={address} onChange={(e) => setAddress(e.target.value)} disabled={!editable} className="min-h-20 rounded-xl" />
+					<Textarea id="s-address" maxLength={500} value={address} onChange={(e) => setAddress(e.target.value)} disabled={!editable} className="min-h-20 rounded-xl" />
 				</Field>
 				<div className="grid gap-4 tablet:grid-cols-2">
 					<Field label={t("currency")} htmlFor="s-currency" hint={t("currencyHint")}>
@@ -218,6 +218,7 @@ export function PaymentSettings() {
 				<SectionTitle>{t("promptPay")}</SectionTitle>
 				<Field label={t("promptPayId")} htmlFor="pp-id" hint={t("promptPayHint")}>
 					<Input
+						maxLength={13}
 						id="pp-id"
 						value={promptPayId}
 						onChange={(e) => setPromptPayId(e.target.value.replace(/\D/g, ""))}
@@ -334,6 +335,7 @@ export function TaxSettings() {
 								<Field label={t("rate")} htmlFor="tax-rate">
 									<div className="relative">
 										<Input
+											maxLength={5}
 											id="tax-rate"
 											inputMode="decimal"
 											value={rate}
@@ -373,6 +375,7 @@ export function TaxSettings() {
 					<SectionTitle>{t("taxIdTitle")}</SectionTitle>
 					<Field label={t("taxId")} htmlFor="tax-id" hint={t("taxIdHint")}>
 						<Input
+							maxLength={17}
 							id="tax-id"
 							inputMode="numeric"
 							value={formatTaxId(taxId)}

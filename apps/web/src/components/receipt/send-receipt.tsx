@@ -62,6 +62,7 @@ export function SendReceiptButton({ orderId, className, size }: { orderId: strin
 					}}
 				>
 					<Input
+						maxLength={255}
 						type="email"
 						inputMode="email"
 						autoComplete="off"

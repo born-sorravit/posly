@@ -70,6 +70,7 @@ function AddCategory() {
 			</PopoverTrigger>
 			<PopoverContent align="end" className="w-72 space-y-3 p-3">
 				<input
+					maxLength={80}
 					// biome-ignore lint/a11y/noAutofocus: opened by an explicit "add" action
 					autoFocus
 					value={name}

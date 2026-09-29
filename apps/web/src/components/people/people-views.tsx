@@ -125,11 +125,11 @@ function InviteDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (op
 				<div className="space-y-4">
 					<div className="space-y-1.5">
 						<Label htmlFor="invite-name">{t("name")}</Label>
-						<Input id="invite-name" value={name} onChange={(e) => setName(e.target.value)} className="h-11 rounded-xl" />
+						<Input id="invite-name" maxLength={120} value={name} onChange={(e) => setName(e.target.value)} className="h-11 rounded-xl" />
 					</div>
 					<div className="space-y-1.5">
 						<Label htmlFor="invite-email">{t("email")}</Label>
-						<Input id="invite-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="h-11 rounded-xl" />
+						<Input id="invite-email" maxLength={255} type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="h-11 rounded-xl" />
 					</div>
 					<div className="space-y-1.5">
 						<Label>{t("role")}</Label>

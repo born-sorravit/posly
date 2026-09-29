@@ -108,6 +108,7 @@ function DiscountEditor({
 				</label>
 				<div className="relative">
 					<input
+						maxLength={10}
 						id="discount-custom"
 						inputMode="decimal"
 						// biome-ignore lint/a11y/noAutofocus: the editor opens for exactly this input

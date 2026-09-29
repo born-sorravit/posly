@@ -339,6 +339,7 @@ export function SetPinDialog({ open, onOpenChange, hasPin }: { open: boolean; on
 						<div className="space-y-2">
 							<Label htmlFor="pin-password">{t("password")}</Label>
 							<Input
+								maxLength={128}
 								id="pin-password"
 								type="password"
 								autoComplete="current-password"

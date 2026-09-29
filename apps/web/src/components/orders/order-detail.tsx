@@ -206,6 +206,7 @@ export function OrderDetail({ order }: { order: OrderDto }) {
 				}}
 			>
 				<input
+					maxLength={300}
 					value={reason}
 					onChange={(event) => setReason(event.target.value)}
 					placeholder={t("reasonPlaceholder")}

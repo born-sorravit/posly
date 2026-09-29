@@ -19,6 +19,7 @@ import { friendlyMessage } from "@/lib/api/backend";
 import { env } from "@/lib/env";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AlertCircle, Loader2 } from "lucide-react";
+import { PASSWORD_MAX_BYTES } from "@posly/utils/password";
 import { useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
@@ -122,14 +123,14 @@ export function AuthForm({ mode }: { mode: Mode }) {
 				{isRegister ? (
 					<div className="space-y-1.5">
 						<Label htmlFor="name">{t("name")}</Label>
-						<Input id="name" autoComplete="name" className="h-11 rounded-xl" {...register("name" as "email")} />
+						<Input id="name" maxLength={120} autoComplete="name" className="h-11 rounded-xl" {...register("name" as "email")} />
 						{fieldError("name") ? <p className="text-danger text-xs">{t("nameRequired")}</p> : null}
 					</div>
 				) : null}
 
 				<div className="space-y-1.5">
 					<Label htmlFor="email">{t("email")}</Label>
-					<Input id="email" type="email" autoComplete="email" className="h-11 rounded-xl" {...register("email")} />
+					<Input id="email" maxLength={255} type="email" autoComplete="email" className="h-11 rounded-xl" {...register("email")} />
 					{fieldError("email") ? <p className="text-danger text-xs">{t("emailInvalid")}</p> : null}
 				</div>
 
@@ -143,6 +144,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
 						)}
 					</div>
 					<PasswordInput
+						maxLength={isRegister ? PASSWORD_MAX_BYTES : 128}
 						id="password"
 						autoComplete={isRegister ? "new-password" : "current-password"}
 						className="h-11 rounded-xl"

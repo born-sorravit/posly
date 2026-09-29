@@ -143,6 +143,7 @@ function ModifierBody({
 				<label className="block space-y-2">
 					<span className="font-medium text-sm">{t("note")}</span>
 					<input
+						maxLength={200}
 						value={note}
 						onChange={(event) => setNote(event.target.value)}
 						placeholder={t("notePlaceholder")}

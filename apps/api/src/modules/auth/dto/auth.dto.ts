@@ -50,12 +50,15 @@ export class RegisterDto {
 export class LoginDto {
 	@ApiProperty()
 	@IsEmail()
+	@MaxLength(255)
 	@Transform(normaliseEmail)
 	email: string;
 
+	// 128, not the 72-byte rule for new passwords: accounts made before it may have longer ones.
 	@ApiProperty()
 	@IsString()
 	@MinLength(1)
+	@MaxLength(128)
 	password: string;
 }
 
@@ -102,6 +105,7 @@ export class ChangePasswordDto {
 	@ApiProperty()
 	@IsString()
 	@MinLength(1)
+	@MaxLength(128)
 	currentPassword: string;
 
 	@ApiProperty({

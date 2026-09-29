@@ -270,7 +270,7 @@ function ProductForm({ product }: { product?: ProductDto }) {
 						<Surface className="space-y-4">
 							<SectionTitle>{t("details")}</SectionTitle>
 							<Field label={t("name")} htmlFor="name" error={errors.name && t("nameRequired")}>
-								<Input id="name" className="h-11 rounded-xl" {...register("name")} />
+								<Input id="name" maxLength={120} className="h-11 rounded-xl" {...register("name")} />
 							</Field>
 							<div className="grid gap-4 tablet:grid-cols-2">
 								<Field label={t("category")} htmlFor="category">
@@ -329,20 +329,20 @@ function ProductForm({ product }: { product?: ProductDto }) {
 									</div>
 								</Field>
 								<Field label={t("price")} htmlFor="price" error={errors.price && t("priceInvalid")}>
-									<Input id="price" inputMode="decimal" className="numeric h-11 rounded-xl" placeholder="0.00" {...register("price")} />
+									<Input id="price" maxLength={10} inputMode="decimal" className="numeric h-11 rounded-xl" placeholder="0.00" {...register("price")} />
 								</Field>
 								<Field
 									label={t("cost")}
 									htmlFor="cost"
 									hint={margin !== null ? t("margin", { margin }) : t("costHint")}
 								>
-									<Input id="cost" inputMode="decimal" className="numeric h-11 rounded-xl" placeholder="0.00" {...register("cost")} />
+									<Input id="cost" maxLength={10} inputMode="decimal" className="numeric h-11 rounded-xl" placeholder="0.00" {...register("cost")} />
 								</Field>
 								<Field label={t("sku")} htmlFor="sku">
-									<Input id="sku" className="h-11 rounded-xl" {...register("sku")} />
+									<Input id="sku" maxLength={40} className="h-11 rounded-xl" {...register("sku")} />
 								</Field>
 								<Field label={t("barcode")} htmlFor="barcode">
-									<Input id="barcode" className="h-11 rounded-xl" {...register("barcode")} />
+									<Input id="barcode" maxLength={40} className="h-11 rounded-xl" {...register("barcode")} />
 								</Field>
 							</div>
 						</Surface>
@@ -364,10 +364,10 @@ function ProductForm({ product }: { product?: ProductDto }) {
 							{trackStock ? (
 								<div className="grid gap-4 tablet:grid-cols-2">
 									<Field label={t("stock")} htmlFor="stock" error={errors.stock && t("stockRequired")}>
-										<UnitInput id="stock" unit={unit} {...register("stock")} />
+										<UnitInput id="stock" maxLength={7} unit={unit} {...register("stock")} />
 									</Field>
 									<Field label={t("lowStockAt")} htmlFor="lowStockAt" hint={t("lowStockHint")}>
-										<UnitInput id="lowStockAt" unit={unit} {...register("lowStockAt")} />
+										<UnitInput id="lowStockAt" maxLength={7} unit={unit} {...register("lowStockAt")} />
 									</Field>
 								</div>
 							) : null}

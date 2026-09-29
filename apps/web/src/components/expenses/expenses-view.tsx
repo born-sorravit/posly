@@ -156,6 +156,7 @@ function ExpenseDialog({
 						<div className="space-y-2.5">
 							<Label htmlFor="ex-amount">{t("amountBaht")}</Label>
 							<Input
+								maxLength={12}
 								id="ex-amount"
 								inputMode="decimal"
 								// biome-ignore lint/a11y/noAutofocus: the dialog opens for this field

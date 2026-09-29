@@ -102,6 +102,7 @@ export function CustomerDialog({
 						<div className="space-y-2.5">
 							<Label htmlFor="cu-phone">{t("phone")}</Label>
 							<Input
+								maxLength={13}
 								id="cu-phone"
 								inputMode="tel"
 								value={phone}
@@ -114,6 +115,7 @@ export function CustomerDialog({
 						<div className="space-y-2.5">
 							<Label htmlFor="cu-email">{t("email")}</Label>
 							<Input
+								maxLength={255}
 								id="cu-email"
 								type="email"
 								value={email}

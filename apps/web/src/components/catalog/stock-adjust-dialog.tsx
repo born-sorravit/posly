@@ -248,6 +248,7 @@ function StockAdjustForm({
 					</Button>
 					<div className="relative flex-1">
 						<input
+							maxLength={7}
 							id="stock-quantity"
 							inputMode="numeric"
 							// biome-ignore lint/a11y/noAutofocus: the dialog opens for exactly this input

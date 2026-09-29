@@ -179,6 +179,7 @@ function GroupDialog({ editing, onClose }: { editing: ModifierGroupDto | null; o
 										className="h-10 rounded-lg"
 									/>
 									<Input
+										maxLength={10}
 										aria-label={t("priceDelta")}
 										inputMode="decimal"
 										value={o.price}

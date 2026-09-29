@@ -229,12 +229,14 @@ export class CreateProductDto {
 	@IsOptional()
 	@IsInt()
 	@Min(0)
+	@Max(1_000_000)
 	stock?: number | null;
 
 	@ApiPropertyOptional({ nullable: true })
 	@IsOptional()
 	@IsInt()
 	@Min(0)
+	@Max(1_000_000)
 	lowStockAt?: number | null;
 
 	@ApiPropertyOptional({ example: "แก้ว" })

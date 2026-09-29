@@ -170,6 +170,7 @@ export class QueryOrdersDto extends PaginationDto {
 	@IsOptional()
 	@Transform(toTrimmedString)
 	@IsString()
+	@MaxLength(120)
 	search?: string;
 }
 

@@ -125,6 +125,7 @@ export const SearchInput = forwardRef<
 		<div className={cn("relative", className)}>
 			<Search className="-translate-y-1/2 pointer-events-none absolute top-1/2 left-3 size-4 text-muted-foreground" />
 			<input
+				maxLength={120}
 				ref={ref}
 				type="search"
 				value={value}

@@ -353,22 +353,22 @@ export function OnboardingFlow() {
 									</label>
 									<div className="space-y-1.5">
 										<Label htmlFor="ob-name">{t("storeName")}</Label>
-										<Input id="ob-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Sunny Cafe" className="h-11 rounded-xl" />
+										<Input id="ob-name" maxLength={120} value={name} onChange={(e) => setName(e.target.value)} placeholder="Sunny Cafe" className="h-11 rounded-xl" />
 									</div>
 									<div className="grid gap-4 tablet:grid-cols-2">
 										<div className="space-y-1.5">
 											<Label htmlFor="ob-phone">{t("phone")}</Label>
-											<Input id="ob-phone" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="h-11 rounded-xl" />
+											<Input id="ob-phone" maxLength={30} inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="h-11 rounded-xl" />
 										</div>
 										<div className="space-y-1.5">
 											<Label htmlFor="ob-tax">{t("taxId")}</Label>
-											<Input id="ob-tax" inputMode="numeric" value={formatTaxId(taxId)} onChange={(e) => setTaxId(e.target.value.replace(/\D/g, "").slice(0, 13))} className="numeric h-11 rounded-xl" placeholder={t("optional")} />
+											<Input id="ob-tax" maxLength={17} inputMode="numeric" value={formatTaxId(taxId)} onChange={(e) => setTaxId(e.target.value.replace(/\D/g, "").slice(0, 13))} className="numeric h-11 rounded-xl" placeholder={t("optional")} />
 											{taxIdOk ? null : <p className="text-danger text-xs">{t("taxIdInvalid")}</p>}
 										</div>
 									</div>
 									<div className="space-y-1.5">
 										<Label htmlFor="ob-address">{t("address")}</Label>
-										<Textarea id="ob-address" value={address} onChange={(e) => setAddress(e.target.value)} className="min-h-20 rounded-xl" />
+										<Textarea id="ob-address" maxLength={500} value={address} onChange={(e) => setAddress(e.target.value)} className="min-h-20 rounded-xl" />
 									</div>
 									<p className="text-muted-foreground text-xs">{t("currencyNote")}</p>
 								</div>
