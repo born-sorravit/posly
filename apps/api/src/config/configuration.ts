@@ -5,7 +5,7 @@ import * as dotenv from "dotenv";
  * Picks the env file from NODE_ENV, mirroring the deployment layout:
  *   development -> .env.development.local
  *   anything else (local, staging, production) -> .env / real process env
- * On Render/Vercel the platform injects the variables directly, so no file exists.
+ * On Railway/Vercel the platform injects the variables directly, so no file exists.
  */
 export const getEnvFilePath = (): string | undefined =>
 	process.env.NODE_ENV === "development" ? ".env.development.local" : ".env";
@@ -81,42 +81,43 @@ export interface DatabaseConfig {
 }
 
 /**
- * Cache only, over Upstash's REST API — optional, falls back to an in-process Map.
- * BullMQ does not run on this; see `QueueConfig`.
+ * Railway Redis, shared by the cache and BullMQ. Empty `REDIS_URL` leaves the cache on an
+ * in-process Map; queues need it only once one is registered.
  */
+export interface RedisConfig {
+	url: string;
+}
+
+/** Read-through cache — optional, falls back to an in-process Map without Redis. */
 export interface CacheConfig {
-	provider: "upstash" | "memory";
-	restUrl: string | undefined;
-	restToken: string | undefined;
+	provider: "redis" | "memory";
 	prefix: string;
 	ttlSeconds: number;
 }
 
 export interface QueueConfig {
-	/**
-	 * BullMQ's PostgreSQL backend: reuses the Supabase database over LISTEN/NOTIFY, so there
-	 * is no broker to pay for. Requires a **session**-mode connection (Supabase port 5432).
-	 */
-	backend: "postgres";
-	schema: string;
 	prefix: string;
 }
 
 /**
- * Supabase Storage, for product images and store logos.
+ * An S3-compatible bucket (Railway Storage Buckets), for product images and store logos.
  *
- * The API never streams file bytes. It mints a short-lived signed upload URL scoped to one
- * object path under the caller's business, the browser PUTs the file straight to Supabase,
- * and the API stores only the resulting path. That keeps 5 MB photos off a 512 MB instance
- * and keeps the service-role key on the server.
+ * The API never streams file bytes. It mints a short-lived presigned PUT URL scoped to one
+ * object path under the caller's business, the browser uploads straight to the bucket, and
+ * the API stores only the resulting path. Railway buckets are private, so images are read
+ * through `GET /media/<path>`, which redirects to a short-lived presigned GET.
  */
 export interface StorageConfig {
-	/** Project URL, e.g. https://<ref>.supabase.co. Empty disables uploads. */
-	supabaseUrl: string;
-	/** Service-role key. Server-only: it bypasses row-level security. */
-	serviceRoleKey: string;
-	/** A **public** bucket — product photos are shown on receipts and to anyone at the till. */
+	/** e.g. https://t3.storageapi.dev. Empty disables uploads. */
+	endpoint: string;
+	region: string;
 	bucket: string;
+	accessKeyId: string;
+	secretAccessKey: string;
+	/** Older Railway buckets need path-style URLs; new ones are virtual-hosted. */
+	forcePathStyle: boolean;
+	/** Public origin of this API (https://api.example.com), for the stable image URLs. */
+	publicBaseUrl: string;
 	maxUploadBytes: number;
 }
 
@@ -160,6 +161,7 @@ export interface BillingConfig {
 export interface Configuration {
 	app: AppConfig;
 	database: DatabaseConfig;
+	redis: RedisConfig;
 	cache: CacheConfig;
 	queue: QueueConfig;
 	security: SecurityConfig;
@@ -184,24 +186,21 @@ export default (): Configuration => ({
 		url: process.env.DATABASE_URL ?? "",
 		synchronize: false,
 		logging: toBool(process.env.DB_LOGGING, false),
-		// Supabase terminates TLS with a chain Node does not ship, so verification is opt-in.
+		// Railway's private network is plain TCP (DB_SSL=false); its public TCP proxy presents a
+		// self-signed certificate, so verification is opt-in.
 		ssl: toBool(process.env.DB_SSL, true)
 			? { rejectUnauthorized: false }
 			: undefined,
 	},
+	redis: {
+		url: process.env.REDIS_URL ?? "",
+	},
 	cache: {
-		provider:
-			process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
-				? "upstash"
-				: "memory",
-		restUrl: process.env.UPSTASH_REDIS_REST_URL,
-		restToken: process.env.UPSTASH_REDIS_REST_TOKEN,
+		provider: process.env.REDIS_URL ? "redis" : "memory",
 		prefix: process.env.CACHE_PREFIX ?? "posly",
 		ttlSeconds: toInt(process.env.CACHE_TTL_SECONDS, 300),
 	},
 	queue: {
-		backend: "postgres",
-		schema: process.env.QUEUE_SCHEMA ?? "bullmq",
 		prefix: process.env.QUEUE_PREFIX ?? "posly",
 	},
 	security: {
@@ -218,9 +217,15 @@ export default (): Configuration => ({
 		googleClientId: process.env.GOOGLE_CLIENT_ID ?? "",
 	},
 	storage: {
-		supabaseUrl: (process.env.SUPABASE_URL ?? "").replace(/\/+$/, ""),
-		serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
-		bucket: process.env.SUPABASE_STORAGE_BUCKET ?? "posly",
+		endpoint: (process.env.S3_ENDPOINT ?? "").replace(/\/+$/, ""),
+		region: process.env.S3_REGION || "auto",
+		bucket: process.env.S3_BUCKET ?? "",
+		accessKeyId: process.env.S3_ACCESS_KEY_ID ?? "",
+		secretAccessKey: process.env.S3_SECRET_ACCESS_KEY ?? "",
+		forcePathStyle: toBool(process.env.S3_FORCE_PATH_STYLE, false),
+		publicBaseUrl: (
+			process.env.PUBLIC_API_URL ?? `http://localhost:${process.env.PORT ?? 3001}`
+		).replace(/\/+$/, ""),
 		maxUploadBytes: toInt(process.env.STORAGE_MAX_UPLOAD_BYTES, 5 * 1024 * 1024),
 	},
 	mail: {

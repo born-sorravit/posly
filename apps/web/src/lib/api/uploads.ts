@@ -3,7 +3,7 @@
  *
  *   1. ask the API (through the `/api/backend` proxy, which attaches the session) for a
  *      signed upload URL scoped to this business;
- *   2. PUT the file straight to Supabase Storage with it.
+ *   2. PUT the file straight to the storage bucket with it.
  *
  * The returned `path` is what gets saved on the product or business; the API derives the
  * public URL from it.

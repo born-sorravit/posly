@@ -15,7 +15,7 @@ export class Business extends BaseEntity {
 	businessType: BusinessType;
 
 	/**
-	 * Object path in Supabase Storage (`<businessId>/logo/<uuid>.png`), not a URL: the public
+	 * Object path in the storage bucket (`<businessId>/logo/<uuid>.png`), not a URL: the public
 	 * URL is derived from config, so moving the bucket or project changes no rows.
 	 */
 	@Column({ name: "logo_path", type: "varchar", length: 300, nullable: true })

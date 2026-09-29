@@ -24,7 +24,7 @@ export class StorageController {
 	@Post()
 	@RequirePermission(Permission.PRODUCTS_WRITE)
 	@ApiOperation({
-		summary: "Get a signed URL to upload an image straight to Supabase Storage",
+		summary: "Get a presigned URL to upload an image straight to the bucket",
 		description:
 			"The browser PUTs the file to `uploadUrl`, then saves `path` on the product or business.",
 	})

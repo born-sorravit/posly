@@ -9,7 +9,7 @@ posly/
 ├── apps/
 │   ├── web/        @posly/web    POS + หลังร้าน — Next.js 16 · Tailwind 4 · TanStack Query · Zustand · Motion · Recharts · next-intl   :3000
 │   ├── admin/      @posly/admin  Platform admin (ยังเป็น scaffold) — Next.js 16                                                        :3003
-│   └── api/        @posly/api    Backend — NestJS 11 · PostgreSQL (Supabase) + TypeORM · BullMQ (PostgreSQL) · Supabase Storage      :3001
+│   └── api/        @posly/api    Backend — NestJS 11 · PostgreSQL + TypeORM · BullMQ (Redis) · S3 bucket — บน Railway      :3001
 └── packages/
     ├── ui/         @posly/ui     shadcn/ui components (radix-nova) + `cn()` + theme CSS (`styles/globals.css`)
     ├── types/      @posly/types  TypeScript types ของสัญญา API (`domain.ts`, `api.ts`)
@@ -29,7 +29,7 @@ posly/
 | Role | อยู่ที่ `BusinessMember` ไม่ใช่ `User` (คนเดียวเป็นเจ้าของร้านหนึ่ง และแคชเชียร์อีกร้านได้) route ประกาศ **permission** ไม่ใช่ role |
 | เงิน | integer satang ทุกที่ (`BIGINT` + transformer ฝั่ง backend, `lib/money.ts` ฝั่ง frontend) ห้าม float |
 | Subscription | frontend ถาม `hasFeature("INVENTORY")` จากสิทธิ์ที่ API ส่งมา ไม่เทียบชื่อแพ็กเกจ |
-| รูปภาพ | Supabase Storage — API ออก signed upload URL, browser อัปโหลดตรง, DB เก็บแค่ path |
+| รูปภาพ | Railway Bucket (S3, private) — API ออก presigned upload URL, browser อัปโหลดตรง, DB เก็บแค่ path, เสิร์ฟผ่าน `/api/v1/media/*` |
 
 ## รันในเครื่อง
 
@@ -43,13 +43,13 @@ pnpm install                                  # ครั้งเดียว�
 
 ### Backend — API :3001 (Swagger: `/api-docs`)
 
-ต่อ Supabase (อ่าน `apps/api/.env.development.local`):
+ต่อ Railway environment สำหรับ dev (อ่าน `apps/api/.env.development.local` — ใช้ `DATABASE_PUBLIC_URL` / `REDIS_PUBLIC_URL`):
 
 ```bash
 pnpm --filter @posly/api start:dev
 ```
 
-หรือใช้ Postgres ใน docker (อ่าน `apps/api/.env`):
+หรือใช้ Postgres + Redis ใน docker (อ่าน `apps/api/.env`):
 
 ```bash
 cp apps/api/.env.example apps/api/.env
@@ -103,15 +103,14 @@ pnpm --filter @posly/api seed:demo -- --remove   # ลบร้านและ�
 | ส่วน | บริการ |
 | --- | --- |
 | Web (`apps/web`) | Vercel — Root Directory `apps/web` |
-| API (`apps/api`) | Render — `apps/api/render.yaml` |
-| PostgreSQL | Supabase (session pooler, port 5432) |
-| Queue (BullMQ) | Supabase — database เดียวกัน, PostgreSQL backend |
-| รูปสินค้า / โลโก้ | Supabase Storage (public bucket `posly`) |
-| Cache | Upstash REST (ไม่บังคับ) |
+| API (`apps/api`) | Railway — `apps/api/railway.json` |
+| PostgreSQL | Railway PostgreSQL (private network) |
+| Queue (BullMQ) / Cache | Railway Redis |
+| รูปสินค้า / โลโก้ | Railway Bucket (private, เสิร์ฟผ่าน `/api/v1/media/*`) |
 
 ## Deploy
 
-ดู [`apps/api/docs/deployment.md`](apps/api/docs/deployment.md) — Render (`render.yaml`) + Vercel (`vercel.json`) + Supabase
+ดู [`apps/api/docs/deployment.md`](apps/api/docs/deployment.md) — Railway (`railway.json`) + Vercel (`vercel.json`)
 
 ## สถานะ
 
@@ -158,7 +157,7 @@ pnpm --filter @posly/api seed:demo -- --remove   # ลบร้านและ�
 
 ```bash
 pnpm test                                                                             # unit ทุก workspace
-E2E_DATABASE_URL=postgres://posly:posly@localhost:5434/posly pnpm --filter @posly/api test:e2e   # ต้องเป็น DB ทิ้งได้ — ห้ามชี้ Supabase
+E2E_DATABASE_URL=postgres://posly:posly@localhost:5434/posly pnpm --filter @posly/api test:e2e   # ต้องเป็น DB ทิ้งได้ — ห้ามชี้ Railway
 ```
 
 ## CI
@@ -171,6 +170,6 @@ E2E_DATABASE_URL=postgres://posly:posly@localhost:5434/posly pnpm --filter @posl
 | Backend (`apps/api/**`) | `pnpm install` → Biome → `tsc` → unit → migrate **ฐานข้อมูลว่าง** (Postgres 17 ใน service container) → e2e ทั้งหมด → `nest build` |
 | Frontend (`apps/web`, `apps/admin`, `packages/**`) | `pnpm install` → `turbo run lint typecheck test build` ของ web + admin + packages ที่ใช้ |
 
-- e2e ใช้ Postgres ของ runner เท่านั้น (`E2E_DATABASE_URL`) ไม่มี secret ของ Supabase / Stripe / Resend ใน CI
+- e2e ใช้ Postgres ของ runner เท่านั้น (`E2E_DATABASE_URL`) ไม่มี secret ของ Railway / Stripe / Resend ใน CI
 - migrate จาก DB ว่างทุกครั้ง: migration ที่รันได้แค่บน schema เดิมจะพังที่นี่ ไม่ใช่ตอน deploy
 - ไม่ต้องตั้ง secret ใดๆ ใน GitHub

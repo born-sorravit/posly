@@ -385,7 +385,7 @@
 		"uploadHint": "JPG, PNG, WebP ไม่เกิน 5 MB",
 		"imageType": "รองรับเฉพาะ JPG, PNG หรือ WebP",
 		"imageSize": "ไฟล์ใหญ่เกิน 5 MB",
-		"storageNote": "รูปจะถูกเก็บใน Supabase Storage ของร้านคุณ",
+		"storageNote": "รูปจะถูกเก็บในพื้นที่จัดเก็บไฟล์ของร้านคุณ",
 		"notFound": "ไม่พบสินค้านี้",
 		"uploadFailed": "อัปโหลดรูปไม่สำเร็จ",
 		"saveFailed": "บันทึกไม่สำเร็จ",

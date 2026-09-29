@@ -20,7 +20,7 @@ src/
     dashboard/ orders/ products/ catalog/ people/ reports/ settings/ onboarding/ auth/
   stores/                         Zustand: cart-store (POS ทำงานได้โดยไม่พึ่ง network), workspace-store
   hooks/                          use-workspace (business/branch/hasFeature), use-media-query, use-now
-  lib/                            api/uploads.ts (Supabase signed upload), auth/, permissions.ts, mock/
+  lib/                            api/uploads.ts (presigned upload ไป bucket), auth/, permissions.ts, mock/
 messages/th.json                  ข้อความทั้งหมด (type-checked ผ่าน global.d.ts)
 ```
 

@@ -28,13 +28,16 @@ Global guards: `ThrottlerGuard → JwtAuthGuard → BusinessAccessGuard`
 - handler ใช้ `@CurrentMembership()` แล้ว scope ทุก query ด้วย `membership.businessId`
 - param ต้องชื่อ `businessId` เท่านั้น
 
-## Supabase
+## Railway
 
-- **Database**: ใช้ *Session pooler* URI (port 5432, database ชื่อ `postgres`, `DB_SSL=true`) — ดูหมายเหตุใน `.env.example`
-- **Storage**: สร้าง public bucket `posly` แล้วใส่ `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY`
+- **Database**: ใน Railway ใช้ `${{Postgres.DATABASE_URL}}` (private network, `DB_SSL=false`) ส่วนจากเครื่องตัวเองใช้ `DATABASE_PUBLIC_URL` กับ `DB_SSL=true`
+- **Redis**: `REDIS_URL` ใช้ร่วมกันระหว่าง cache (`CacheService`) และ BullMQ ถ้าไม่ตั้ง cache จะใช้ Map ใน process
+- **Storage**: Railway Bucket (S3-compatible, private) ตั้งค่าผ่าน `S3_*` และ `PUBLIC_API_URL`
   - `POST /api/v1/businesses/:businessId/uploads` → `{ uploadUrl, path, publicUrl }`
-  - browser `PUT` ไฟล์ไปที่ `uploadUrl` แล้วส่ง `path` กลับตอนบันทึกสินค้า/โลโก้
+  - browser `PUT` ไฟล์ไปที่ `uploadUrl` (presigned) แล้วส่ง `path` กลับตอนบันทึกสินค้า/โลโก้
   - path ขึ้นต้นด้วย businessId เสมอ และถูกตรวจด้วย `assertOwnedPath`
+  - `publicUrl` คือ `GET /api/v1/media/<path>` ซึ่ง redirect 302 ไปที่ presigned GET อายุ 1 ชม.
+- **Deploy**: `railway.json` ดู [`docs/deployment.md`](docs/deployment.md)
 
 ## Scripts
 

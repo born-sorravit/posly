@@ -33,7 +33,7 @@ export function Brand({
 }
 
 /**
- * A shop's avatar: its logo from Supabase Storage when uploaded, otherwise its initial on a
+ * A shop's avatar: its logo from the storage bucket when uploaded, otherwise its initial on a
  * soft tint.
  */
 export function StoreAvatar({

@@ -1,0 +1,18 @@
+{
+	"$schema": "https://railway.com/railway.schema.json",
+	"build": {
+		"builder": "RAILPACK",
+		"buildCommand": "pnpm install --frozen-lockfile --prod=false --filter @posly/api... && pnpm --filter @posly/api build",
+		"watchPatterns": ["apps/api/**", "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml"]
+	},
+	"deploy": {
+		"preDeployCommand": [
+			"node apps/api/node_modules/typeorm/cli.js migration:run -d apps/api/dist/shared/database/typeorm.config.js"
+		],
+		"startCommand": "node apps/api/dist/main",
+		"healthcheckPath": "/healthcheck",
+		"healthcheckTimeout": 120,
+		"restartPolicyType": "ON_FAILURE",
+		"restartPolicyMaxRetries": 5
+	}
+}

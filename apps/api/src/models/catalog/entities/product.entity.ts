@@ -46,7 +46,7 @@ export class Product extends BaseEntity {
 	@Column({ type: "varchar", length: 40, nullable: true })
 	barcode: string | null;
 
-	/** Supabase Storage object path; the public URL is derived from config. */
+	/** Storage bucket object path; the public URL is derived from config. */
 	@Column({ name: "image_path", type: "varchar", length: 300, nullable: true })
 	imagePath: string | null;
 

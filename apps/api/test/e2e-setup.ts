@@ -16,8 +16,8 @@ process.env.REFRESH_ROTATION_GRACE_MS =
 	process.env.REFRESH_ROTATION_GRACE_MS ?? "1000";
 
 /**
- * The suites write real rows, so they must never reach the deployed database. `.env` points
- * at Supabase; the e2e run requires an explicit throwaway database instead and refuses to
+ * The suites write real rows, so they must never reach the deployed database. `.env` may point
+ * at Railway; the e2e run requires an explicit throwaway database instead and refuses to
  * start without one.
  */
 if (!process.env.E2E_DATABASE_URL) {

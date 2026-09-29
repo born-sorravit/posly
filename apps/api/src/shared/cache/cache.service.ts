@@ -1,7 +1,7 @@
-import { CacheConfig } from "@/config/configuration";
-import { Redis } from "@upstash/redis";
-import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
+import type { CacheConfig, RedisConfig } from "@/config/configuration";
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { Redis } from "ioredis";
 
 interface MemoryEntry {
 	value: unknown;
@@ -11,38 +11,44 @@ interface MemoryEntry {
 /**
  * A small read-through cache.
  *
- * Upstash over its **REST** API, not a TCP client: there is no socket to hold, it works from
- * any runtime, and cache traffic is low enough to stay inside the free tier. (Queues could
- * not use Redis for exactly the opposite reason — see the README.)
+ * Railway Redis over its private network, shared with BullMQ. Values are stored as JSON.
  *
- * With no credentials it degrades to an in-process Map, so local development and CI need no
+ * With no REDIS_URL it degrades to an in-process Map, so local development and CI need no
  * network service and nothing has to branch on whether a cache exists.
  */
 @Injectable()
-export class CacheService implements OnModuleInit {
+export class CacheService implements OnModuleInit, OnModuleDestroy {
 	private readonly logger = new Logger(CacheService.name);
 	private readonly config: CacheConfig;
+	private readonly redisConfig: RedisConfig;
 	private readonly memory = new Map<string, MemoryEntry>();
 	private redis: Redis | null = null;
 
 	constructor(configService: ConfigService) {
 		this.config = configService.getOrThrow<CacheConfig>("cache");
+		this.redisConfig = configService.getOrThrow<RedisConfig>("redis");
 	}
 
 	onModuleInit(): void {
-		if (
-			this.config.provider === "upstash" &&
-			this.config.restUrl &&
-			this.config.restToken
-		) {
-			this.redis = new Redis({
-				url: this.config.restUrl,
-				token: this.config.restToken,
+		if (this.config.provider === "redis" && this.redisConfig.url) {
+			this.redis = new Redis(this.redisConfig.url, {
+				// Railway's private network resolves over IPv6 as well as IPv4.
+				family: 0,
+				lazyConnect: true,
+				// Fail a command fast rather than hold a request while Redis is away.
+				maxRetriesPerRequest: 1,
 			});
-			this.logger.log("Cache: Upstash REST");
+			this.redis.on("error", (error: Error) => {
+				this.logger.warn(`Redis: ${error.message}`);
+			});
+			this.logger.log("Cache: Redis");
 			return;
 		}
-		this.logger.log("Cache: in-process (no Upstash credentials configured)");
+		this.logger.log("Cache: in-process (no REDIS_URL configured)");
+	}
+
+	async onModuleDestroy(): Promise<void> {
+		await this.redis?.quit().catch(() => undefined);
 	}
 
 	/**
@@ -81,8 +87,8 @@ export class CacheService implements OnModuleInit {
 	private async read<T>(key: string): Promise<T | undefined> {
 		if (this.redis) {
 			try {
-				const value = await this.redis.get<T>(key);
-				return value === null ? undefined : value;
+				const value = await this.redis.get(key);
+				return value === null ? undefined : (JSON.parse(value) as T);
 			} catch (error) {
 				this.logger.warn(
 					`Cache read failed for ${key}: ${error instanceof Error ? error.message : error}`
@@ -106,9 +112,11 @@ export class CacheService implements OnModuleInit {
 		ttlSeconds: number
 	): Promise<void> {
 		if (this.redis) {
-			await this.redis.set(key, value, { ex: ttlSeconds }).catch((error: Error) => {
-				this.logger.warn(`Cache write failed for ${key}: ${error.message}`);
-			});
+			await this.redis
+				.set(key, JSON.stringify(value), "EX", ttlSeconds)
+				.catch((error: Error) => {
+					this.logger.warn(`Cache write failed for ${key}: ${error.message}`);
+				});
 			return;
 		}
 

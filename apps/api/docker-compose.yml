@@ -1,6 +1,6 @@
-# Postgres only, for local development. Deployments use Supabase; BullMQ runs on the same
-# database (PostgreSQL backend) and the cache talks to Upstash over HTTP or falls back to an
-# in-process Map, so there is no local Redis to run.
+# Postgres and Redis for local development; deployments use the same two on Railway.
+# Redis is optional locally: without REDIS_URL the cache falls back to an in-process Map, and
+# no BullMQ queue is registered yet.
 services:
   postgres:
     image: postgres:17-alpine
@@ -16,6 +16,18 @@ services:
       - posly-pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U posly"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: posly-redis
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 5s
       retries: 10
