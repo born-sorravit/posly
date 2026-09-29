@@ -13,7 +13,7 @@ export default async function AuthLayout({ children }: { children: ReactNode }) 
 					"radial-gradient(ellipse 60% 50% at 50% -10%, color-mix(in oklab, var(--primary) 14%, transparent), transparent 70%)",
 			}}
 		>
-			<Brand />
+			<Brand size="lg" />
 			<div className="w-full max-w-sm surface rounded-3xl p-6 tablet:p-8">
 				{children}
 			</div>

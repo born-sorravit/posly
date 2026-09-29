@@ -38,7 +38,7 @@ export default async function NotFound() {
 				}}
 			/>
 			<div className="relative flex max-w-md flex-col items-center text-center">
-				<Brand />
+				<Brand size="lg" />
 				<p
 					aria-hidden
 					className="numeric mt-10 select-none bg-linear-to-b from-foreground to-foreground/15 bg-clip-text font-bold text-[7.5rem] text-transparent leading-none tracking-tighter tablet:text-[9rem]"

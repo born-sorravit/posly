@@ -13,20 +13,35 @@ export function BrandMark({ className }: { className?: string }) {
 
 export function Brand({
 	collapsed = false,
+	size = "md",
 	onNavigate,
 }: {
 	collapsed?: boolean;
+	/** "lg" is the standalone lockup over a centred card (sign-in, 404). */
+	size?: "md" | "lg";
 	onNavigate?: () => void;
 }) {
+	const lg = size === "lg";
 	return (
 		<Link
 			href="/dashboard"
 			onClick={onNavigate}
-			className="flex min-w-0 items-center gap-2.5 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring"
+			className={cn(
+				"flex min-w-0 items-center rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring",
+				lg ? "gap-3" : "gap-2.5"
+			)}
 		>
-			<BrandMark />
+			<BrandMark className={lg ? "size-11" : undefined} />
 			{collapsed ? null : (
-				<span className="truncate font-semibold text-lg tracking-tight">Posly</span>
+				<span
+					className={cn(
+						"truncate tracking-tight",
+						// leading-none so the glyphs, not Anuphan's tall line box, set the centre.
+						lg ? "font-bold text-[1.75rem] leading-none" : "font-semibold text-lg"
+					)}
+				>
+					Posly
+				</span>
 			)}
 		</Link>
 	);
