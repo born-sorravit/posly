@@ -1,0 +1,11 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+# Dependencies allowed to run install scripts (native binaries). scarf is telemetry.
+allowBuilds:
+  "@parcel/watcher": true
+  "@swc/core": true
+  msgpackr-extract: true
+  unrs-resolver: true
+  "@scarf/scarf": false

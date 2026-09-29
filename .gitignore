@@ -1,0 +1,32 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.*
+
+# build output
+.next/
+out/
+dist/
+build/
+coverage/
+.turbo/
+.vercel
+*.tsbuildinfo
+next-env.d.ts
+
+# env — only the examples are committed
+.env*
+!.env.example
+
+# logs
+*.log
+
+# editors / OS
+.DS_Store
+.idea/
+.vscode/
+*.pem
+
+# local agent state
+.agents
+.claude

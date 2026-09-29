@@ -1,0 +1,19 @@
+{
+	"name": "@posly/types",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts",
+		"./*": "./src/*.ts"
+	},
+	"scripts": {
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@posly/utils": "workspace:*"
+	},
+	"devDependencies": {
+		"typescript": "^5"
+	}
+}

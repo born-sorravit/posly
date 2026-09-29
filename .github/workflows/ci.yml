@@ -1,0 +1,135 @@
+# Checks every push and pull request. Each side is checked only when something it depends
+# on changed (the frontend side includes packages/*); a change to the lockfile or this file
+# checks both.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A newer push to the same branch makes the older run pointless.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'apps/api/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - '.github/workflows/ci.yml'
+            frontend:
+              - 'apps/web/**'
+              - 'apps/admin/**'
+              - 'packages/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'turbo.json'
+              - 'tsconfig.base.json'
+              - '.github/workflows/ci.yml'
+
+  backend:
+    name: Backend · lint, types, unit, e2e, build
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # A throwaway database, the same major version as docker-compose.yml. The e2e suites
+    # write real rows and refuse to run without E2E_DATABASE_URL, so they can never reach
+    # Supabase from here.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: posly
+          POSTGRES_PASSWORD: posly
+          POSTGRES_DB: posly
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U posly"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://posly:posly@localhost:5432/posly
+      E2E_DATABASE_URL: postgres://posly:posly@localhost:5432/posly
+      DB_SSL: "false"
+      JWT_SECRET: ci-only-secret
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      # Version comes from `packageManager` in the root package.json.
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Lint (Biome)
+        run: pnpm --filter @posly/api lint
+      - name: Type-check
+        run: pnpm --filter @posly/api typecheck
+      - name: Unit tests
+        run: pnpm --filter @posly/api test
+      # From an empty database, every time: a migration that only works on top of an
+      # already-migrated schema fails here, not in production.
+      - name: Migrate an empty database
+        run: pnpm --filter @posly/api migration:run:src
+      - name: End-to-end tests
+        run: pnpm --filter @posly/api test:e2e
+      - name: Build
+        run: pnpm --filter @posly/api build
+
+  frontend:
+    name: Frontend · web, admin, packages
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      TURBO_TELEMETRY_DISABLED: "1"
+      # Inlined at build time; the build only needs a well-formed URL, not a live API.
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:3001/api/v1
+      NEXT_PUBLIC_SITE_URL: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+      # Version comes from `packageManager` in the root package.json.
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Cache Next.js build
+        uses: actions/cache@v4
+        with:
+          path: |
+            apps/web/.next/cache
+            apps/admin/.next/cache
+          key: next-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('apps/web/src/**', 'apps/admin/src/**', 'packages/*/src/**') }}
+          restore-keys: |
+            next-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
+      # Both apps plus every package they depend on (the trailing `...`).
+      - name: Lint, type-check, unit tests, build
+        run: pnpm turbo run lint typecheck test build --filter=@posly/web... --filter=@posly/admin...

@@ -1,0 +1,119 @@
+# Render Blueprint for the Posly API.
+#
+# Create it from the Render dashboard with "New > Blueprint" pointed at this repo, with the
+# blueprint path set to apps/api/render.yaml. Every
+# `sync: false` variable is prompted for once at that point and then lives only in Render.
+# See docs/deployment.md for the order to set things up in.
+services:
+  - name: posly-backend
+    type: web
+    runtime: node
+    plan: free
+    # Supabase is in aws-0-ap-southeast-1; anything else puts an ocean between the API and
+    # its database, and every checkout is several round trips inside one transaction.
+    region: singapore
+    branch: main
+    healthCheckPath: /healthcheck
+    autoDeployTrigger: commit
+
+    # The repo is a pnpm workspace; the API lives in apps/api. Commands run from rootDir, and
+    # pnpm finds the workspace root (and its lockfile) on its own. Only changes under
+    # buildFilter trigger a deploy — a web-only commit leaves the API alone.
+    rootDir: apps/api
+    buildFilter:
+      paths:
+        - apps/api/**
+        - pnpm-lock.yaml
+        - pnpm-workspace.yaml
+    # corepack reads `packageManager` from the root package.json, so Render uses the same
+    # pnpm as everyone else. `--prod=false` is load-bearing: NODE_ENV=production below also
+    # applies during the build, pnpm then skips devDependencies, and `nest build` dies with
+    # "nest: not found". `--filter @posly/api...` installs only this app, not the Next apps.
+    buildCommand: corepack enable && pnpm install --frozen-lockfile --prod=false --filter @posly/api... && pnpm run build
+    # Migrations read ./dist, so they follow the build. They are idempotent, so running
+    # them on every start is safe — and it means a deploy can never run new code on an old
+    # schema.
+    startCommand: pnpm run migration:run && node dist/main
+
+    envVars:
+      # --- App -------------------------------------------------------------
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "24"
+      # An explicit heap ceiling well under the free instance's 512 MB.
+      - key: NODE_OPTIONS
+        value: "--max-old-space-size=384"
+      # PORT is injected by Render; main.ts reads it and binds 0.0.0.0.
+      - key: API_PREFIX
+        value: api
+      - key: APP_TIMEZONE
+        value: Asia/Bangkok
+      # Both are the Vercel production URL (https://<project>.vercel.app, no trailing slash).
+      # PUBLIC_WEB_URL builds employee invite links — leave it wrong and every invite points
+      # at localhost.
+      - key: CORS_ORIGINS
+        sync: false
+      - key: PUBLIC_WEB_URL
+        sync: false
+
+      # --- Database (Supabase) ---------------------------------------------
+      # The *Session pooler* URI (aws-0-<region>.pooler.supabase.com:5432). Not the direct
+      # host (IPv6-only; Render is IPv4) and not the transaction pooler on 6543 (drops
+      # LISTEN/NOTIFY, which BullMQ needs).
+      - key: DATABASE_URL
+        sync: false
+      - key: DB_SSL
+        value: "true"
+      - key: DB_LOGGING
+        value: "false"
+      # The session pooler allows 15 clients in total, shared with every future BullMQ queue.
+      - key: DB_POOL_MAX
+        value: "3"
+
+      # --- Queue (BullMQ on the same Postgres) -----------------------------
+      - key: QUEUE_SCHEMA
+        value: bullmq
+      - key: QUEUE_PREFIX
+        value: posly
+
+      # --- Cache (optional; in-process Map unless both are set) -------------
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false
+      - key: CACHE_PREFIX
+        value: posly
+      - key: CACHE_TTL_SECONDS
+        value: "300"
+
+      # --- Security --------------------------------------------------------
+      # Nothing outside this service needs it, so let Render generate it.
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 15m
+      - key: REFRESH_TTL_DAYS
+        value: "30"
+      - key: REFRESH_ROTATION_GRACE_MS
+        value: "15000"
+      - key: BCRYPT_ROUNDS
+        value: "10"
+      - key: THROTTLE_TTL_SECONDS
+        value: "60"
+      - key: THROTTLE_LIMIT
+        value: "120"
+      # Empty keeps Google sign-in disabled (the button on the login page is off too).
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+
+      # --- Storage (Supabase Storage) --------------------------------------
+      - key: SUPABASE_URL
+        sync: false
+      # Service-role key: bypasses RLS. It lives here and nowhere in the frontend.
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: posly
+      - key: STORAGE_MAX_UPLOAD_BYTES
+        value: "5242880"
