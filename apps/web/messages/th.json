@@ -129,7 +129,9 @@
 			"evening": "สวัสดีตอนเย็น"
 		},
 		"todaySales": "ยอดขายวันนี้",
-		"vsYesterday": "จากเมื่อวาน",
+		"previousToday": "เมื่อวานเวลานี้",
+		"previousRange": "ช่วงก่อนหน้า",
+		"noSalesYet": "ยังไม่มีการขายวันนี้",
 		"metrics": {
 			"revenue": "ยอดขายวันนี้",
 			"orders": "ออเดอร์",
@@ -152,7 +154,6 @@
 		"alerts": "แจ้งเตือน",
 		"lowStock": "ใกล้หมด",
 		"noAlerts": "สต็อกเพียงพอทุกรายการ",
-		"vsPrevious": "จากช่วงก่อนหน้า",
 		"noSales": "ยังไม่มียอดขายในช่วงนี้",
 		"noSalesHint": "เปิด POS แล้วรับออเดอร์แรก ตัวเลขจะขึ้นที่นี่ทันที",
 		"remaining": "เหลือ {count} {unit}",
@@ -384,7 +385,7 @@
 		"uploadHint": "JPG, PNG, WebP ไม่เกิน 5 MB",
 		"imageType": "รองรับเฉพาะ JPG, PNG หรือ WebP",
 		"imageSize": "ไฟล์ใหญ่เกิน 5 MB",
-		"storageNote": "รูปจะถูกเก็บใน Supabase Storage ของร้านคุณ",
+		"storageNote": "รูปจะถูกเก็บในพื้นที่จัดเก็บไฟล์ของร้านคุณ",
 		"notFound": "ไม่พบสินค้านี้",
 		"uploadFailed": "อัปโหลดรูปไม่สำเร็จ",
 		"saveFailed": "บันทึกไม่สำเร็จ",

@@ -27,8 +27,13 @@ export async function generateMetadata({
 		description: t("description"),
 		applicationName: t("name"),
 		appleWebApp: { capable: true, title: t("name"), statusBarStyle: "default" },
+		// Setting `icons` at all replaces the file-convention `app/icon.png`, so the tab icon
+		// has to be listed here too — without it the page has no favicon.
 		// iOS ignores the manifest's icons and wants its own, full-bleed.
-		icons: { apple: "/icons/apple-touch-icon.png" },
+		icons: {
+			icon: [{ url: "/icon.png", type: "image/png", sizes: "256x256" }],
+			apple: "/icons/apple-touch-icon.png",
+		},
 	};
 }
 

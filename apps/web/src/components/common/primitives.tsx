@@ -97,24 +97,36 @@ export function MoneyDisplay({
 	return <span className={cn("numeric", className)}>{formatBaht(amount, { signed })}</span>;
 }
 
-/** +14.2% / −3.1% versus the comparison period. Up is green, down is red, flat is muted. */
+/**
+ * +14.2% / −3.1% versus the comparison period. Up is green, down is red, flat is muted.
+ * `softDecline` mutes a drop too — for a day still in progress, where being behind
+ * yesterday at 10 a.m. is ordinary, not an alarm. `pill` puts it on a tinted chip, for
+ * when it heads its own line.
+ */
 export function StatTrend({
 	change,
 	label,
+	softDecline = false,
+	pill = false,
 	className,
 }: {
 	change: number;
 	label?: string;
+	softDecline?: boolean;
+	pill?: boolean;
 	className?: string;
 }) {
 	const up = change > 0;
 	const flat = change === 0;
+	const muted = flat || (!up && softDecline);
 	const Icon = up ? ArrowUpRight : ArrowDownRight;
 	return (
 		<span
 			className={cn(
-				"inline-flex items-center gap-1 font-medium text-xs",
-				flat ? "text-muted-foreground" : up ? "text-success" : "text-danger",
+				"inline-flex flex-wrap items-center gap-1 font-medium text-xs",
+				muted ? "text-muted-foreground" : up ? "text-success" : "text-danger",
+				pill && "rounded-md px-1.5 py-0.5",
+				pill && (muted ? "bg-muted" : up ? "bg-success/12" : "bg-danger/10"),
 				className
 			)}
 		>
@@ -202,6 +214,9 @@ export function MetricCard({
 	tone = "primary",
 	change,
 	changeLabel,
+	previous,
+	softDecline = false,
+	note,
 	tinted = false,
 	trend,
 	className,
@@ -215,6 +230,15 @@ export function MetricCard({
 	/** Null = no comparison available (the previous period had nothing). */
 	change?: number | null;
 	changeLabel?: string;
+	/**
+	 * The comparison period's own figure, formatted. With it the line reads
+	 * "{changeLabel} ฿7,720 · ↘ 98.9%" — the amount gives the percentage its scale.
+	 */
+	previous?: ReactNode;
+	/** See StatTrend. */
+	softDecline?: boolean;
+	/** Shown in place of the percentage when there is none, e.g. before the first sale. */
+	note?: ReactNode;
 	tinted?: boolean;
 	className?: string;
 }) {
@@ -232,7 +256,25 @@ export function MetricCard({
 				<span className="font-medium text-muted-foreground text-sm">{label}</span>
 			</div>
 			<div className="numeric font-semibold text-[28px] leading-none tracking-tight">{value}</div>
-			{change !== undefined && change !== null ? <StatTrend change={change} label={changeLabel} /> : null}
+			{previous !== undefined ? (
+				// Two lines, in the order they are read: which way (the chip), then against what.
+				<div className="flex flex-col items-start gap-1.5">
+					{change !== undefined && change !== null ? (
+						<StatTrend change={change} softDecline={softDecline} pill />
+					) : note ? (
+						<span className="rounded-md bg-muted px-1.5 py-0.5 font-medium text-muted-foreground text-xs">
+							{note}
+						</span>
+					) : null}
+					<span className="text-muted-foreground text-xs">
+						{changeLabel} <span className="numeric font-medium text-foreground/80">{previous}</span>
+					</span>
+				</div>
+			) : change !== undefined && change !== null ? (
+				<StatTrend change={change} label={changeLabel} softDecline={softDecline} />
+			) : note ? (
+				<span className="text-muted-foreground text-xs">{note}</span>
+			) : null}
 			{trend ? <Sparkline values={trend} tone={tone} className="-mx-1 -mb-1 mt-auto" /> : null}
 		</div>
 	);

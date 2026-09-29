@@ -30,10 +30,10 @@ export const dataSourceOptions: DataSourceOptions = {
 	entities: [`${root}/models/**/*.entity.${ext}`],
 	migrations: [`${root}/shared/database/migrations/*.${ext}`],
 	/**
-	 * Supabase's session pooler allows 15 clients in total, shared with every BullMQ queue and
-	 * worker once those exist. node-postgres defaults to 10 — most of the budget on its own.
+	 * A direct Railway Postgres connection, no pooler in front: node-postgres' own default of
+	 * 10 fits well inside the server's connection limit. Realtime holds one more for LISTEN.
 	 */
-	extra: { max: toInt(process.env.DB_POOL_MAX, 3) },
+	extra: { max: toInt(process.env.DB_POOL_MAX, 10) },
 };
 
 export const dataSource = new DataSource(dataSourceOptions);

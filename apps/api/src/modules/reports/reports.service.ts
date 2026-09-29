@@ -109,6 +109,13 @@ export class ReportsService {
 				expenses,
 				estimatedProfit: profit,
 				profitChange: change(profit, previousProfit),
+				// The comparison period's own figures (for "today", yesterday up to this time), so
+				// a card can say "yesterday by now: ฿7,720" instead of a bare "-98.9%".
+				previousRevenue: previous.revenue,
+				previousOrders: previous.orders,
+				previousAverageOrder: average(previous),
+				previousGrossProfit: previous.revenue - previous.cost,
+				previousEstimatedProfit: previousProfit,
 			},
 			series,
 			topProducts,

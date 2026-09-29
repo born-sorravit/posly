@@ -107,7 +107,7 @@ function Field({
 }
 
 /**
- * Add / edit product (plan §15). The image goes straight to Supabase Storage through a
+ * Add / edit product (plan §15). The image goes straight to the storage bucket through a
  * signed URL (`uploadImage`) the moment it is picked; saving the form only stores its path.
  */
 export function ProductFormPage({ productId }: { productId?: string }) {

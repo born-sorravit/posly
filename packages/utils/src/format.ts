@@ -37,9 +37,19 @@ export const formatRelative = (value: string | Date, now: Date = new Date()): st
 	return formatThaiDate(value, { day: "numeric", month: "short" });
 };
 
-/** 0.142 -> "14.2%". */
-export const formatPercent = (ratio: number, digits = 1): string =>
-	`${(Math.abs(ratio) * 100).toFixed(digits)}%`;
+/**
+ * 0.142 -> "14.2%", 25.556 -> "2,556%". Unsigned — the arrow beside it carries the sign.
+ * From 100% up the decimal says nothing a reader can use, so it goes; thousands get grouped.
+ */
+export const formatPercent = (ratio: number, digits = 1): string => {
+	const percent = Math.abs(ratio) * 100;
+	// Decided on the rounded value, so 99.96% reads "100%", not "100.0%".
+	const fraction = Number(percent.toFixed(digits)) >= 100 ? 0 : digits;
+	return `${new Intl.NumberFormat("en-US", {
+		minimumFractionDigits: fraction,
+		maximumFractionDigits: fraction,
+	}).format(percent)}%`;
+};
 
 export const formatNumber = (value: number): string => new Intl.NumberFormat("th-TH").format(value);
 

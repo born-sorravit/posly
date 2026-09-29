@@ -32,7 +32,7 @@ const TICKET_TTL_SECONDS = 60;
  * Events travel through Postgres LISTEN/NOTIFY, so every API instance hears every event
  * with no broker to run — and `pg_notify` inside a transaction is delivered only when it
  * commits, so a rolled-back sale never makes a screen refresh. Each instance holds one
- * dedicated connection for LISTEN (Supabase's session pooler, port 5432, supports it).
+ * dedicated connection for LISTEN, which needs a direct connection, never a transaction pooler.
  *
  * If that connection is down, events still reach this instance's own streams directly, and
  * clients keep a slow poll as a safety net; nothing depends on an event arriving.

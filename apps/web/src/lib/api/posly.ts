@@ -112,6 +112,12 @@ export interface DashboardDto {
 		/** Gross profit minus expenses — for reports, where the period is long enough. */
 		estimatedProfit: Satang;
 		profitChange: number | null;
+		/** The comparison period's figures — for "today", yesterday up to the same time. */
+		previousRevenue: Satang;
+		previousOrders: number;
+		previousAverageOrder: Satang;
+		previousGrossProfit: Satang;
+		previousEstimatedProfit: Satang;
 	};
 	series: { label: string; date: string; revenue: Satang; orders: number }[];
 	topProducts: { name: string; art: ProductArt; sold: number; revenue: Satang }[];
