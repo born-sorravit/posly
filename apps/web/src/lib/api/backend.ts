@@ -26,6 +26,8 @@ const KNOWN: [RegExp, (match: RegExpMatchArray) => string][] = [
 	[/^(.+) is required for (.+)$/, (m) => `กรุณาเลือก${m[1]}ของ ${m[2]}`],
 	[/reset link has expired or was already used/i, () => "ลิงก์นี้หมดอายุหรือถูกใช้ไปแล้ว ขอลิงก์ใหม่ได้ที่หน้าลืมรหัสผ่าน"],
 	[/^Incorrect email or password$/, () => "อีเมลหรือรหัสผ่านไม่ถูกต้อง"],
+	[/^Current password is incorrect$/, () => "รหัสผ่านปัจจุบันไม่ถูกต้อง"],
+	[/^The new password must be different from the current one$/, () => "รหัสผ่านใหม่ต้องไม่ซ้ำกับรหัสผ่านเดิม"],
 	[/^Password must not be consecutive digits$/, () => "รหัสผ่านห้ามเป็นตัวเลขเรียงกัน"],
 	[/^Password must not contain your name or email$/, () => "รหัสผ่านไม่ควรมีชื่อหรืออีเมลของคุณ"],
 	[/^Password must be at most \d+ bytes$/, () => "รหัสผ่านยาวเกินไป"],

@@ -114,7 +114,7 @@ function InviteDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (op
 
 	return (
 		<Dialog open={open} onOpenChange={close}>
-			<DialogContent className="rounded-3xl sm:max-w-md">
+			<DialogContent className="gap-6 p-6 sm:max-w-md">
 				<DialogHeader>
 					<DialogTitle>{t("inviteTitle")}</DialogTitle>
 					<DialogDescription>{t("inviteHint")}</DialogDescription>
@@ -149,7 +149,7 @@ function InviteDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (op
 					</div>
 				</div>
 				)}
-				<DialogFooter>
+				<DialogFooter className="-mx-6 -mb-6 mt-2 px-6 py-4">
 					<Button variant="outline" size="lg" onClick={() => close(false)}>
 						{link ? t("done") : t("cancel")}
 					</Button>
@@ -224,6 +224,28 @@ export function EmployeesView() {
 			}
 		);
 
+	const roleBadges = (e: Employee) => (
+		<span className="flex flex-wrap items-center gap-1.5">
+			<StatusBadge tone={ROLE_TONE[e.role]}>{tRole(e.role)}</StatusBadge>
+			{e.hasPin ? <PinBadge /> : null}
+			{e.customPermissions ? (
+				<span className="rounded-full border border-dashed px-2 py-0.5 text-muted-foreground text-xs">
+					{t("customBadge")}
+				</span>
+			) : null}
+		</span>
+	);
+	const statusBadge = (e: Employee) =>
+		e.status === "INVITED" ? (
+			<StatusBadge tone="warning" dot>
+				{t("pending")}
+			</StatusBadge>
+		) : e.status === "DISABLED" ? (
+			<StatusBadge tone="neutral" dot>
+				{t("disabledBadge")}
+			</StatusBadge>
+		) : null;
+
 	const columns: Column<Employee>[] = [
 		{
 			key: "name",
@@ -241,36 +263,17 @@ export function EmployeesView() {
 		{
 			key: "role",
 			header: t("role"),
-			cell: (e) => (
-				<span className="flex flex-wrap items-center gap-1.5">
-					<StatusBadge tone={ROLE_TONE[e.role]}>{tRole(e.role)}</StatusBadge>
-					{e.hasPin ? <PinBadge /> : null}
-					{e.customPermissions ? (
-						<span className="rounded-full border border-dashed px-2 py-0.5 text-muted-foreground text-xs">
-							{t("customBadge")}
-						</span>
-					) : null}
-				</span>
-			),
+			cell: (e) => roleBadges(e),
 		},
 		{
 			key: "status",
 			header: t("status"),
 			hideBelow: "tablet",
-			cell: (e) =>
-				e.status === "INVITED" ? (
-					<StatusBadge tone="warning" dot>
-						{t("pending")}
-					</StatusBadge>
-				) : e.status === "DISABLED" ? (
-					<StatusBadge tone="neutral" dot>
-						{t("disabledBadge")}
-					</StatusBadge>
-				) : (
-					<span className="text-muted-foreground text-sm" suppressHydrationWarning>
-						{e.lastActiveAt ? formatRelative(e.lastActiveAt) : "—"}
-					</span>
-				),
+			cell: (e) => statusBadge(e) ?? (
+				<span className="text-muted-foreground text-sm" suppressHydrationWarning>
+					{e.lastActiveAt ? formatRelative(e.lastActiveAt) : "—"}
+				</span>
+			),
 		},
 		{
 			key: "orders",
@@ -407,7 +410,44 @@ export function EmployeesView() {
 				{members.isPending ? (
 					<TableSkeleton rows={4} />
 				) : (
-					<DataTable columns={columns} rows={members.data ?? []} rowKey={(e) => e.id} />
+					<DataTable
+						columns={columns}
+						rows={members.data ?? []}
+						rowKey={(e) => e.id}
+						// A phone: who on the left, their role on the right, the actions menu last. The
+						// extras (pending, PIN, custom permissions) get a third line only when there are any.
+						mobileRow={(e) => {
+							const status = statusBadge(e);
+							const hasExtras = status !== null || e.hasPin || e.customPermissions;
+							return (
+								<div className="flex items-center gap-3">
+									<UserAvatar name={e.name} className="size-10" />
+									<div className="min-w-0 flex-1">
+										<p className="truncate font-medium text-sm leading-tight">{e.name}</p>
+										<p className="mt-0.5 truncate text-muted-foreground text-xs">{e.email}</p>
+										{hasExtras ? (
+											<div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+												{status}
+												{e.hasPin ? <PinBadge /> : null}
+												{e.customPermissions ? (
+													<span className="rounded-full border border-dashed px-2 py-0.5 text-muted-foreground text-xs">
+														{t("customBadge")}
+													</span>
+												) : null}
+											</div>
+										) : null}
+									</div>
+									<StatusBadge tone={ROLE_TONE[e.role]} className="shrink-0">
+										{tRole(e.role)}
+									</StatusBadge>
+									{/* The owner has no menu; the slot keeps every role badge in one column. */}
+									<div className="-mr-1.5 flex w-8 shrink-0 justify-center">
+										{columns.find((c) => c.key === "actions")?.cell(e)}
+									</div>
+								</div>
+							);
+						}}
+					/>
 				)}
 			</Surface>
 			<InviteDialog open={inviting} onOpenChange={setInviting} />
@@ -438,7 +478,7 @@ export function EmployeesView() {
 				}}
 			/>
 			<Dialog open={renewed !== null} onOpenChange={(o) => !o && setRenewed(null)}>
-				<DialogContent className="rounded-3xl sm:max-w-md">
+				<DialogContent className="gap-6 p-6 sm:max-w-md">
 					<DialogHeader>
 						<DialogTitle>{t("newLink")}</DialogTitle>
 						<DialogDescription>{t("newLinkHint")}</DialogDescription>

@@ -8,7 +8,7 @@ import { PageTourButton } from "@/components/tour/product-tour";
 import { UserMenu } from "@/components/layout/user-menu";
 import { Button } from "@posly/ui/components/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@posly/ui/components/sheet";
-import { Brand } from "@/components/layout/brand";
+import { StoreSwitcher } from "@/components/layout/store-switcher";
 import { useActiveBusiness } from "@/hooks/use-workspace";
 import { useNow } from "@/hooks/use-now";
 import { formatClock, formatThaiDate } from "@posly/utils/format";
@@ -21,7 +21,8 @@ import { useState } from "react";
  *
  *   desktop (≥1280)  search · clock · bell           (sidebar carries brand, store, user)
  *   tablet  (768+)   ☰ · search · clock · bell · avatar
- *   mobile  (<768)   brand · search icon · avatar    (bell moves to the bottom nav)
+ *   mobile  (<768)   store · search icon · avatar    (bell moves to the bottom nav; no
+ *                                                     sidebar, so the store switcher lives here)
  */
 export function AppHeader() {
 	const t = useTranslations("header");
@@ -52,8 +53,8 @@ export function AppHeader() {
 
 			<SidebarToggle />
 
-			<div className="tablet:hidden">
-				<Brand />
+			<div className="min-w-0 flex-1 tablet:hidden">
+				<StoreSwitcher placement="header" />
 			</div>
 
 			<button

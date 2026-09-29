@@ -16,7 +16,7 @@ import {
 } from "@/modules/members/dto/member.dto";
 import { EntitlementsService } from "@/modules/subscriptions/entitlements.service";
 import type { ResolvedMembership } from "@/shared/decorators/current-membership.decorator";
-import { MemberRole } from "@/shared/enums/member-role.enum";
+import { MemberRole, bySeniority } from "@/shared/enums/member-role.enum";
 import { MemberStatus } from "@/shared/enums/member-status.enum";
 import { OrderStatus } from "@/shared/enums/order.enum";
 import {
@@ -96,7 +96,8 @@ export class MembersService {
 		const byMember = new Map(stats.map((s) => [s.member_id, s]));
 		const withPin = await this.membersWithPin(membership.businessId);
 
-		return members.map((m) => ({
+		// Owner first, then managers, cashiers, staff; within a role, in the order they joined.
+		return [...members].sort(bySeniority).map((m) => ({
 			...this.toResponse(m, byMember.get(m.id)),
 			isYou: m.id === membership.memberId,
 			hasPin: withPin.has(m.id),
@@ -124,6 +125,7 @@ export class MembersService {
 		const withPin = await this.membersWithPin(membership.businessId);
 		return members
 			.filter((m) => m.userId !== null)
+			.sort(bySeniority)
 			.map((m) => ({
 				id: m.id,
 				name: m.displayName,

@@ -245,17 +245,20 @@ export function MetricCard({
 	return (
 		<div
 			className={cn(
-				"flex flex-col gap-3 rounded-2xl p-5",
+				// Two to a row on a phone leaves ~170px each, so the card tightens below tablet.
+				"flex min-w-0 flex-col gap-2.5 rounded-2xl p-4 tablet:gap-3 tablet:p-5",
 				tinted ? "tint-surface" : "surface",
 				className
 			)}
 			style={tinted ? toneStyle(tone) : undefined}
 		>
-			<div className="flex items-center gap-3">
-				<IconChip icon={icon} tone={tone} className="size-9 rounded-lg" />
-				<span className="font-medium text-muted-foreground text-sm">{label}</span>
+			<div className="flex items-center gap-2.5 tablet:gap-3">
+				<IconChip icon={icon} tone={tone} className="size-8 rounded-lg tablet:size-9 [&_svg]:size-4 tablet:[&_svg]:size-5" />
+				<span className="min-w-0 font-medium text-muted-foreground text-xs leading-snug tablet:text-sm">{label}</span>
 			</div>
-			<div className="numeric font-semibold text-[28px] leading-none tracking-tight">{value}</div>
+			<div className="numeric truncate font-semibold text-xl leading-tight tracking-tight tablet:text-[28px] tablet:leading-none">
+				{value}
+			</div>
 			{previous !== undefined ? (
 				// Two lines, in the order they are read: which way (the chip), then against what.
 				<div className="flex flex-col items-start gap-1.5">

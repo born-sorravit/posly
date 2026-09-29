@@ -64,10 +64,10 @@ export function DemoDialog({ children }: { children: ReactNode }) {
 	return (
 		<Dialog onOpenChange={() => setError(null)}>
 			<DialogTrigger asChild>{children}</DialogTrigger>
-			<DialogContent className="sm:max-w-md">
-				<DialogHeader>
-					<DialogTitle>{t("title")}</DialogTitle>
-					<DialogDescription>{t("subtitle")}</DialogDescription>
+			<DialogContent className="gap-6 p-6 sm:max-w-lg">
+				<DialogHeader className="gap-1.5 pr-8">
+					<DialogTitle className="text-lg">{t("title")}</DialogTitle>
+					<DialogDescription className="text-pretty">{t("subtitle")}</DialogDescription>
 				</DialogHeader>
 
 				{error ? (
@@ -77,7 +77,7 @@ export function DemoDialog({ children }: { children: ReactNode }) {
 					</Alert>
 				) : null}
 
-				<div className="grid gap-2">
+				<div className="grid gap-3">
 					{ROLES.map(({ role, icon: Icon, home }) => (
 						<button
 							key={role}
@@ -85,17 +85,17 @@ export function DemoDialog({ children }: { children: ReactNode }) {
 							disabled={pending !== null}
 							onClick={() => start(role, home)}
 							className={cn(
-								"group flex items-center gap-3 rounded-xl border bg-card p-3 text-left transition-colors",
+								"group flex items-center gap-4 rounded-2xl border bg-card px-4 py-3.5 text-left transition-colors",
 								"hover:border-primary/50 hover:bg-muted/50 disabled:cursor-not-allowed disabled:opacity-60",
 								pending === role && "border-primary opacity-100"
 							)}
 						>
-							<span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+							<span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
 								<Icon className="size-5" />
 							</span>
 							<span className="min-w-0 flex-1">
-								<span className="block font-medium">{t(`roles.${role}.title`)}</span>
-								<span className="block text-muted-foreground text-xs">{t(`roles.${role}.body`)}</span>
+								<span className="block font-medium text-base">{t(`roles.${role}.title`)}</span>
+								<span className="mt-0.5 block text-muted-foreground text-sm">{t(`roles.${role}.body`)}</span>
 							</span>
 							{pending === role ? (
 								<Loader2 className="size-4 animate-spin text-primary" />
@@ -106,7 +106,7 @@ export function DemoDialog({ children }: { children: ReactNode }) {
 					))}
 				</div>
 
-				<p className="text-muted-foreground text-xs">
+				<p className="border-t pt-4 text-center text-muted-foreground text-xs">
 					{t("note")}{" "}
 					<Link href="/register" className="font-medium text-primary hover:underline">
 						{t("signup")}

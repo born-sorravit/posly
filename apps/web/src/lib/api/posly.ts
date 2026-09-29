@@ -1,3 +1,4 @@
+import type { AuthUser } from "@posly/types/api";
 import { backend } from "@/lib/api/backend";
 import type { Satang } from "@posly/utils/money";
 import type {
@@ -337,6 +338,7 @@ export const api = {
 		forgotPassword: (email: string) => backend.post<{ sent: true }>("/auth/forgot-password", { email }),
 		resetPassword: (token: string, newPassword: string) =>
 			backend.post<{ reset: true }>("/auth/reset-password", { token, newPassword }),
+		updateProfile: (body: { name?: string }) => backend.patch<AuthUser>("/auth/me", body),
 	},
 	plans: {
 		list: (signal?: AbortSignal) => backend.get<PlanDto[]>("/plans", undefined, signal),

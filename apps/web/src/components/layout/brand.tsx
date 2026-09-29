@@ -1,5 +1,6 @@
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
+import { nameInitial } from "@posly/utils/format";
 import Image from "next/image";
 
 /** The Posly mark: the app icon, so the sidebar, the tab and the home screen all match. */
@@ -84,7 +85,7 @@ export function StoreAvatar({
 			)}
 			aria-hidden
 		>
-			{name.trim().charAt(0).toUpperCase()}
+			{nameInitial(name)}
 		</span>
 	);
 }

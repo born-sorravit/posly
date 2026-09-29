@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatPercent } from "./format";
+import { formatPercent, nameInitial } from "./format";
 
 describe("formatPercent", () => {
 	it("keeps one decimal below 100%", () => {
@@ -23,4 +23,18 @@ describe("formatPercent", () => {
 		expect(formatPercent(0.9996)).toBe("100%");
 		expect(formatPercent(0.9994)).toBe("99.9%");
 	});
+});
+
+describe("nameInitial", () => {
+	it.each([
+		["คุณแนน", "น"],
+		["แนน", "น"],
+		["ไก่", "ก"],
+		["เจ๊หมวย", "จ"],
+		["มายด์", "ม"],
+		["  somchai ", "S"],
+		["Sunny Cafe", "S"],
+		["คุณ", "ค"],
+		["", "?"],
+	])("%s → %s", (name, initial) => expect(nameInitial(name)).toBe(initial));
 });

@@ -92,9 +92,16 @@ export function SettingsNav({ variant = "rail" }: { variant?: "rail" | "list" })
 
 export function SettingsLayout({ children }: { children: ReactNode }) {
 	const t = useTranslations("settings");
+	const pathname = usePathname();
+	// On a phone the index is the section list, so a section page says which section it is.
+	// From tablet up the rail beside it does that.
+	const section = SETTINGS_SECTIONS.find((s) => s.href === pathname);
 	return (
 		<PageContainer>
-			<h1 className="font-semibold text-2xl tracking-tight">{t("title")}</h1>
+			{section ? (
+				<h1 className="font-semibold text-2xl tracking-tight tablet:hidden">{t(`sections.${section.key}`)}</h1>
+			) : null}
+			<h1 className={cn("font-semibold text-2xl tracking-tight", section && "hidden tablet:block")}>{t("title")}</h1>
 			<div className="grid gap-6 tablet:grid-cols-[220px_1fr]">
 				<aside className="hidden tablet:block">
 					<SettingsNav />

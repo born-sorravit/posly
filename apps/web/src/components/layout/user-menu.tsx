@@ -15,10 +15,23 @@ import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { useTourStore } from "@/stores/tour-store";
 import { IosInstallDialog, useInstallApp } from "@/components/pwa/pwa";
-import { ChevronDown, CircleHelp, KeyRound, LogOut, MonitorSmartphone, Settings, UserRound, Users } from "lucide-react";
+import {
+	ChevronDown,
+	CircleHelp,
+	KeyRound,
+	LogOut,
+	type LucideIcon,
+	MonitorSmartphone,
+	Settings,
+	UserRound,
+	Users,
+} from "lucide-react";
 import { SetPinDialog, useSwitchUser } from "@/components/pin/switch-user";
 import { useRoster } from "@/hooks/use-posly";
-import { useState } from "react";
+import { nameInitial } from "@posly/utils/format";
+import { TABLET_UP, useMediaQuery } from "@/hooks/use-media-query";
+import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@posly/ui/components/sheet";
+import { Fragment, useState } from "react";
 import { useTranslations } from "next-intl";
 
 export function UserAvatar({ name, className }: { name: string; className?: string }) {
@@ -30,13 +43,26 @@ export function UserAvatar({ name, className }: { name: string; className?: stri
 			)}
 			aria-hidden
 		>
-			{name.replace(/^คุณ/, "").trim().charAt(0).toUpperCase() || "?"}
+			{nameInitial(name)}
 		</span>
 	);
 }
 
+type MenuAction = {
+	key: string;
+	icon: LucideIcon;
+	label: string;
+	href?: "/profile" | "/settings";
+	onSelect?: () => void;
+	danger?: boolean;
+};
+
 /**
  * The signed-in person, with their role in the shop currently open.
+ *
+ * A dropdown everywhere except the header on a phone, where it is a bottom drawer: the
+ * avatar sits in the top corner, but the thumb is at the bottom, and a drawer's rows are
+ * big enough to hit.
  */
 export function UserMenu({
 	variant = "row",
@@ -55,35 +81,144 @@ export function UserMenu({
 	const { mode: installMode, install } = useInstallApp();
 	const [iosHelp, setIosHelp] = useState(false);
 	const [settingPin, setSettingPin] = useState(false);
+	const [drawerOpen, setDrawerOpen] = useState(false);
 	const openSwitch = useSwitchUser((s) => s.setOpen);
 	const myPin = useRoster(settingPin).data?.find((p) => p.isYou)?.hasPin ?? false;
+	const wide = useMediaQuery(TABLET_UP);
+	const asDrawer = variant === "avatar" && !wide;
 
 	const name = user?.name ?? "";
 	const email = user?.email ?? "";
 
+	// One list for both presentations; each inner array is a group between separators.
+	const groups: MenuAction[][] = [
+		[
+			{ key: "profile", icon: UserRound, label: t("profile"), href: "/profile" },
+			{ key: "settings", icon: Settings, label: t("settings"), href: "/settings" },
+			{ key: "switch", icon: Users, label: tPin("switch"), onSelect: () => openSwitch(true) },
+			{ key: "pin", icon: KeyRound, label: tPin("setMine"), onSelect: () => setSettingPin(true) },
+		],
+		[
+			{ key: "tour", icon: CircleHelp, label: t("tour"), onSelect: () => startTour("app") },
+			...(installMode
+				? [
+						{
+							key: "install",
+							icon: MonitorSmartphone,
+							label: t("install"),
+							onSelect: () => (installMode === "prompt" ? void install() : setIosHelp(true)),
+						},
+					]
+				: []),
+		],
+		[
+			{
+				key: "signOut",
+				icon: LogOut,
+				label: t("signOut"),
+				danger: true,
+				onSelect: async () => {
+					await signOut();
+					// The next person on this tablet must not see this account's cache.
+					queryClient.clear();
+					router.push("/login");
+					router.refresh();
+				},
+			},
+		],
+	];
+
+	const trigger = (
+		<button
+			type="button"
+			data-tour="user-menu"
+			className={cn(
+				"flex items-center gap-3 rounded-xl text-left outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
+				variant === "row" ? "w-full p-2" : "rounded-full p-0.5"
+			)}
+			aria-label={t("label")}
+		>
+			<UserAvatar name={name} />
+			{variant === "row" ? (
+				<>
+					<span className="min-w-0 flex-1">
+						<span className="block truncate font-medium text-sm leading-tight">{name}</span>
+						<span className="block truncate text-muted-foreground text-xs">{tRole(business.role)}</span>
+					</span>
+					<ChevronDown className="size-4 shrink-0 text-muted-foreground" />
+				</>
+			) : null}
+		</button>
+	);
+
+	const dialogs = (
+		<>
+			<IosInstallDialog open={iosHelp} onOpenChange={setIosHelp} />
+			<SetPinDialog open={settingPin} onOpenChange={setSettingPin} hasPin={myPin} />
+		</>
+	);
+
+	if (asDrawer) {
+		return (
+			<Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
+				<SheetTrigger asChild>{trigger}</SheetTrigger>
+				<SheetContent
+					side="bottom"
+					showCloseButton={false}
+					className="gap-0 rounded-t-3xl px-3 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))]"
+				>
+					<span aria-hidden className="mx-auto mb-3 h-1 w-10 rounded-full bg-muted-foreground/30" />
+					<div className="flex items-center gap-3 px-3 pb-4">
+						<UserAvatar name={name} className="size-11 text-base" />
+						<div className="min-w-0 flex-1">
+							<SheetTitle className="truncate font-semibold text-base">{name}</SheetTitle>
+							<SheetDescription className="truncate text-xs">
+								{email} · {tRole(business.role)}
+							</SheetDescription>
+						</div>
+					</div>
+					{groups.map((group) => (
+						<div key={group[0].key} className="border-t py-2">
+							{group.map(({ key, icon: Icon, label, href, onSelect, danger }) => {
+								const className = cn(
+									"flex h-12 w-full items-center gap-3.5 rounded-xl px-3 text-left font-medium text-[15px] transition-colors active:bg-muted",
+									danger && "text-danger"
+								);
+								const content = (
+									<>
+										<Icon className={cn("size-5", danger ? "text-danger" : "text-muted-foreground")} />
+										{label}
+									</>
+								);
+								return href ? (
+									<Link key={key} href={href} className={className} onClick={() => setDrawerOpen(false)}>
+										{content}
+									</Link>
+								) : (
+									<button
+										key={key}
+										type="button"
+										className={className}
+										onClick={() => {
+											setDrawerOpen(false);
+											void onSelect?.();
+										}}
+									>
+										{content}
+									</button>
+								);
+							})}
+						</div>
+					))}
+				</SheetContent>
+				{dialogs}
+			</Sheet>
+		);
+	}
+
 	return (
 		<DropdownMenu>
-			<DropdownMenuTrigger
-				data-tour="user-menu"
-				className={cn(
-					"flex items-center gap-3 rounded-xl text-left outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
-					variant === "row" ? "w-full p-2" : "rounded-full p-0.5"
-				)}
-				aria-label={t("label")}
-			>
-				<UserAvatar name={name} />
-				{variant === "row" ? (
-					<>
-						<span className="min-w-0 flex-1">
-							<span className="block truncate font-medium text-sm leading-tight">{name}</span>
-							<span className="block truncate text-muted-foreground text-xs">
-								{tRole(business.role)}
-							</span>
-						</span>
-						<ChevronDown className="size-4 shrink-0 text-muted-foreground" />
-					</>
-				) : null}
-			</DropdownMenuTrigger>
+			<DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
 			<DropdownMenuContent
 				side={variant === "row" ? "top" : "bottom"}
 				align={variant === "row" ? "end" : "start"}
@@ -93,54 +228,28 @@ export function UserMenu({
 					<p className="truncate font-medium text-sm">{name}</p>
 					<p className="truncate text-muted-foreground text-xs">{email}</p>
 				</DropdownMenuLabel>
-				<DropdownMenuSeparator />
-				<DropdownMenuItem asChild>
-					<Link href="/settings/general">
-						<UserRound className="size-4" />
-						{t("profile")}
-					</Link>
-				</DropdownMenuItem>
-				<DropdownMenuItem asChild>
-					<Link href="/settings">
-						<Settings className="size-4" />
-						{t("settings")}
-					</Link>
-				</DropdownMenuItem>
-				<DropdownMenuItem onClick={() => openSwitch(true)}>
-					<Users className="size-4" />
-					{tPin("switch")}
-				</DropdownMenuItem>
-				<DropdownMenuItem onClick={() => setSettingPin(true)}>
-					<KeyRound className="size-4" />
-					{tPin("setMine")}
-				</DropdownMenuItem>
-				<DropdownMenuSeparator />
-				<DropdownMenuItem onClick={() => startTour("app")}>
-					<CircleHelp className="size-4" />
-					{t("tour")}
-				</DropdownMenuItem>
-				{installMode ? (
-					<DropdownMenuItem onClick={() => (installMode === "prompt" ? void install() : setIosHelp(true))}>
-						<MonitorSmartphone className="size-4" />
-						{t("install")}
-					</DropdownMenuItem>
-				) : null}
-				<DropdownMenuSeparator />
-				<DropdownMenuItem
-					onClick={async () => {
-						await signOut();
-						// The next person on this tablet must not see this account's cache.
-						queryClient.clear();
-						router.push("/login");
-						router.refresh();
-					}}
-				>
-					<LogOut className="size-4" />
-					{t("signOut")}
-				</DropdownMenuItem>
+				{groups.map((group) => (
+					<Fragment key={group[0].key}>
+						<DropdownMenuSeparator />
+						{group.map(({ key, icon: Icon, label, href, onSelect }) =>
+							href ? (
+								<DropdownMenuItem key={key} asChild>
+									<Link href={href}>
+										<Icon className="size-4" />
+										{label}
+									</Link>
+								</DropdownMenuItem>
+							) : (
+								<DropdownMenuItem key={key} onClick={() => void onSelect?.()}>
+									<Icon className="size-4" />
+									{label}
+								</DropdownMenuItem>
+							)
+						)}
+					</Fragment>
+				))}
 			</DropdownMenuContent>
-			<IosInstallDialog open={iosHelp} onOpenChange={setIosHelp} />
-			<SetPinDialog open={settingPin} onOpenChange={setSettingPin} hasPin={myPin} />
+			{dialogs}
 		</DropdownMenu>
 	);
 }

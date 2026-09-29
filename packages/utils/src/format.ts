@@ -80,3 +80,15 @@ export const dayRange = (range: "today" | "yesterday" | "7d", now: Date = new Da
 	const from = range === "7d" ? new Date(today.getTime() - 6 * day) : today;
 	return { from: from.toISOString(), to: new Date(today.getTime() + day).toISOString() };
 };
+
+/**
+ * The letter for an avatar circle. Thai writes เ แ โ ใ ไ before the consonant they follow in
+ * speech, so "แนน" starts with แ but is known by น; the polite "คุณ" is dropped for the same
+ * reason. Latin initials are uppercased.
+ */
+export const nameInitial = (name: string): string => {
+	const trimmed = name.trim();
+	const bare = trimmed.replace(/^คุณ\s*/, "") || trimmed;
+	const letter = [...bare.replace(/^[เแโใไ]+/, "")][0] ?? [...bare][0];
+	return letter ? letter.toUpperCase() : "?";
+};

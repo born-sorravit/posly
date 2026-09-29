@@ -190,7 +190,7 @@
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: oklch(0.32 0.08 277);
   --sidebar-accent-foreground: oklch(0.9 0.06 280);
-  --sidebar-border: oklch(0.8 0.03 270 / 7%);
+  --sidebar-border: oklch(0.8 0.03 270 / 12%);
   --sidebar-ring: #7b74ff;
 }
 

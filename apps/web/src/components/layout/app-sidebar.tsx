@@ -96,7 +96,7 @@ export function AppSidebar() {
 	return (
 		<aside
 			className={cn(
-				"sticky top-0 hidden h-svh shrink-0 bg-sidebar transition-[width] duration-200 desktop:block",
+				"sticky top-0 hidden h-svh shrink-0 border-sidebar-border border-r bg-sidebar transition-[width] duration-200 desktop:block",
 				collapsed ? "w-[76px]" : "w-64"
 			)}
 		>

@@ -238,18 +238,23 @@ export interface Column<T> {
 /**
  * A light table: rows separated by hairlines, no cell borders, a hover tint, and the whole
  * row as the click target when `onRowClick` is given.
+ *
+ * With `mobileRow`, a phone gets a list of those rows instead of the table: columns that fit
+ * side by side at 1280px do not fit at 390px, and hiding them only goes so far.
  */
 export function DataTable<T>({
 	columns,
 	rows,
 	rowKey,
 	onRowClick,
+	mobileRow,
 	className,
 }: {
 	columns: Column<T>[];
 	rows: T[];
 	rowKey: (row: T) => string;
 	onRowClick?: (row: T) => void;
+	mobileRow?: (row: T) => ReactNode;
 	className?: string;
 }) {
 	const hide = (c: Column<T>) =>
@@ -260,7 +265,21 @@ export function DataTable<T>({
 				: "";
 
 	return (
-		<div className={cn("overflow-x-auto", className)}>
+		<>
+		{mobileRow ? (
+			<ul className={cn("divide-y divide-border/50 tablet:hidden", className)}>
+				{rows.map((row) => (
+					<li
+						key={rowKey(row)}
+						onClick={onRowClick ? () => onRowClick(row) : undefined}
+						className={cn("px-4 py-3", onRowClick && "cursor-pointer active:bg-muted/40")}
+					>
+						{mobileRow(row)}
+					</li>
+				))}
+			</ul>
+		) : null}
+		<div className={cn("overflow-x-auto", mobileRow && "hidden tablet:block", className)}>
 			<table className="w-full border-separate border-spacing-0 text-sm">
 				<thead>
 					<tr className="text-left text-muted-foreground text-xs">
@@ -308,6 +327,7 @@ export function DataTable<T>({
 				</tbody>
 			</table>
 		</div>
+		</>
 	);
 }
 
