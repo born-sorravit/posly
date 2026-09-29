@@ -24,7 +24,6 @@ The two apps point at each other, so one of them has to go first with a placehol
    - Variables. Use the **Raw Editor**; `${{…}}` references resolve inside Railway:
      ```
      NODE_ENV=production
-     NODE_OPTIONS=--max-old-space-size=384
      API_PREFIX=api
      APP_TIMEZONE=Asia/Bangkok
      DATABASE_URL=${{Postgres.DATABASE_URL}}
