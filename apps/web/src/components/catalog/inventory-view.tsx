@@ -13,6 +13,7 @@ import {
 import { ProductThumb } from "@/components/common/product-thumb";
 import { Button } from "@posly/ui/components/button";
 import { StockAdjustDialog } from "@/components/catalog/stock-adjust-dialog";
+import { InventoryTabs } from "@/components/catalog/ingredients-view";
 import { useActiveBusiness, useFeature } from "@/hooks/use-workspace";
 import { Link } from "@/i18n/navigation";
 import { useProducts } from "@/hooks/use-posly";
@@ -141,6 +142,7 @@ export function InventoryView() {
 					) : undefined
 				}
 			/>
+			<InventoryTabs value="products" />
 			<div className="grid grid-cols-3 gap-3" data-tour="inventory-status">
 				<MetricCard icon={PackageCheck} tone="success" label={t("inStock")} value={counts.in} />
 				<MetricCard icon={TriangleAlert} tone="warning" label={t("lowStock")} value={counts.low} />

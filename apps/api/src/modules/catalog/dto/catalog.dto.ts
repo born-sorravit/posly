@@ -168,6 +168,10 @@ export class ModifierOptionResponse {
 		description: "Null for members who cannot edit products",
 	})
 	costDelta: number | null;
+	@ApiPropertyOptional({
+		description: "The cost comes from its recipe (list endpoint only)",
+	})
+	costFromRecipe?: boolean;
 	@ApiProperty() isDefault: boolean;
 }
 

@@ -18,6 +18,7 @@ import {
 	QueryOrdersDto,
 	ReverseOrderDto,
 } from "@/modules/orders/dto/order.dto";
+import { InventoryService } from "@/modules/inventory/inventory.service";
 import { allocateDiscount, computeOrderTotals } from "@/modules/orders/pricing";
 import { Customer } from "@/models/customers/entities/customer.entity";
 import { Feature } from "@/shared/enums/subscription.enum";
@@ -64,7 +65,8 @@ export class OrdersService {
 		private readonly entitlements: EntitlementsService,
 		private readonly notifications: NotificationsService,
 		private readonly realtime: RealtimeService,
-		private readonly cacheService: CacheService
+		private readonly cacheService: CacheService,
+		private readonly inventory: InventoryService
 	) {}
 
 	/**
@@ -230,6 +232,17 @@ export class OrdersService {
 			);
 		}
 
+		// Recipes: what the sale used comes out of tracked ingredients, never blocking it.
+		const ingredientUsage = await this.inventory.consume(
+			manager,
+			business.id,
+			items.map((i) => ({
+				productId: i.product.id,
+				optionIds: i.modifiers.map((m) => m.optionId),
+				quantity: i.quantity,
+			}))
+		);
+
 		// Per-business sequence under the business row's lock: concurrent tills queue here.
 		// TypeORM's postgres driver answers an UPDATE … RETURNING with [rows, affected].
 		const sequence = (await manager.query(
@@ -264,6 +277,7 @@ export class OrdersService {
 				: null,
 			kitchenUpdatedAt: items.some((i) => toKitchen(i.product)) ? now : null,
 			...totals,
+			ingredientUsage,
 			vatBasisPoints: business.vatBasisPoints,
 			pricesIncludeVat: business.pricesIncludeVat,
 			paidAt: now,
@@ -508,6 +522,8 @@ export class OrdersService {
 					);
 				}
 			}
+
+			await this.inventory.restore(manager, order.ingredientUsage);
 
 			await manager.update(Order, { id: order.id }, { status });
 			await manager.update(

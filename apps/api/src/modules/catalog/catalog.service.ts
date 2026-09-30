@@ -63,6 +63,19 @@ export class CatalogService {
 		private readonly cacheService: CacheService
 	) {}
 
+	/** Which of these products (or options) are costed by a recipe. */
+	private async hasRecipe(
+		ids: string[],
+		column: "product_id" | "modifier_option_id" = "product_id"
+	): Promise<Set<string>> {
+		if (!ids.length) return new Set();
+		const rows = (await this.dataSource.query(
+			`SELECT DISTINCT ${column} AS id FROM recipe_line WHERE deleted_at IS NULL AND ${column} = ANY($1)`,
+			[ids]
+		)) as { id: string }[];
+		return new Set(rows.map((r) => r.id));
+	}
+
 	/** The dashboard lists low stock and product names: a product change retires it. */
 	private productsChanged(membership: ResolvedMembership) {
 		return this.cacheService.bump(CacheKeys.dashboardVersion(membership.businessId));
@@ -182,9 +195,20 @@ export class CatalogService {
 			).map((r) => [r.id, r.n])
 		);
 		const showCost = membership.permissions.includes(Permission.PRODUCTS_WRITE);
+		const recipeCosted = showCost
+			? await this.hasRecipe(
+					groups.flatMap((g) => g.options.map((o) => o.id)),
+					"modifier_option_id"
+				)
+			: new Set<string>();
 		return groups.map((g) => {
+			const base = toModifierGroupResponse(g);
 			const response = {
-				...toModifierGroupResponse(g),
+				...base,
+				options: base.options.map((o) => ({
+					...o,
+					costFromRecipe: recipeCosted.has(o.id),
+				})),
 				productCount: counts.get(g.id) ?? 0,
 			};
 			return showCost ? response : withoutModifierCost(response);
@@ -228,11 +252,16 @@ export class CatalogService {
 					required: dto.required,
 				}
 			);
+			const recipeCosted = await this.hasRecipe(
+				dto.options.flatMap((o) => (o.id ? [o.id] : [])),
+				"modifier_option_id"
+			);
 			for (const [index, o] of dto.options.entries()) {
 				const values = {
 					name: o.name,
 					priceDelta: o.priceDelta,
-					costDelta: o.costDelta ?? 0,
+					// An option with a recipe keeps the cost its recipe gives it.
+					...(o.id && recipeCosted.has(o.id) ? {} : { costDelta: o.costDelta ?? 0 }),
 					isDefault:
 						dto.selection === ModifierSelection.SINGLE && (o.isDefault ?? false),
 					displayOrder: index,
@@ -535,6 +564,14 @@ export class CatalogService {
 			product.modifierGroups = groups;
 		}
 
+		// A product costed by its recipe keeps that cost; the form's figure is only a display.
+		if (
+			fields.cost !== undefined &&
+			product.id &&
+			(await this.hasRecipe([product.id])).size
+		) {
+			delete fields.cost;
+		}
 		Object.assign(product, fields);
 
 		if (

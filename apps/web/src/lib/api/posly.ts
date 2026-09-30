@@ -271,8 +271,18 @@ export interface ModifierGroupDto {
 	name: string;
 	selection: "SINGLE" | "MULTIPLE";
 	required: boolean;
-	/** `costDelta` is null for members who cannot edit products. */
-	options: { id: string; name: string; priceDelta: Satang; costDelta: Satang | null; isDefault: boolean }[];
+	/**
+	 * `costDelta` is null for members who cannot edit products; `costFromRecipe` (list only)
+	 * means the extra cost is its recipe's, not typed.
+	 */
+	options: {
+		id: string;
+		name: string;
+		priceDelta: Satang;
+		costDelta: Satang | null;
+		costFromRecipe?: boolean;
+		isDefault: boolean;
+	}[];
 	defaultOptionId: string | null;
 	/** Products using the group (list only). */
 	productCount?: number;
@@ -284,6 +294,50 @@ export interface ModifierGroupInput {
 	required: boolean;
 	/** An option with an id keeps it (and any cart holding it); without one it is new. */
 	options: { id?: string; name: string; priceDelta: Satang; costDelta?: Satang; isDefault?: boolean }[];
+}
+
+export interface IngredientDto {
+	id: string;
+	name: string;
+	/** What recipes measure it in: กรัม, มล., ชิ้น. */
+	unit: string;
+	/** Satang paid for `purchaseQty` units; null for members who cannot edit products. */
+	purchasePrice: Satang | null;
+	purchaseQty: number;
+	/** Satang per unit, fractional; null like the price. */
+	unitCost: number | null;
+	trackStock: boolean;
+	/** May be below zero: sales never stop over an ingredient. */
+	stock: number | null;
+	lowStockAt: number | null;
+	/** Products and options whose recipe uses it. */
+	usedBy: number;
+}
+
+export interface IngredientInput {
+	name: string;
+	unit: string;
+	purchasePrice: Satang;
+	purchaseQty: number;
+	trackStock: boolean;
+	stock?: number | null;
+	lowStockAt?: number | null;
+}
+
+/** Whose recipe: a product's, or a modifier option's. */
+export type RecipeOwner = { productId: string } | { optionId: string };
+
+export interface RecipeDto {
+	/** `cost` per line is fractional satang. */
+	lines: { ingredientId: string; name: string; unit: string; quantity: number; cost: number }[];
+	/** Whole satang, as written to the product's cost or the option's extra cost. */
+	cost: Satang;
+}
+
+export interface IngredientStockInput {
+	type: StockAdjustmentType;
+	quantity: number;
+	note?: string;
 }
 
 export type ExpenseCategory = "INGREDIENTS" | "UTILITIES" | "SALARY" | "RENT" | "EQUIPMENT" | "OTHER";
@@ -409,6 +463,9 @@ export interface ProductInput {
 
 const b = (businessId: string) => `/businesses/${businessId}`;
 
+const recipePath = (base: string, owner: RecipeOwner) =>
+	"productId" in owner ? `${base}/products/${owner.productId}/recipe` : `${base}/modifier-options/${owner.optionId}/recipe`;
+
 export const api = {
 	auth: {
 		forgotPassword: (email: string) => backend.post<{ sent: true }>("/auth/forgot-password", { email }),
@@ -465,6 +522,18 @@ export const api = {
 		stockAdjustments: (id: string, query: StockAdjustmentFilters & { limit?: number }, signal?: AbortSignal) =>
 			backend.page<StockAdjustmentDto>(`${b(id)}/stock-adjustments`, query, signal),
 		deleteProduct: (id: string, productId: string) => backend.delete(`${b(id)}/products/${productId}`),
+		ingredients: (id: string, signal?: AbortSignal) =>
+			backend.get<IngredientDto[]>(`${b(id)}/ingredients`, undefined, signal),
+		createIngredient: (id: string, input: IngredientInput) => backend.post<IngredientDto>(`${b(id)}/ingredients`, input),
+		updateIngredient: (id: string, ingredientId: string, input: Partial<IngredientInput>) =>
+			backend.patch<IngredientDto>(`${b(id)}/ingredients/${ingredientId}`, input),
+		deleteIngredient: (id: string, ingredientId: string) => backend.delete(`${b(id)}/ingredients/${ingredientId}`),
+		adjustIngredientStock: (id: string, ingredientId: string, input: IngredientStockInput) =>
+			backend.post<IngredientDto>(`${b(id)}/ingredients/${ingredientId}/stock-adjustments`, input),
+		recipe: (id: string, owner: RecipeOwner, signal?: AbortSignal) =>
+			backend.get<RecipeDto>(recipePath(b(id), owner), undefined, signal),
+		setRecipe: (id: string, owner: RecipeOwner, lines: { ingredientId: string; quantity: number }[]) =>
+			backend.put<RecipeDto>(recipePath(b(id), owner), { lines }),
 		/** What "use sample data" will create for a shop type — before the shop exists. */
 		samplePreview: (type: BusinessType, signal?: AbortSignal) =>
 			backend.get<SamplePreviewDto>(`/catalog/samples/${type}`, undefined, signal),

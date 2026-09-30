@@ -9,6 +9,9 @@ import {
 	type CustomerInput,
 	type ExpenseFilters,
 	type ExpenseInput,
+	type IngredientInput,
+	type IngredientStockInput,
+	type RecipeOwner,
 	type KitchenBoardDto,
 	type KitchenStatus,
 	type KitchenTicketDto,
@@ -616,4 +619,82 @@ export function useKitchenMutations() {
 			onSettled: settle,
 		}),
 	};
+}
+
+/** The shop's ingredients (Inventory feature). Off until asked for, so plans without it never call. */
+export function useIngredients(enabled = true) {
+	const id = useBusinessId();
+	return useQuery({
+		queryKey: queryKeys.ingredients(id),
+		queryFn: ({ signal }) => api.catalog.ingredients(id, signal),
+		enabled,
+	});
+}
+
+/**
+ * Ingredient writes. A new price re-costs every recipe that uses it, so products, options
+ * and the dashboard's gross profit are re-read too.
+ */
+export function useIngredientMutations() {
+	const id = useBusinessId();
+	const queryClient = useQueryClient();
+	const refresh = (costs: boolean) =>
+		Promise.all([
+			queryClient.invalidateQueries({ queryKey: queryKeys.ingredients(id) }),
+			...(costs
+				? [
+						queryClient.invalidateQueries({ queryKey: queryKeys.products(id) }),
+						queryClient.invalidateQueries({ queryKey: queryKeys.modifierGroups(id) }),
+						queryClient.invalidateQueries({ queryKey: ["business", id, "recipe"] }),
+						queryClient.invalidateQueries({ queryKey: ["business", id, "dashboard"] }),
+					]
+				: [queryClient.invalidateQueries({ queryKey: queryKeys.notifications(id) })]),
+		]);
+	return {
+		create: useMutation({
+			mutationFn: (input: IngredientInput) => api.catalog.createIngredient(id, input),
+			onSuccess: () => void refresh(false),
+		}),
+		update: useMutation({
+			mutationFn: ({ ingredientId, ...input }: Partial<IngredientInput> & { ingredientId: string }) =>
+				api.catalog.updateIngredient(id, ingredientId, input),
+			onSuccess: () => void refresh(true),
+		}),
+		remove: useMutation({
+			mutationFn: (ingredientId: string) => api.catalog.deleteIngredient(id, ingredientId),
+			onSuccess: () => void refresh(false),
+		}),
+		adjust: useMutation({
+			mutationFn: ({ ingredientId, ...input }: IngredientStockInput & { ingredientId: string }) =>
+				api.catalog.adjustIngredientStock(id, ingredientId, input),
+			onSuccess: () => void refresh(false),
+		}),
+	};
+}
+
+export function useRecipe(owner: RecipeOwner | null, enabled = true) {
+	const id = useBusinessId();
+	return useQuery({
+		queryKey: owner ? queryKeys.recipe(id, owner) : ["business", id, "recipe", "none"],
+		queryFn: ({ signal }) => api.catalog.recipe(id, owner as RecipeOwner, signal),
+		enabled: enabled && owner !== null,
+	});
+}
+
+/** Saving a recipe writes the owner's cost, so its product or option lists are re-read. */
+export function useSetRecipe() {
+	const id = useBusinessId();
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: ({ owner, lines }: { owner: RecipeOwner; lines: { ingredientId: string; quantity: number }[] }) =>
+			api.catalog.setRecipe(id, owner, lines),
+		onSuccess: () =>
+			void Promise.all([
+				queryClient.invalidateQueries({ queryKey: ["business", id, "recipe"] }),
+				queryClient.invalidateQueries({ queryKey: queryKeys.ingredients(id) }),
+				queryClient.invalidateQueries({ queryKey: queryKeys.products(id) }),
+				queryClient.invalidateQueries({ queryKey: queryKeys.modifierGroups(id) }),
+				queryClient.invalidateQueries({ queryKey: ["business", id, "dashboard"] }),
+			]),
+	});
 }
