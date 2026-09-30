@@ -142,7 +142,7 @@ export function InventoryView() {
 					) : undefined
 				}
 			/>
-			<InventoryTabs value="products" />
+			<InventoryTabs />
 			<div className="grid grid-cols-3 gap-3" data-tour="inventory-status">
 				<MetricCard icon={PackageCheck} tone="success" label={t("inStock")} value={counts.in} />
 				<MetricCard icon={TriangleAlert} tone="warning" label={t("lowStock")} value={counts.low} />

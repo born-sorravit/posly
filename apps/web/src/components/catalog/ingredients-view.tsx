@@ -1,9 +1,16 @@
 "use client";
 
-import { ConfirmDialog, type Column, DataTable, Segmented } from "@/components/common/controls";
+import { ConfirmDialog, type Column, DataTable, PageTabs, Segmented } from "@/components/common/controls";
 import { StockBadge } from "@/components/common/order-badges";
 import { previewAverageCost } from "@/components/catalog/stock-adjust-dialog";
-import { EmptyState, PageContainer, PageHeader, Surface, TableSkeleton } from "@/components/common/primitives";
+import {
+	EmptyState,
+	PageContainer,
+	PageHeader,
+	StatusBadge,
+	Surface,
+	TableSkeleton,
+} from "@/components/common/primitives";
 import { Button } from "@posly/ui/components/button";
 import {
 	Dialog,
@@ -24,27 +31,24 @@ import { Label } from "@posly/ui/components/label";
 import { Switch } from "@posly/ui/components/switch";
 import { useIngredientMutations, useIngredients } from "@/hooks/use-posly";
 import { useActiveBusiness, useFeature } from "@/hooks/use-workspace";
-import { Link, useRouter } from "@/i18n/navigation";
+import { Link } from "@/i18n/navigation";
 import type { IngredientDto, StockAdjustmentType } from "@/lib/api/posly";
 import { stockStatus } from "@/lib/stock";
 import { formatNumber } from "@posly/utils/format";
 import { formatBaht, fromBaht } from "@posly/utils/money";
-import { Carrot, Lock, MoreHorizontal, PackagePlus, Pencil, Plus, Trash2 } from "lucide-react";
+import { Carrot, Lock, MoreHorizontal, Package, PackagePlus, Pencil, Plus, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { toast } from "sonner";
 
 /** "สินค้า / วัตถุดิบ": the two halves of stock, one page each. */
-export function InventoryTabs({ value }: { value: "products" | "ingredients" }) {
+export function InventoryTabs() {
 	const t = useTranslations("ingredients");
-	const router = useRouter();
 	return (
-		<Segmented
-			value={value}
-			onChange={(next) => router.push(next === "products" ? "/inventory" : "/inventory/ingredients")}
-			options={[
-				{ value: "products", label: t("tabProducts") },
-				{ value: "ingredients", label: t("tabIngredients") },
+		<PageTabs
+			tabs={[
+				{ href: "/inventory", label: t("tabProducts"), icon: Package },
+				{ href: "/inventory/ingredients", label: t("tabIngredients"), icon: Carrot },
 			]}
 		/>
 	);
@@ -414,7 +418,32 @@ export function IngredientsView() {
 				{formatNumber(i.stock ?? 0)} {i.unit}
 			</span>
 		) : (
-			<span className="text-muted-foreground">{t("notTracked")}</span>
+			<span className="text-muted-foreground">
+				{/* The table's status column says it; the phone row has only this cell. */}
+				<span className="tablet:hidden">{t("notTracked")}</span>
+				<span className="hidden tablet:inline">—</span>
+			</span>
+		);
+	// As bought ("฿95 / 2,000 มล."), which is what the shop recognises; the price per unit
+	// is often a fraction of a baht, so it sits underneath as the detail.
+	const boughtCell = (i: IngredientDto) =>
+		i.purchasePrice !== null && i.purchasePrice > 0 ? (
+			<span className="numeric">
+				<span className="block">
+					{t("boughtFor", {
+						price: formatBaht(i.purchasePrice),
+						qty: formatNumber(i.purchaseQty),
+						unit: i.unit,
+					})}
+				</span>
+				{i.purchaseQty !== 1 && i.unitCost !== null ? (
+					<span className="block text-muted-foreground text-xs">
+						{t("perUnitHint", { cost: perUnit(i.unitCost), unit: i.unit })}
+					</span>
+				) : null}
+			</span>
+		) : (
+			<span className="text-muted-foreground">—</span>
 		);
 	const menu = (i: IngredientDto) =>
 		canEdit || (canAdjust && i.trackStock) ? (
@@ -426,7 +455,8 @@ export function IngredientsView() {
 				</DropdownMenuTrigger>
 				<DropdownMenuContent align="end">
 					{canAdjust && i.trackStock ? (
-						<DropdownMenuItem onClick={() => setAdjusting(i)}>
+						// The row shows its own button from tablet up.
+						<DropdownMenuItem className="tablet:hidden" onClick={() => setAdjusting(i)}>
 							<PackagePlus />
 							{ti("adjust")}
 						</DropdownMenuItem>
@@ -460,14 +490,7 @@ export function IngredientsView() {
 		},
 		...(canEdit
 			? [
-					{
-						key: "cost",
-						header: t("unitCost"),
-						align: "right" as const,
-						cell: (i: IngredientDto) => (
-							<span className="numeric">{i.unitCost !== null ? t("perUnit", { cost: perUnit(i.unitCost), unit: i.unit }) : "—"}</span>
-						),
-					},
+					{ key: "cost", header: t("bought"), align: "right" as const, cell: boughtCell },
 				]
 			: []),
 		{ key: "stock", header: ti("current"), align: "right", cell: stockCell },
@@ -475,9 +498,28 @@ export function IngredientsView() {
 			key: "status",
 			header: ti("status"),
 			hideBelow: "tablet",
-			cell: (i) => (i.trackStock ? <StockBadge status={stockStatus(i)} /> : null),
+			cell: (i) =>
+				i.trackStock ? (
+					<StockBadge status={stockStatus(i)} />
+				) : (
+					<StatusBadge tone="neutral">{t("notTracked")}</StatusBadge>
+				),
 		},
-		{ key: "actions", header: "", align: "right", cell: menu },
+		{
+			key: "actions",
+			header: "",
+			align: "right",
+			cell: (i) => (
+				<span className="inline-flex items-center gap-1">
+					{canAdjust && i.trackStock ? (
+						<Button variant="outline" size="sm" className="hidden tablet:inline-flex" onClick={() => setAdjusting(i)}>
+							{ti("adjust")}
+						</Button>
+					) : null}
+					{menu(i)}
+				</span>
+			),
+		},
 	];
 
 	return (
@@ -494,7 +536,7 @@ export function IngredientsView() {
 					) : undefined
 				}
 			/>
-			<InventoryTabs value="ingredients" />
+			<InventoryTabs />
 			{ingredients.isPending ? (
 				<TableSkeleton />
 			) : rows.length === 0 ? (
@@ -512,7 +554,7 @@ export function IngredientsView() {
 								<div className="min-w-0 flex-1">
 									<p className="truncate font-medium">{i.name}</p>
 									<p className="text-muted-foreground text-xs">
-										{canEdit && i.unitCost !== null ? `${t("perUnit", { cost: perUnit(i.unitCost), unit: i.unit })} · ` : ""}
+										{canEdit && i.purchasePrice ? `${t("boughtFor", { price: formatBaht(i.purchasePrice), qty: formatNumber(i.purchaseQty), unit: i.unit })} · ` : ""}
 										{i.usedBy ? t("usedBy", { count: i.usedBy }) : t("unused")}
 									</p>
 								</div>

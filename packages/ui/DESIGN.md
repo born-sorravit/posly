@@ -208,7 +208,8 @@ Posly คือระบบ POS สำหรับร้านค้าไทย
 ## Component
 
 - **shadcn:** component พื้นฐานเป็น shadcn (style `radix-nova`) อยู่ใน `packages/ui/src/components` import ด้วย `@posly/ui/components/<name>` มี accordion, alert, avatar, badge, button, card, checkbox, collapsible, command, dialog, dropdown-menu, input, input-group, label, pagination, popover, scroll-area, select, separator, sheet, skeleton, slider, sonner, switch, table, tabs, textarea, tooltip
-- **ระดับแอปของ web:** อยู่ใน `apps/web/src/components/common` มี `PageHeader`, `PageContainer`, `Surface`, `SectionTitle`, `MetricCard`, `StatusBadge`, `EmptyState`, `Segmented`, `DataTable`, `ConfirmDialog`
+- **ระดับแอปของ web:** อยู่ใน `apps/web/src/components/common` มี `PageHeader`, `PageContainer`, `Surface`, `SectionTitle`, `MetricCard`, `StatusBadge`, `EmptyState`, `Segmented`, `PageTabs`, `DataTable`, `ConfirmDialog`
+- **แท็บของหน้าย่อย ใช้ `PageTabs` ไม่ใช่ `Segmented`:** ถ้าต้องสลับไปหน้าอื่น (เช่น สต็อก "สินค้า / วัตถุดิบ") ใช้ `PageTabs` ซึ่งเป็นลิงก์จริง มีไอคอน เส้นใต้ `primary` ที่แท็บปัจจุบัน และเส้น `border` ยาวเต็มแถว วางไว้ใต้ `PageHeader` ส่วน `Segmented` ใช้สลับค่าภายในหน้าเดียวกันเท่านั้น เช่น "กราฟ / ตาราง" หรือ "กรอกเอง / คิดจากสูตร"
 - **admin ใช้ชุดเดียวกัน:** `apps/admin/src/components/common/primitives.tsx` และ `segmented.tsx` คัดลอกหน้าตามาจาก web (MetricCard → `StatCard`, `IconChip`, `Sparkline`, `StatusBadge`, `EmptyState`, `Segmented`) ถ้าแก้ฝั่งหนึ่งต้องแก้อีกฝั่งด้วย
 - **หน้าแรกของแอป:** ขึ้นต้นด้วยการ์ด `.hero-surface` หนึ่งใบ ตามด้วยการ์ดตัวเลขแบบ `tinted` 4 ใบ (`success`, `primary`, `info`, `warning`) ที่มี sparkline ทั้ง dashboard ของร้านและภาพรวมของ admin
 - **ก่อนสร้างใหม่:** ใช้ของที่มีอยู่ก่อนเสมอ
