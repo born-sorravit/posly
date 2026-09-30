@@ -1,11 +1,22 @@
 import { BusinessRepository } from "@/models/businesses/business.repository";
 import { ProductRepository } from "@/models/catalog/product.repository";
+import { CacheKeys } from "@/shared/cache/cache-keys";
+import { CacheService } from "@/shared/cache/cache.service";
 import type { ResolvedMembership } from "@/shared/decorators/current-membership.decorator";
 import { OrderStatus } from "@/shared/enums/order.enum";
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { DataSource } from "typeorm";
 
 export type ReportRange = "today" | "yesterday" | "7d" | "30d";
+
+/**
+ * How long a dashboard answer is reused. The web polls it every minute from every open tab,
+ * so this must outlast a poll to save anything. Whatever changes the figures (a sale, refund,
+ * cancellation, expense, product or stock change, the shop's settings, its branches) bumps
+ * the shop's version and retires the answer at once; the TTL only bounds what moves with the
+ * clock alone: "yesterday by now" and the day rolling over at midnight, each at most this late.
+ */
+const DASHBOARD_TTL_SECONDS = 300;
 
 const DAYS: Record<ReportRange, number> = {
 	today: 1,
@@ -40,10 +51,29 @@ export class ReportsService {
 	constructor(
 		private readonly dataSource: DataSource,
 		private readonly businessRepository: BusinessRepository,
-		private readonly productRepository: ProductRepository
+		private readonly productRepository: ProductRepository,
+		private readonly cacheService: CacheService
 	) {}
 
 	async dashboard(membership: ResolvedMembership, range: ReportRange) {
+		const version = await this.cacheService.version(
+			CacheKeys.dashboardVersion(membership.businessId)
+		);
+		// A branch-limited member sees only their branches' figures: the scope is in the key.
+		const scope = membership.branchIds
+			? [...membership.branchIds].sort().join(",")
+			: "all";
+		return this.cacheService.remember(
+			`dashboard:${membership.businessId}:${version}:${range}:${scope}`,
+			() => this.computeDashboard(membership, range),
+			DASHBOARD_TTL_SECONDS
+		);
+	}
+
+	private async computeDashboard(
+		membership: ResolvedMembership,
+		range: ReportRange
+	) {
 		const business = await this.businessRepository.findOne({
 			where: { id: membership.businessId },
 		});

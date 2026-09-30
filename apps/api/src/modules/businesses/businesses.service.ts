@@ -14,6 +14,8 @@ import {
 	CreateBusinessDto,
 	UpdateBusinessDto,
 } from "@/modules/businesses/dto/business.dto";
+import { CacheKeys } from "@/shared/cache/cache-keys";
+import { CacheService } from "@/shared/cache/cache.service";
 import type { ResolvedMembership } from "@/shared/decorators/current-membership.decorator";
 import { StorageService } from "@/modules/storage/storage.service";
 import { MemberRole } from "@/shared/enums/member-role.enum";
@@ -34,7 +36,8 @@ export class BusinessesService {
 		private readonly usersRepository: UsersRepository,
 		private readonly storageService: StorageService,
 		private readonly entitlements: EntitlementsService,
-		private readonly billing: BillingService
+		private readonly billing: BillingService,
+		private readonly cacheService: CacheService
 	) {}
 
 	/** Every business the user is an active member of — what the store switcher lists. */
@@ -132,6 +135,8 @@ export class BusinessesService {
 		}
 		Object.assign(business, fields);
 		await this.businessRepository.save(business);
+		// The dashboard's day boundaries follow the shop's timezone.
+		await this.cacheService.bump(CacheKeys.dashboardVersion(membership.businessId));
 		return await this.toDetail(business, membership);
 	}
 

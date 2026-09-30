@@ -321,6 +321,7 @@ export class BillingService {
 					stripeSubscriptionId: null,
 				}
 			);
+			await this.entitlements.forgetSubscription(row.businessId);
 			return;
 		}
 
@@ -338,6 +339,7 @@ export class BillingService {
 				stripeSubscriptionId: subscription.id,
 			}
 		);
+		await this.entitlements.forgetSubscription(row.businessId);
 
 		if (status === SubscriptionStatus.PAST_DUE && !wasPastDue && item) {
 			await this.notifications.emit(

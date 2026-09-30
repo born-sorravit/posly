@@ -8,6 +8,8 @@ import {
 	QueryExpensesDto,
 	UpdateExpenseDto,
 } from "@/modules/expenses/dto/expense.dto";
+import { CacheKeys } from "@/shared/cache/cache-keys";
+import { CacheService } from "@/shared/cache/cache.service";
 import type { ResolvedMembership } from "@/shared/decorators/current-membership.decorator";
 import { OrderDirection } from "@/shared/dto/pagination.dto";
 import { PaginatedResponse, paginate } from "@/shared/utils/pagination.util";
@@ -27,7 +29,15 @@ const toResponse = (e: Expense): ExpenseResponse => ({
 /** Expenses (plan §19), each keyed by the shop and stamped with who recorded it. */
 @Injectable()
 export class ExpensesService {
-	constructor(private readonly expenseRepository: ExpenseRepository) {}
+	constructor(
+		private readonly expenseRepository: ExpenseRepository,
+		private readonly cacheService: CacheService
+	) {}
+
+	/** Expenses feed the dashboard's estimated profit. */
+	private changed(membership: ResolvedMembership) {
+		return this.cacheService.bump(CacheKeys.dashboardVersion(membership.businessId));
+	}
 
 	private filtered(
 		membership: ResolvedMembership,
@@ -94,6 +104,7 @@ export class ExpensesService {
 				recordedBy: member.displayName,
 			})
 		);
+		await this.changed(membership);
 		return toResponse(expense);
 	}
 
@@ -107,12 +118,15 @@ export class ExpensesService {
 		if (dto.amount !== undefined) expense.amount = dto.amount;
 		if (dto.note !== undefined) expense.note = dto.note || null;
 		if (dto.spentOn !== undefined) expense.spentOn = dto.spentOn;
-		return toResponse(await this.expenseRepository.save(expense));
+		const saved = await this.expenseRepository.save(expense);
+		await this.changed(membership);
+		return toResponse(saved);
 	}
 
 	async remove(membership: ResolvedMembership, id: string): Promise<void> {
 		const expense = await this.load(membership, id);
 		await this.expenseRepository.softDelete({ id: expense.id });
+		await this.changed(membership);
 	}
 
 	private async load(membership: ResolvedMembership, id: string): Promise<Expense> {

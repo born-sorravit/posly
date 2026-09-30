@@ -28,6 +28,8 @@ import {
 	UpdateProductDto,
 } from "@/modules/catalog/dto/catalog.dto";
 import { StorageService } from "@/modules/storage/storage.service";
+import { CacheKeys } from "@/shared/cache/cache-keys";
+import { CacheService } from "@/shared/cache/cache.service";
 import type { ResolvedMembership } from "@/shared/decorators/current-membership.decorator";
 import { AuditAction } from "@/shared/enums/audit-action.enum";
 import { Permission } from "@/shared/enums/permission.enum";
@@ -56,8 +58,14 @@ export class CatalogService {
 		private readonly productRepository: ProductRepository,
 		private readonly modifierGroupRepository: ModifierGroupRepository,
 		private readonly storageService: StorageService,
-		private readonly notifications: NotificationsService
+		private readonly notifications: NotificationsService,
+		private readonly cacheService: CacheService
 	) {}
+
+	/** The dashboard lists low stock and product names: a product change retires it. */
+	private productsChanged(membership: ResolvedMembership) {
+		return this.cacheService.bump(CacheKeys.dashboardVersion(membership.businessId));
+	}
 
 	// ---------------------------------------------------------------- categories
 
@@ -324,6 +332,7 @@ export class CatalogService {
 		});
 		await this.applyProduct(membership, product, dto);
 		await this.saveProduct(product);
+		await this.productsChanged(membership);
 		return this.findProduct(membership, product.id);
 	}
 
@@ -394,6 +403,7 @@ export class CatalogService {
 			);
 		});
 
+		await this.productsChanged(membership);
 		return this.findProduct(membership, id);
 	}
 
@@ -473,6 +483,7 @@ export class CatalogService {
 		const previousImage = product.imagePath;
 		await this.applyProduct(membership, product, dto);
 		await this.saveProduct(product);
+		await this.productsChanged(membership);
 		if (previousImage && previousImage !== product.imagePath) {
 			void this.storageService.remove(previousImage);
 		}
@@ -483,6 +494,7 @@ export class CatalogService {
 	async deleteProduct(membership: ResolvedMembership, id: string): Promise<void> {
 		const product = await this.loadProduct(membership, id);
 		await this.productRepository.softRemove(product);
+		await this.productsChanged(membership);
 	}
 
 	private async applyProduct(

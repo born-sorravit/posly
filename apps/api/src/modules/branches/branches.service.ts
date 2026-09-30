@@ -6,6 +6,8 @@ import {
 	CreateBranchDto,
 	UpdateBranchDto,
 } from "@/modules/branches/dto/branch.dto";
+import { CacheKeys } from "@/shared/cache/cache-keys";
+import { CacheService } from "@/shared/cache/cache.service";
 import type { ResolvedMembership } from "@/shared/decorators/current-membership.decorator";
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { In } from "typeorm";
@@ -14,7 +16,8 @@ import { In } from "typeorm";
 export class BranchesService {
 	constructor(
 		private readonly branchRepository: BranchRepository,
-		private readonly entitlements: EntitlementsService
+		private readonly entitlements: EntitlementsService,
+		private readonly cacheService: CacheService
 	) {}
 
 	/** Only the branches this member may work in, when their membership is restricted. */
@@ -50,6 +53,8 @@ export class BranchesService {
 				isDefault: false,
 			})
 		);
+		// The dashboard's "all branches" figures and branch-scoped keys change with the list.
+		await this.cacheService.bump(CacheKeys.dashboardVersion(membership.businessId));
 		return toBranchResponse(branch);
 	}
 
@@ -70,7 +75,9 @@ export class BranchesService {
 		}
 
 		Object.assign(branch, dto);
-		return toBranchResponse(await this.branchRepository.save(branch));
+		const saved = await this.branchRepository.save(branch);
+		await this.cacheService.bump(CacheKeys.dashboardVersion(membership.businessId));
+		return toBranchResponse(saved);
 	}
 }
 

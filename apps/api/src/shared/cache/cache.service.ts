@@ -22,6 +22,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
 	private readonly config: CacheConfig;
 	private readonly redisConfig: RedisConfig;
 	private readonly memory = new Map<string, MemoryEntry>();
+	private readonly versions = new Map<string, number>();
 	private redis: Redis | null = null;
 
 	constructor(configService: ConfigService) {
@@ -71,6 +72,42 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
 		const value = await factory();
 		await this.write(namespaced, value, ttl);
 		return value;
+	}
+
+	/**
+	 * A counter that is part of a family of cache keys, so one `bump` retires every key built
+	 * on the old value — e.g. a shop's dashboard across all its ranges and branch scopes —
+	 * without having to know or list them. Read it, put it in the key, and the stale entries
+	 * simply stop being asked for and expire on their own TTL.
+	 */
+	async version(key: string): Promise<number> {
+		const namespaced = `${this.config.prefix}:v:${key}`;
+		if (this.redis) {
+			try {
+				return Number(await this.redis.get(namespaced)) || 0;
+			} catch {
+				return 0;
+			}
+		}
+		return this.versions.get(namespaced) ?? 0;
+	}
+
+	/** Moves `version(key)` on. Like every write here, a failure never fails the caller. */
+	async bump(key: string): Promise<void> {
+		const namespaced = `${this.config.prefix}:v:${key}`;
+		if (this.redis) {
+			await this.redis
+				.multi()
+				.incr(namespaced)
+				// Outlives any key built on it; a counter nobody bumps for a day can go.
+				.expire(namespaced, 86_400)
+				.exec()
+				.catch((error: Error) => {
+					this.logger.warn(`Cache bump failed for ${key}: ${error.message}`);
+				});
+			return;
+		}
+		this.versions.set(namespaced, (this.versions.get(namespaced) ?? 0) + 1);
 	}
 
 	/** For the admin system page: which backend is in use and whether it answers. */

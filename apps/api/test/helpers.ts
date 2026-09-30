@@ -1,4 +1,5 @@
 import { AppModule } from "@/app.module";
+import { EntitlementsService } from "@/modules/subscriptions/entitlements.service";
 import { ResponseFormatInterceptor } from "@/shared/interceptors/response.interceptor";
 import { GlobalExceptionFilter } from "@/shared/filters/global.filter";
 import { INestApplication, ValidationPipe, VersioningType } from "@nestjs/common";
@@ -62,6 +63,8 @@ export async function setPlan(
 			`UPDATE subscription SET plan_code = $2, status = 'ACTIVE', end_date = $3 WHERE business_id = $1`,
 			[businessId, plan, endDate]
 		);
+	// Written behind the app's back, so drop its cached copy of the row.
+	await app.get(EntitlementsService).forgetSubscription(businessId);
 }
 
 /** A fresh account with its own business, seeded with the sample cafe menu. */

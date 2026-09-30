@@ -1,4 +1,6 @@
 import { SubscriptionPlan } from "@/models/subscriptions/entities/subscription-plan.entity";
+import { CacheKeys } from "@/shared/cache/cache-keys";
+import { CacheService } from "@/shared/cache/cache.service";
 import { Subscription } from "@/models/subscriptions/entities/subscription.entity";
 import {
 	Feature,
@@ -36,6 +38,14 @@ export interface Entitlements {
 }
 
 const PLAN_CACHE_MS = 60_000;
+/** Billing writes forget it at once (`forgetSubscription`); this only bounds anything else. */
+const SUBSCRIPTION_CACHE_SECONDS = 60;
+
+/** The fields entitlements read, as they survive a JSON round trip through the cache. */
+type SubscriptionSnapshot = Pick<
+	Subscription,
+	"planCode" | "status" | "endDate" | "cancelAtPeriodEnd" | "stripeSubscriptionId"
+>;
 const STRIPE_RENEWAL_GRACE_MS = 48 * 3_600_000;
 
 /**
@@ -51,7 +61,10 @@ export class EntitlementsService {
 	private plans: Map<string, SubscriptionPlan> | null = null;
 	private plansAt = 0;
 
-	constructor(private readonly dataSource: DataSource) {}
+	constructor(
+		private readonly dataSource: DataSource,
+		private readonly cacheService: CacheService
+	) {}
 
 	async plansByCode(): Promise<Map<string, SubscriptionPlan>> {
 		if (!this.plans || Date.now() - this.plansAt > PLAN_CACHE_MS) {
@@ -74,8 +87,7 @@ export class EntitlementsService {
 		businessId: string,
 		manager?: EntityManager
 	): Promise<Entitlements> {
-		const repo = (manager ?? this.dataSource.manager).getRepository(Subscription);
-		const subscription = await repo.findOne({ where: { businessId } });
+		const subscription = await this.subscriptionOf(businessId, manager);
 		const plans = await this.plansByCode();
 
 		// A Stripe renewal lands by webhook moments after the period ends; the grace keeps a
@@ -107,6 +119,50 @@ export class EntitlementsService {
 				branches: plan.branchLimit,
 			},
 		};
+	}
+
+	/**
+	 * The shop's subscription row. Read fresh inside a transaction (the checkout's quota check
+	 * must see the row as the transaction does); otherwise cached, since every feature-gated
+	 * request asks and the row changes only through billing.
+	 */
+	private async subscriptionOf(
+		businessId: string,
+		manager?: EntityManager
+	): Promise<SubscriptionSnapshot | null> {
+		const read = async (): Promise<SubscriptionSnapshot | null> => {
+			const row = await (manager ?? this.dataSource.manager)
+				.getRepository(Subscription)
+				.findOne({ where: { businessId } });
+			return row
+				? {
+						planCode: row.planCode,
+						status: row.status,
+						endDate: row.endDate,
+						cancelAtPeriodEnd: row.cancelAtPeriodEnd,
+						stripeSubscriptionId: row.stripeSubscriptionId,
+					}
+				: null;
+		};
+		if (manager) return read();
+
+		const cached = await this.cacheService.remember(
+			CacheKeys.subscription(businessId),
+			read,
+			SUBSCRIPTION_CACHE_SECONDS
+		);
+		// Dates come back from the cache as strings.
+		return (
+			cached && {
+				...cached,
+				endDate: cached.endDate ? new Date(cached.endDate) : null,
+			}
+		);
+	}
+
+	/** Call after writing a shop's subscription row, so its new plan applies at once. */
+	forgetSubscription(businessId: string): Promise<void> {
+		return this.cacheService.forget(CacheKeys.subscription(businessId));
 	}
 
 	async hasFeature(businessId: string, feature: Feature): Promise<boolean> {

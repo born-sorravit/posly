@@ -1,4 +1,6 @@
 import { AuditLog } from "@/models/audit/entities/audit-log.entity";
+import { CacheKeys } from "@/shared/cache/cache-keys";
+import { CacheService } from "@/shared/cache/cache.service";
 import { AuditLogRepository } from "@/models/audit/audit-log.repository";
 import { Branch } from "@/models/branches/entities/branch.entity";
 import { BusinessMember } from "@/models/businesses/entities/business-member.entity";
@@ -61,7 +63,8 @@ export class OrdersService {
 		private readonly auditLogRepository: AuditLogRepository,
 		private readonly entitlements: EntitlementsService,
 		private readonly notifications: NotificationsService,
-		private readonly realtime: RealtimeService
+		private readonly realtime: RealtimeService,
+		private readonly cacheService: CacheService
 	) {}
 
 	/**
@@ -88,6 +91,10 @@ export class OrdersService {
 		try {
 			const orderId = await this.dataSource.transaction((manager) =>
 				this.createInTransaction(manager, membership, dto)
+			);
+			// After the commit, so a dashboard read cannot re-cache the pre-sale figures.
+			await this.cacheService.bump(
+				CacheKeys.dashboardVersion(membership.businessId)
 			);
 			return this.findOne(membership, orderId);
 		} catch (error) {
@@ -541,6 +548,7 @@ export class OrdersService {
 			}
 		});
 
+		await this.cacheService.bump(CacheKeys.dashboardVersion(membership.businessId));
 		return this.findOne(membership, id);
 	}
 

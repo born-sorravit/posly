@@ -228,6 +228,41 @@ describe("checkout", () => {
 		).toBe(metrics.revenue);
 	});
 
+	it("shows a sale and its refund on the dashboard at once, despite the cache", async () => {
+		const dashboard = async () =>
+			(
+				await api(app)
+					.get(`/api/v1/businesses/${owner.businessId}/dashboard?range=today`)
+					.set("Authorization", `Bearer ${owner.token}`)
+					.expect(200)
+			).body.data.metrics as { orders: number; revenue: number };
+
+		const before = await dashboard();
+		// Read twice so the second answer comes from the cache.
+		expect(await dashboard()).toEqual(before);
+
+		const sale = await checkout(owner.token, owner.businessId, {
+			clientOrderId: randomUUID(),
+			items: [{ productId: croissant.id, quantity: 1 }],
+			payment: { method: "CASH", received: 10_000 },
+		}).expect(200);
+		const afterSale = await dashboard();
+		expect(afterSale.orders).toBe(before.orders + 1);
+		expect(afterSale.revenue).toBe(before.revenue + sale.body.data.total);
+
+		await api(app)
+			.post(
+				`/api/v1/businesses/${owner.businessId}/orders/${sale.body.data.id}/refund`
+			)
+			.set("Authorization", `Bearer ${owner.token}`)
+			.send({})
+			.expect(200);
+		expect(await dashboard()).toMatchObject({
+			orders: before.orders,
+			revenue: before.revenue,
+		});
+	});
+
 	it("returns the comparison period's figures beside each change", async () => {
 		const res = await api(app)
 			.get(`/api/v1/businesses/${owner.businessId}/dashboard?range=today`)

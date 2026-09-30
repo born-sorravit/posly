@@ -4,6 +4,8 @@ import { ModifierGroup } from "@/models/catalog/entities/modifier-group.entity";
 import { ModifierOption } from "@/models/catalog/entities/modifier-option.entity";
 import { Product } from "@/models/catalog/entities/product.entity";
 import { SAMPLE_CATALOGS } from "@/modules/catalog/sample-catalog";
+import { CacheKeys } from "@/shared/cache/cache-keys";
+import { CacheService } from "@/shared/cache/cache.service";
 import type { ResolvedMembership } from "@/shared/decorators/current-membership.decorator";
 import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { DataSource } from "typeorm";
@@ -12,7 +14,8 @@ import { DataSource } from "typeorm";
 export class SampleCatalogService {
 	constructor(
 		private readonly dataSource: DataSource,
-		private readonly businessRepository: BusinessRepository
+		private readonly businessRepository: BusinessRepository,
+		private readonly cacheService: CacheService
 	) {}
 
 	/** One transaction: a half-seeded menu is worse than none. */
@@ -24,7 +27,7 @@ export class SampleCatalogService {
 
 		const sample = SAMPLE_CATALOGS[business.businessType];
 
-		return this.dataSource.transaction(async (manager) => {
+		const result = await this.dataSource.transaction(async (manager) => {
 			const existing = await manager.count(Product, {
 				where: { businessId: business.id },
 			});
@@ -89,5 +92,8 @@ export class SampleCatalogService {
 
 			return { products: count };
 		});
+		// New products and stock show on the dashboard (low stock).
+		await this.cacheService.bump(CacheKeys.dashboardVersion(membership.businessId));
+		return result;
 	}
 }
