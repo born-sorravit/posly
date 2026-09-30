@@ -11,6 +11,7 @@ import { ProductRepository } from "@/models/catalog/product.repository";
 import {
 	toModifierGroupResponse,
 	toProductResponse,
+	withoutModifierCost,
 } from "@/modules/catalog/catalog.mapper";
 import {
 	AdjustStockDto,
@@ -180,10 +181,14 @@ export class CatalogService {
 				)) as { id: string; n: number }[]
 			).map((r) => [r.id, r.n])
 		);
-		return groups.map((g) => ({
-			...toModifierGroupResponse(g),
-			productCount: counts.get(g.id) ?? 0,
-		}));
+		const showCost = membership.permissions.includes(Permission.PRODUCTS_WRITE);
+		return groups.map((g) => {
+			const response = {
+				...toModifierGroupResponse(g),
+				productCount: counts.get(g.id) ?? 0,
+			};
+			return showCost ? response : withoutModifierCost(response);
+		});
 	}
 
 	/**
@@ -227,6 +232,7 @@ export class CatalogService {
 				const values = {
 					name: o.name,
 					priceDelta: o.priceDelta,
+					costDelta: o.costDelta ?? 0,
 					isDefault:
 						dto.selection === ModifierSelection.SINGLE && (o.isDefault ?? false),
 					displayOrder: index,
@@ -296,6 +302,7 @@ export class CatalogService {
 					Object.assign(new ModifierOption(), {
 						name: o.name,
 						priceDelta: o.priceDelta,
+						costDelta: o.costDelta ?? 0,
 						isDefault: o.isDefault ?? false,
 						displayOrder: index,
 					})
@@ -602,6 +609,10 @@ export class CatalogService {
 		);
 		return membership.permissions.includes(Permission.PRODUCTS_WRITE)
 			? response
-			: { ...response, cost: null };
+			: {
+					...response,
+					cost: null,
+					modifierGroups: response.modifierGroups.map(withoutModifierCost),
+				};
 	}
 }

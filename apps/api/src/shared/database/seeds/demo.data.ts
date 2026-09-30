@@ -56,8 +56,8 @@ const SIZE: SampleGroup = {
 	required: true,
 	options: [
 		{ name: "S", priceDelta: 0 },
-		{ name: "M", priceDelta: 1000, isDefault: true },
-		{ name: "L", priceDelta: 2000 },
+		{ name: "M", priceDelta: 1000, costDelta: 300, isDefault: true },
+		{ name: "L", priceDelta: 2000, costDelta: 600 },
 	],
 };
 
@@ -81,9 +81,9 @@ const EXTRA: SampleGroup = {
 	selection: ModifierSelection.MULTIPLE,
 	required: false,
 	options: [
-		{ name: "Extra Shot", priceDelta: 1500 },
-		{ name: "Oat Milk", priceDelta: 2000 },
-		{ name: "วิปครีม", priceDelta: 1000 },
+		{ name: "Extra Shot", priceDelta: 1500, costDelta: 500 },
+		{ name: "Oat Milk", priceDelta: 2000, costDelta: 900 },
+		{ name: "วิปครีม", priceDelta: 1000, costDelta: 400 },
 	],
 };
 
@@ -95,7 +95,7 @@ const TEMP: SampleGroup = {
 	options: [
 		{ name: "ร้อน", priceDelta: 0 },
 		{ name: "เย็น", priceDelta: 500, isDefault: true },
-		{ name: "ปั่น", priceDelta: 1500 },
+		{ name: "ปั่น", priceDelta: 1500, costDelta: 300 },
 	],
 };
 

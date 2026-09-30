@@ -112,11 +112,13 @@ export interface DashboardDto {
 		averageOrderChange: number | null;
 		/** Cost of the goods sold, from the cost snapshot taken at each sale. */
 		cost: Satang;
-		/** Sales minus cost of goods — what the dashboard shows. */
+		/** Sales (less VAT added on top) minus cost of goods — what the dashboard shows. */
 		grossProfit: Satang;
 		grossProfitChange: number | null;
 		/** Expenses recorded for the same days. */
 		expenses: Satang;
+		/** Of those, the INGREDIENTS category — may overlap the cost of goods. */
+		ingredientExpenses: Satang;
 		/** Gross profit minus expenses — for reports, where the period is long enough. */
 		estimatedProfit: Satang;
 		profitChange: number | null;
@@ -133,6 +135,8 @@ export interface DashboardDto {
 	paymentBreakdown: { method: PaymentMethod; amount: Satang; count: number }[];
 	employees: { name: string; orders: number; revenue: Satang; refunds: Satang; discounts: Satang }[];
 	lowStock: { id: string; name: string; stock: number; unit: string; tone: "danger" | "warning" }[];
+	/** Active products with no cost entered; their sales count as free. */
+	productsWithoutCost: number;
 }
 
 export type SamplePreviewDto = {
@@ -215,10 +219,13 @@ export interface InsightsCustomerRow {
 
 export interface InsightsProfitRow {
 	sold: number;
+	/** After each line's share of the order discount. */
 	revenue: Satang;
-	/** From the cost snapshot on each order line; before order-level discounts. */
+	/** From the cost snapshot on each order line. */
 	cost: Satang;
 	profit: Satang;
+	/** Some of these sales had no cost entered, so the profit reads high. */
+	missingCost: boolean;
 }
 
 export interface InsightsDto {
@@ -264,7 +271,8 @@ export interface ModifierGroupDto {
 	name: string;
 	selection: "SINGLE" | "MULTIPLE";
 	required: boolean;
-	options: { id: string; name: string; priceDelta: Satang; isDefault: boolean }[];
+	/** `costDelta` is null for members who cannot edit products. */
+	options: { id: string; name: string; priceDelta: Satang; costDelta: Satang | null; isDefault: boolean }[];
 	defaultOptionId: string | null;
 	/** Products using the group (list only). */
 	productCount?: number;
@@ -275,7 +283,7 @@ export interface ModifierGroupInput {
 	selection: "SINGLE" | "MULTIPLE";
 	required: boolean;
 	/** An option with an id keeps it (and any cart holding it); without one it is new. */
-	options: { id?: string; name: string; priceDelta: Satang; isDefault?: boolean }[];
+	options: { id?: string; name: string; priceDelta: Satang; costDelta?: Satang; isDefault?: boolean }[];
 }
 
 export type ExpenseCategory = "INGREDIENTS" | "UTILITIES" | "SALARY" | "RENT" | "EQUIPMENT" | "OTHER";

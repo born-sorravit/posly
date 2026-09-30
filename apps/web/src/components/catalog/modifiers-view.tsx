@@ -29,11 +29,12 @@ interface DraftOption {
 	id?: string;
 	name: string;
 	price: string;
+	cost: string;
 	isDefault: boolean;
 }
 
 let draftSeq = 0;
-const blankOption = (): DraftOption => ({ key: `new-${++draftSeq}`, name: "", price: "", isDefault: false });
+const blankOption = (): DraftOption => ({ key: `new-${++draftSeq}`, name: "", price: "", cost: "", isDefault: false });
 
 /** Create or edit one group: its name, how it is chosen, and its options in order. */
 function GroupDialog({ editing, onClose }: { editing: ModifierGroupDto | null; onClose: () => void }) {
@@ -49,6 +50,7 @@ function GroupDialog({ editing, onClose }: { editing: ModifierGroupDto | null; o
 					id: o.id,
 					name: o.name,
 					price: o.priceDelta ? String(o.priceDelta / 100) : "",
+					cost: o.costDelta ? String(o.costDelta / 100) : "",
 					isDefault: o.isDefault,
 				}))
 			: [blankOption(), blankOption()]
@@ -88,6 +90,7 @@ function GroupDialog({ editing, onClose }: { editing: ModifierGroupDto | null; o
 				id: o.id,
 				name: o.name.trim(),
 				priceDelta: fromBaht(Number.parseFloat(o.price) || 0),
+				costDelta: fromBaht(Number.parseFloat(o.cost) || 0),
 				isDefault: selection === "SINGLE" && o.isDefault,
 			})),
 		};
@@ -165,29 +168,49 @@ function GroupDialog({ editing, onClose }: { editing: ModifierGroupDto | null; o
 
 					<div className="space-y-3">
 						<Label>{t("options")}</Label>
-						<div className="grid grid-cols-[1fr_7rem_auto] items-center gap-x-2 gap-y-2">
-							<span className="px-1 text-muted-foreground text-xs">{t("optionName")}</span>
-							<span className="px-1 text-muted-foreground text-xs">{t("priceDelta")}</span>
-							<span />
+						{/* Phone: each option is its own block (name, then price and cost, then its actions). From
+						    tablet up the blocks dissolve into one four-column grid under shared headings. */}
+						<div className="grid gap-2 tablet:grid-cols-[1fr_6rem_6rem_auto] tablet:items-center tablet:gap-x-2">
+							<span className="hidden px-1 text-muted-foreground text-xs tablet:block">{t("optionName")}</span>
+							<span className="hidden px-1 text-muted-foreground text-xs tablet:block">{t("priceDelta")}</span>
+							<span className="hidden px-1 text-muted-foreground text-xs tablet:block">{t("costDelta")}</span>
+							<span className="hidden tablet:block" />
 							{options.map((o, index) => (
-								<div key={o.key} className="contents">
+								<div
+									key={o.key}
+									className="grid grid-cols-2 gap-2 rounded-xl bg-muted/50 p-2.5 tablet:contents"
+								>
 									<Input
 										aria-label={t("optionName")}
 										value={o.name}
 										maxLength={80}
+										placeholder={t("optionName")}
 										onChange={(e) => patch(o.key, { name: e.target.value })}
-										className="h-10 rounded-lg"
+										className="col-span-2 h-10 rounded-lg tablet:col-span-1"
 									/>
-									<Input
-										maxLength={10}
-										aria-label={t("priceDelta")}
-										inputMode="decimal"
-										value={o.price}
-										placeholder="0"
-										onChange={(e) => patch(o.key, { price: e.target.value.replace(/[^\d.]/g, "") })}
-										className="numeric h-10 rounded-lg text-right"
-									/>
-									<span className="flex items-center gap-0.5">
+									<label className="grid gap-1">
+										<span className="px-1 text-muted-foreground text-xs tablet:sr-only">{t("priceDelta")}</span>
+										<Input
+											maxLength={10}
+											inputMode="decimal"
+											value={o.price}
+											placeholder="0"
+											onChange={(e) => patch(o.key, { price: e.target.value.replace(/[^\d.]/g, "") })}
+											className="numeric h-10 rounded-lg text-right"
+										/>
+									</label>
+									<label className="grid gap-1">
+										<span className="px-1 text-muted-foreground text-xs tablet:sr-only">{t("costDelta")}</span>
+										<Input
+											maxLength={10}
+											inputMode="decimal"
+											value={o.cost}
+											placeholder="0"
+											onChange={(e) => patch(o.key, { cost: e.target.value.replace(/[^\d.]/g, "") })}
+											className="numeric h-10 rounded-lg text-right"
+										/>
+									</label>
+									<span className="col-span-2 flex items-center justify-end gap-0.5 tablet:col-span-1">
 										<button
 											type="button"
 											role={selection === "SINGLE" ? "radio" : "checkbox"}

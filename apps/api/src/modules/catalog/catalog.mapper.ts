@@ -20,11 +20,20 @@ export const toModifierGroupResponse = (
 			id: o.id,
 			name: o.name,
 			priceDelta: o.priceDelta,
+			costDelta: o.costDelta,
 			isDefault: o.isDefault,
 		})),
 		defaultOptionId: options.find((o) => o.isDefault)?.id ?? null,
 	};
 };
+
+/** The group as a cashier may see it: without what each option costs the shop. */
+export const withoutModifierCost = <T extends ModifierGroupResponse>(
+	group: T
+): T => ({
+	...group,
+	options: group.options.map((o) => ({ ...o, costDelta: null })),
+});
 
 export const toProductResponse = (
 	product: Product,

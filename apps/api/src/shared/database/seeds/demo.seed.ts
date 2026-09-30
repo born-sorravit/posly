@@ -14,7 +14,7 @@ import { OrderItemModifier } from "@/models/orders/entities/order-item-modifier.
 import { Payment } from "@/models/orders/entities/payment.entity";
 import { Subscription } from "@/models/subscriptions/entities/subscription.entity";
 import { User } from "@/models/users/entities/user.entity";
-import { computeOrderTotals } from "@/modules/orders/pricing";
+import { allocateDiscount, computeOrderTotals } from "@/modules/orders/pricing";
 import {
 	DEMO_ACCOUNTS,
 	DEMO_EMAIL_DOMAIN,
@@ -272,6 +272,7 @@ async function createShop(
 						m.create(ModifierOption, {
 							name: o.name,
 							priceDelta: o.priceDelta,
+							costDelta: o.costDelta ?? 0,
 							isDefault: o.isDefault ?? false,
 							displayOrder: j,
 						})
@@ -405,7 +406,9 @@ async function createShop(
 							?.name ?? "",
 					quantity: random() < 0.15 ? 2 : 1,
 					unitPrice,
-					unitCost: entry.product.cost ?? 0,
+					unitCost:
+						(entry.product.cost ?? 0) + chosen.reduce((s, o) => s + o.costDelta, 0),
+					costMissing: entry.product.cost === null,
 				};
 			});
 
@@ -415,6 +418,10 @@ async function createShop(
 				discount,
 				shop.vatBasisPoints,
 				shop.pricesIncludeVat
+			);
+			const lineDiscounts = allocateDiscount(
+				lines.map((l) => l.unitPrice * l.quantity),
+				totals.discount
 			);
 			const method = pickWeighted(random, mix, ([, w]) => w)[0];
 			const received =
@@ -481,7 +488,9 @@ async function createShop(
 							quantity: line.quantity,
 							unitPrice: line.unitPrice,
 							unitCost: line.unitCost,
+							costMissing: line.costMissing,
 							lineTotal: line.unitPrice * line.quantity,
+							discount: lineDiscounts[i],
 							note: null,
 							// Keeps the line order stable, like a real cart.
 							createdAt: new Date(at.getTime() + i),
@@ -494,6 +503,7 @@ async function createShop(
 								groupName: line.groupName(option.id),
 								optionName: option.name,
 								priceDelta: option.priceDelta,
+								costDelta: option.costDelta,
 								createdAt: at,
 								updatedAt: at,
 							});

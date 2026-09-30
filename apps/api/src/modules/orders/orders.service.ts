@@ -18,7 +18,7 @@ import {
 	QueryOrdersDto,
 	ReverseOrderDto,
 } from "@/modules/orders/dto/order.dto";
-import { computeOrderTotals } from "@/modules/orders/pricing";
+import { allocateDiscount, computeOrderTotals } from "@/modules/orders/pricing";
 import { Customer } from "@/models/customers/entities/customer.entity";
 import { Feature } from "@/shared/enums/subscription.enum";
 import { EntitlementsService } from "@/modules/subscriptions/entitlements.service";
@@ -174,7 +174,8 @@ export class OrdersService {
 				quantity: line.quantity,
 				note: line.note?.trim() || null,
 				unitPrice,
-				unitCost: product.cost ?? 0,
+				unitCost: Money.add(product.cost ?? 0, ...chosen.map((c) => c.costDelta)),
+				costMissing: product.cost === null,
 				modifiers: chosen,
 			};
 		});
@@ -184,6 +185,11 @@ export class OrdersService {
 			dto.discount ?? 0,
 			business.vatBasisPoints,
 			business.pricesIncludeVat
+		);
+
+		const lineDiscounts = allocateDiscount(
+			items.map((i) => Money.multiply(i.unitPrice, i.quantity)),
+			totals.discount
 		);
 
 		const cash = dto.payment.method === PaymentMethod.CASH;
@@ -261,7 +267,7 @@ export class OrdersService {
 			vatBasisPoints: business.vatBasisPoints,
 			pricesIncludeVat: business.pricesIncludeVat,
 			paidAt: now,
-			items: items.map((item) =>
+			items: items.map((item, index) =>
 				manager.create(OrderItem, {
 					productId: item.product.id,
 					name: item.product.name,
@@ -269,7 +275,9 @@ export class OrdersService {
 					quantity: item.quantity,
 					unitPrice: item.unitPrice,
 					unitCost: item.unitCost,
+					costMissing: item.costMissing,
 					lineTotal: Money.multiply(item.unitPrice, item.quantity),
+					discount: lineDiscounts[index],
 					note: item.note,
 					toKitchen: toKitchen(item.product),
 					modifiers: item.modifiers.map((m) => manager.create(OrderItemModifier, m)),
@@ -317,6 +325,7 @@ export class OrdersService {
 			groupName: string;
 			optionName: string;
 			priceDelta: number;
+			costDelta: number;
 		}[] = [];
 		let matched = 0;
 
@@ -338,6 +347,7 @@ export class OrdersService {
 					groupName: group.name,
 					optionName: option.name,
 					priceDelta: option.priceDelta,
+					costDelta: option.costDelta,
 				});
 			}
 		}

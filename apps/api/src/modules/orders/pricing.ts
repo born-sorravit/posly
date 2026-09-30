@@ -48,3 +48,28 @@ export const computeOrderTotals = (
 		totalCost,
 	};
 };
+
+/**
+ * Spreads an order discount over its lines in proportion to each line's amount, so a
+ * line's profit is what it actually earned. Largest-remainder rounding: the shares are whole
+ * satang and always add up to exactly `discount`.
+ */
+export const allocateDiscount = (
+	lineAmounts: Satang[],
+	discount: Satang
+): Satang[] => {
+	const total = lineAmounts.reduce((sum, a) => sum + a, 0);
+	if (discount <= 0 || total <= 0) return lineAmounts.map(() => 0);
+	const exact = lineAmounts.map((a) => (a * discount) / total);
+	const shares = exact.map(Math.floor);
+	let left = discount - shares.reduce((sum, s) => sum + s, 0);
+	const byRemainder = exact
+		.map((e, i) => ({ i, rest: e - shares[i] }))
+		.sort((a, b) => b.rest - a.rest || a.i - b.i);
+	for (const { i } of byRemainder) {
+		if (left <= 0) break;
+		shares[i] += 1;
+		left -= 1;
+	}
+	return shares;
+};

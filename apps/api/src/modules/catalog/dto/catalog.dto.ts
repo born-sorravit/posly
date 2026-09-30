@@ -120,6 +120,13 @@ export class ModifierOptionInput {
 	@Max(MAX_PRICE)
 	priceDelta: number;
 
+	@ApiPropertyOptional({ description: "Satang added to the cost", example: 800 })
+	@IsOptional()
+	@IsInt()
+	@Min(0)
+	@Max(MAX_PRICE)
+	costDelta?: number;
+
 	@ApiPropertyOptional()
 	@IsOptional()
 	@IsBoolean()
@@ -155,6 +162,12 @@ export class ModifierOptionResponse {
 	@ApiProperty() id: string;
 	@ApiProperty() name: string;
 	@ApiProperty() priceDelta: number;
+	@ApiProperty({
+		type: Number,
+		nullable: true,
+		description: "Null for members who cannot edit products",
+	})
+	costDelta: number | null;
 	@ApiProperty() isDefault: boolean;
 }
 

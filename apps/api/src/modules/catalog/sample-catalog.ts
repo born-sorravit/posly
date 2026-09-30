@@ -12,7 +12,12 @@ export interface SampleGroup {
 	name: string;
 	selection: ModifierSelection;
 	required: boolean;
-	options: { name: string; priceDelta: number; isDefault?: boolean }[];
+	options: {
+		name: string;
+		priceDelta: number;
+		costDelta?: number;
+		isDefault?: boolean;
+	}[];
 }
 
 export interface SampleCatalog {
@@ -39,8 +44,8 @@ const SIZE: SampleGroup = {
 	required: true,
 	options: [
 		{ name: "S", priceDelta: 0 },
-		{ name: "M", priceDelta: 1000, isDefault: true },
-		{ name: "L", priceDelta: 2000 },
+		{ name: "M", priceDelta: 1000, costDelta: 300, isDefault: true },
+		{ name: "L", priceDelta: 2000, costDelta: 600 },
 	],
 };
 
@@ -64,8 +69,8 @@ const EXTRAS: SampleGroup = {
 	selection: ModifierSelection.MULTIPLE,
 	required: false,
 	options: [
-		{ name: "Extra Shot", priceDelta: 1500 },
-		{ name: "Oat Milk", priceDelta: 2000 },
+		{ name: "Extra Shot", priceDelta: 1500, costDelta: 500 },
+		{ name: "Oat Milk", priceDelta: 2000, costDelta: 900 },
 	],
 };
 
@@ -262,8 +267,8 @@ const MEAT: SampleGroup = {
 	options: [
 		{ name: "หมูสับ", priceDelta: 0, isDefault: true },
 		{ name: "ไก่", priceDelta: 0 },
-		{ name: "หมูกรอบ", priceDelta: 1000 },
-		{ name: "กุ้ง", priceDelta: 2000 },
+		{ name: "หมูกรอบ", priceDelta: 1000, costDelta: 600 },
+		{ name: "กุ้ง", priceDelta: 2000, costDelta: 1200 },
 	],
 };
 
@@ -273,9 +278,9 @@ const TOPPING: SampleGroup = {
 	selection: ModifierSelection.MULTIPLE,
 	required: false,
 	options: [
-		{ name: "ไข่ดาว", priceDelta: 1000 },
-		{ name: "ไข่เจียว", priceDelta: 1000 },
-		{ name: "พิเศษ", priceDelta: 1500 },
+		{ name: "ไข่ดาว", priceDelta: 1000, costDelta: 450 },
+		{ name: "ไข่เจียว", priceDelta: 1000, costDelta: 450 },
+		{ name: "พิเศษ", priceDelta: 1500, costDelta: 800 },
 	],
 };
 

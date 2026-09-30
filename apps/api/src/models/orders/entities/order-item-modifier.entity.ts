@@ -3,7 +3,7 @@ import { OrderItem } from "@/models/orders/entities/order-item.entity";
 import { moneyColumnTransformer, type Satang } from "@/shared/utils/money.util";
 import { Column, Entity, Index, JoinColumn, ManyToOne } from "typeorm";
 
-/** A snapshot of one chosen option — names and delta as they were when sold. */
+/** A snapshot of one chosen option — names and deltas as they were when sold. */
 @Entity("order_item_modifier")
 export class OrderItemModifier extends BaseEntity {
 	@Index("idx_order_item_modifier_item_id")
@@ -34,4 +34,12 @@ export class OrderItemModifier extends BaseEntity {
 		transformer: moneyColumnTransformer,
 	})
 	priceDelta: Satang;
+
+	@Column({
+		name: "cost_delta",
+		type: "bigint",
+		default: 0,
+		transformer: moneyColumnTransformer,
+	})
+	costDelta: Satang;
 }
