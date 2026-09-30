@@ -39,7 +39,31 @@ export interface DemoShop {
 	hours: [number, number];
 	/** Relative weight per hour of the day — a cafe's morning rush, a minimart's evening. */
 	peak: (hour: number) => number;
+	/** What the kitchen buys, so recipes can cost the menu (Inventory feature). */
+	ingredients?: DemoIngredient[];
+	/**
+	 * Recipes as [ingredient key, quantity]. Products by name; options as "group:option".
+	 * A recipe replaces the typed cost — the seed writes the recipe's cost instead.
+	 */
+	recipes?: {
+		products: Record<string, DemoRecipe>;
+		options: Record<string, DemoRecipe>;
+	};
 }
+
+export interface DemoIngredient {
+	key: string;
+	name: string;
+	unit: string;
+	/** Satang paid for `purchaseQty` units. */
+	purchasePrice: number;
+	purchaseQty: number;
+	/** Tracked ingredients only. */
+	stock?: number;
+	lowStockAt?: number;
+}
+
+export type DemoRecipe = [ingredient: string, quantity: number][];
 
 export const DEMO_ACCOUNTS: DemoAccount[] = [
 	{ key: "nan", email: `nan@${DEMO_EMAIL_DOMAIN}`, name: "คุณแนน" },
@@ -132,6 +156,163 @@ export const DEMO_SHOPS: DemoShop[] = [
 		hours: [7, 19],
 		peak: (h) =>
 			h >= 7 && h < 10 ? 3 : h >= 12 && h < 14 ? 2 : h >= 15 && h < 17 ? 1.5 : 1,
+		// Drinks are made from a recipe; bottles and pastries are bought in at a typed cost,
+		// so the demo shows both kinds side by side.
+		ingredients: [
+			{
+				key: "beans",
+				name: "เมล็ดกาแฟคั่ว",
+				unit: "กรัม",
+				purchasePrice: 65_000,
+				purchaseQty: 1000,
+				stock: 2400,
+				lowStockAt: 1000,
+			},
+			{
+				key: "milk",
+				name: "นมสด",
+				unit: "มล.",
+				purchasePrice: 9500,
+				purchaseQty: 2000,
+				stock: 9000,
+				lowStockAt: 4000,
+			},
+			{
+				key: "oat",
+				name: "นมโอ๊ต",
+				unit: "มล.",
+				purchasePrice: 11_500,
+				purchaseQty: 1000,
+			},
+			{
+				key: "cup",
+				name: "แก้วพร้อมฝา",
+				unit: "ชิ้น",
+				purchasePrice: 25_000,
+				purchaseQty: 50,
+				stock: 180,
+				lowStockAt: 100,
+			},
+			{
+				key: "syrup",
+				name: "น้ำเชื่อม",
+				unit: "มล.",
+				purchasePrice: 8000,
+				purchaseQty: 750,
+			},
+			{
+				key: "caramel",
+				name: "ซอสคาราเมล",
+				unit: "มล.",
+				purchasePrice: 29_000,
+				purchaseQty: 1000,
+			},
+			{
+				key: "cocoa",
+				name: "ผงโกโก้",
+				unit: "กรัม",
+				purchasePrice: 22_000,
+				purchaseQty: 500,
+			},
+			{
+				key: "thaiTea",
+				name: "ผงชาไทย",
+				unit: "กรัม",
+				purchasePrice: 18_000,
+				purchaseQty: 400,
+			},
+			{
+				key: "greenTea",
+				name: "ผงชาเขียว",
+				unit: "กรัม",
+				purchasePrice: 16_000,
+				purchaseQty: 200,
+			},
+			// Below its reorder point, so the page and the bell have something to warn about.
+			{
+				key: "matcha",
+				name: "ผงมัทฉะ",
+				unit: "กรัม",
+				purchasePrice: 35_000,
+				purchaseQty: 100,
+				stock: 60,
+				lowStockAt: 100,
+			},
+			{
+				key: "condensed",
+				name: "นมข้นหวาน",
+				unit: "กรัม",
+				purchasePrice: 3200,
+				purchaseQty: 380,
+			},
+			{
+				key: "whip",
+				name: "วิปครีม",
+				unit: "มล.",
+				purchasePrice: 14_500,
+				purchaseQty: 1000,
+			},
+		],
+		recipes: {
+			products: {
+				Americano: [
+					["beans", 18],
+					["cup", 1],
+				],
+				Espresso: [
+					["beans", 18],
+					["cup", 1],
+				],
+				Latte: [
+					["beans", 18],
+					["milk", 180],
+					["cup", 1],
+				],
+				Cappuccino: [
+					["beans", 18],
+					["milk", 150],
+					["cup", 1],
+				],
+				Mocha: [
+					["beans", 18],
+					["milk", 150],
+					["cocoa", 15],
+					["cup", 1],
+				],
+				"Caramel Macchiato": [
+					["beans", 18],
+					["milk", 180],
+					["caramel", 20],
+					["cup", 1],
+				],
+				"Thai Tea": [
+					["thaiTea", 20],
+					["condensed", 30],
+					["milk", 60],
+					["cup", 1],
+				],
+				"Matcha Latte": [
+					["matcha", 4],
+					["milk", 150],
+					["cup", 1],
+				],
+				"Green Tea": [
+					["greenTea", 10],
+					["syrup", 20],
+					["cup", 1],
+				],
+				Chocolate: [
+					["cocoa", 25],
+					["milk", 180],
+					["cup", 1],
+				],
+			},
+			options: {
+				"extra:Extra Shot": [["beans", 9]],
+				"extra:Oat Milk": [["oat", 80]],
+				"extra:วิปครีม": [["whip", 30]],
+			},
+		},
 		catalog: {
 			groups: [TEMP, SIZE, SWEET, EXTRA, WARM],
 			categories: [
