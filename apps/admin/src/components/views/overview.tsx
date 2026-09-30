@@ -2,15 +2,15 @@
 
 import { DailyChart } from "@/components/charts/daily-chart";
 import { DemoToggle, useDemoFilter } from "@/components/common/demo-filter";
-import { EmptyState, ErrorState, PageHeader, SectionTitle, StatCard, Surface } from "@/components/common/primitives";
+import { EmptyState, ErrorState, SectionTitle, StatCard, Surface } from "@/components/common/primitives";
 import { useAdmin } from "@/lib/admin-api";
 import { PLAN_LABEL } from "@/lib/labels";
 import type { AdminOverviewResponse } from "@/lib/types";
 import { Skeleton } from "@posly/ui/components/skeleton";
-import { Tabs, TabsList, TabsTrigger } from "@posly/ui/components/tabs";
-import { formatNumber } from "@posly/utils/format";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@posly/ui/components/select";
+import { formatNumber, formatThaiDate } from "@posly/utils/format";
 import { formatBaht } from "@posly/utils/money";
-import { Banknote, CreditCard, ReceiptText, Store, Undo2, Users } from "lucide-react";
+import { Coins, ReceiptText, ShoppingBag, Store, TrendingUp, Undo2, Users } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -35,7 +35,7 @@ function PlanBreakdown({ rows }: { rows: AdminOverviewResponse["subscriptions"] 
 					</div>
 					<div className="h-2 rounded-full bg-muted">
 						<div
-							className="h-2 rounded-full bg-chart-1"
+							className="h-2 rounded-full bg-primary"
 							style={{ width: `${(count / max) * 100}%`, minWidth: count ? 8 : 0 }}
 						/>
 					</div>
@@ -50,27 +50,50 @@ export function OverviewView() {
 	const [days, setDays] = useState<number>(30);
 	const { data, error, isLoading, refetch } = useAdmin<AdminOverviewResponse>("overview", { days, includeDemo });
 	const t = data?.totals;
+	const series = data?.series;
 
 	return (
 		<div className="grid gap-6">
-			<PageHeader
-				title="ภาพรวมแพลตฟอร์ม"
-				description="ตัวเลขทั้งระบบ อัปเดตอัตโนมัติทุก 1 นาที"
-				actions={
-					<>
-						<DemoToggle />
-						<Tabs value={String(days)} onValueChange={(v) => setDays(Number(v))}>
-							<TabsList>
+			{/* The same branded hero as the shop dashboard in apps/web: the one dark surface. */}
+			<section className="hero-surface relative overflow-hidden rounded-3xl px-6 py-7 text-white tablet:px-8 tablet:py-8">
+				<div aria-hidden className="hero-grid pointer-events-none absolute inset-0" />
+				<div className="relative flex flex-col gap-4 tablet:flex-row tablet:items-start tablet:justify-between">
+					<div className="space-y-1">
+						<h1 className="font-semibold text-2xl tracking-tight tablet:text-3xl">ภาพรวมแพลตฟอร์ม</h1>
+						<p className="text-white/70">ทุกร้านบน Posly · อัปเดตทุก 1 นาที</p>
+					</div>
+					<div className="flex flex-wrap items-center gap-3">
+						<span className="text-sm text-white/60" suppressHydrationWarning>
+							{formatThaiDate(new Date(), { day: "numeric", month: "long", year: "numeric" })}
+						</span>
+						<Select value={String(days)} onValueChange={(v) => setDays(Number(v))}>
+							<SelectTrigger className="h-9 min-w-28 rounded-xl border-white/15 bg-white/10 text-white backdrop-blur hover:bg-white/15 data-[size=default]:h-9 [&_svg]:text-white/70">
+								<SelectValue />
+							</SelectTrigger>
+							<SelectContent align="end">
 								{RANGES.map((r) => (
-									<TabsTrigger key={r} value={String(r)}>
-										{r} วัน
-									</TabsTrigger>
+									<SelectItem key={r} value={String(r)}>
+										{r} วันล่าสุด
+									</SelectItem>
 								))}
-							</TabsList>
-						</Tabs>
-					</>
-				}
-			/>
+							</SelectContent>
+						</Select>
+					</div>
+				</div>
+
+				<div className="relative mt-6 flex flex-col gap-4 tablet:flex-row tablet:items-end tablet:justify-between">
+					<div>
+						<p className="text-sm text-white/60">ยอดขายวันนี้ทั้งแพลตฟอร์ม</p>
+						<p className="numeric font-semibold text-4xl tracking-tight">{t ? formatBaht(t.gmvToday) : "—"}</p>
+						<p className="mt-1 text-sm text-white/60">
+							{t ? `${formatNumber(t.ordersToday)} ออเดอร์วันนี้` : "กำลังโหลด…"}
+						</p>
+					</div>
+					<div className="[&_label]:text-white/70">
+						<DemoToggle />
+					</div>
+				</div>
+			</section>
 
 			{error && !data ? (
 				<Surface>
@@ -78,48 +101,77 @@ export function OverviewView() {
 				</Surface>
 			) : (
 				<>
-					<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 desktop:grid-cols-3">
+					<div className="grid grid-cols-2 gap-3 desktop:grid-cols-4 desktop:gap-4">
 						<StatCard
-							label="ยอดขายวันนี้"
-							icon={Banknote}
-							loading={isLoading}
-							value={t ? formatBaht(t.gmvToday) : null}
-							hint={t ? `${formatNumber(t.ordersToday)} ออเดอร์` : null}
-						/>
-						<StatCard
+							tinted
+							tone="success"
+							icon={Coins}
 							label={`ยอดขาย ${days} วัน`}
-							icon={ReceiptText}
 							loading={isLoading}
 							value={t ? formatBaht(t.gmvPeriod) : null}
-							hint={t ? `${formatNumber(t.ordersPeriod)} ออเดอร์ · ${formatNumber(t.activeShopsPeriod)} ร้านที่มียอดขาย` : null}
+							hint={t ? `${formatNumber(t.activeShopsPeriod)} ร้านที่มียอดขาย` : null}
+							trend={series?.map((d) => d.gmv)}
 						/>
 						<StatCard
-							label="ร้านค้าทั้งหมด"
+							tinted
+							tone="primary"
+							icon={ShoppingBag}
+							label={`ออเดอร์ ${days} วัน`}
+							loading={isLoading}
+							value={t ? formatNumber(t.ordersPeriod) : null}
+							hint={t ? `สะสม ${formatNumber(t.ordersAllTime)} ออเดอร์` : null}
+							trend={series?.map((d) => d.orders)}
+						/>
+						<StatCard
+							tinted
+							tone="info"
 							icon={Store}
+							label="ร้านค้าทั้งหมด"
 							loading={isLoading}
 							value={t ? formatNumber(t.businesses) : null}
 							hint={t ? `ใหม่ ${formatNumber(t.newBusinesses)} ร้านใน ${days} วัน` : null}
+							trend={series?.map((d) => d.newBusinesses)}
 						/>
 						<StatCard
-							label="ผู้ใช้ทั้งหมด"
+							tinted
+							tone="warning"
 							icon={Users}
+							label="ผู้ใช้ทั้งหมด"
 							loading={isLoading}
 							value={t ? formatNumber(t.users) : null}
 							hint={t ? `สมัครใหม่ ${formatNumber(t.newUsers)} คนใน ${days} วัน` : null}
+							trend={series?.map((d) => d.signups)}
 						/>
+					</div>
+
+					<div className="grid grid-cols-2 gap-3 desktop:grid-cols-3 desktop:gap-4">
 						<StatCard
-							label={`คืนเงิน / ยกเลิก (${days} วัน)`}
+							tone="danger"
 							icon={Undo2}
+							label={`คืนเงิน ${days} วัน`}
 							loading={isLoading}
-							value={t ? `${formatNumber(t.refundsPeriod)} / ${formatNumber(t.cancelledPeriod)}` : null}
-							hint={t ? `คืนเงินรวม ${formatBaht(t.refundedAmountPeriod)}` : null}
+							value={t ? formatBaht(t.refundedAmountPeriod) : null}
+							hint={t ? `${formatNumber(t.refundsPeriod)} ออเดอร์ · ยกเลิก ${formatNumber(t.cancelledPeriod)}` : null}
 						/>
 						<StatCard
-							label="ออเดอร์สะสม"
-							icon={CreditCard}
+							tone="primary"
+							icon={ReceiptText}
+							label="เฉลี่ยต่อออเดอร์"
 							loading={isLoading}
-							value={t ? formatNumber(t.ordersAllTime) : null}
-							hint="ออเดอร์ที่ชำระแล้วทั้งหมด"
+							value={t ? formatBaht(t.ordersPeriod ? Math.round(t.gmvPeriod / t.ordersPeriod) : 0) : null}
+							hint={`${days} วันล่าสุด`}
+						/>
+						<StatCard
+							// Two to a row on a phone: the odd third takes the whole row, as in apps/web.
+							className="col-span-2 desktop:col-span-1"
+							tone="success"
+							icon={TrendingUp}
+							label="ยอดขายเฉลี่ยต่อร้าน"
+							loading={isLoading}
+							value={
+								t ? formatBaht(t.activeShopsPeriod ? Math.round(t.gmvPeriod / t.activeShopsPeriod) : 0) : null
+							}
+							hint={`เฉพาะร้านที่มียอดขาย ${days} วัน`}
 						/>
 					</div>
 
@@ -127,7 +179,7 @@ export function OverviewView() {
 						<SectionTitle title="ยอดขายรายวัน" hint="ออเดอร์ที่ชำระแล้ว ตามวันในเวลาไทย" />
 						<div className="px-3 pb-4">
 							{data ? (
-								<DailyChart data={data.series} dataKey="gmv" kind="money" label="ยอดขาย" height={280} />
+								<DailyChart data={data.series} dataKey="gmv" kind="money" label="ยอดขาย" color="var(--success)" height={280} />
 							) : (
 								<Skeleton className="mx-2 h-[280px]" />
 							)}
@@ -139,7 +191,7 @@ export function OverviewView() {
 							<SectionTitle title="ออเดอร์รายวัน" />
 							<div className="px-3 pb-4">
 								{data ? (
-									<DailyChart data={data.series} dataKey="orders" kind="count" label="ออเดอร์" color="var(--chart-2)" />
+									<DailyChart data={data.series} dataKey="orders" kind="count" label="ออเดอร์" color="var(--chart-1)" />
 								) : (
 									<Skeleton className="mx-2 h-[240px]" />
 								)}
@@ -149,7 +201,7 @@ export function OverviewView() {
 							<SectionTitle title="ผู้ใช้สมัครใหม่รายวัน" />
 							<div className="px-3 pb-4">
 								{data ? (
-									<DailyChart data={data.series} dataKey="signups" kind="count" label="สมัครใหม่" color="var(--chart-3)" />
+									<DailyChart data={data.series} dataKey="signups" kind="count" label="สมัครใหม่" color="var(--chart-2)" />
 								) : (
 									<Skeleton className="mx-2 h-[240px]" />
 								)}
@@ -172,12 +224,16 @@ export function OverviewView() {
 										<li key={b.id}>
 											<Link
 												href={`/businesses/${b.id}`}
-												className="flex items-center gap-3 rounded-xl px-2 py-2 hover:bg-muted"
+												className="flex min-h-11 items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-muted"
 											>
-												<span className="numeric w-5 text-muted-foreground text-sm">{i + 1}</span>
-												<span className="min-w-0 flex-1 truncate font-medium">{b.name}</span>
-												<span className="numeric text-muted-foreground text-xs">{formatNumber(b.orders)} ออเดอร์</span>
-												<span className="numeric w-28 text-right font-medium">{formatBaht(b.gmv)}</span>
+												<span className="numeric flex size-7 shrink-0 items-center justify-center rounded-lg bg-accent font-semibold text-accent-foreground text-xs">
+													{i + 1}
+												</span>
+												<span className="min-w-0 flex-1 truncate font-medium text-sm">{b.name}</span>
+												<span className="numeric hidden text-muted-foreground text-xs tablet:inline">
+													{formatNumber(b.orders)} ออเดอร์
+												</span>
+												<span className="numeric w-28 text-right font-semibold text-sm">{formatBaht(b.gmv)}</span>
 											</Link>
 										</li>
 									))}

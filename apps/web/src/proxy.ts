@@ -42,7 +42,11 @@ export default async function proxy(request: NextRequest) {
 	try {
 		const refreshed = await fetch(`${env.apiBaseUrl}/auth/refresh`, {
 			method: "POST",
-			headers: { "Content-Type": "application/json" },
+			headers: {
+				"Content-Type": "application/json",
+				// The browser's, so the API labels the session's device rather than this server.
+				"User-Agent": request.headers.get("user-agent") ?? "",
+			},
 			body: JSON.stringify({ refreshToken: refresh }),
 			cache: "no-store",
 		});

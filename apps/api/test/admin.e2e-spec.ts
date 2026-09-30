@@ -135,4 +135,99 @@ describe("platform admin", () => {
 			.set(auth(admin.token))
 			.expect(400);
 	});
+
+	it("puts a shop on a plan, applies it at once and logs who did it", async () => {
+		const free = await ownerWithShop(app, "FREE");
+		const expenses = `/api/v1/businesses/${free.businessId}/expenses`;
+		// Read once on Free so the subscription is cached before the change.
+		await api(app).get(expenses).set(auth(free.token)).expect(403);
+
+		await api(app)
+			.post(`/api/v1/admin/businesses/${free.businessId}/subscription`)
+			.set(auth(owner.token))
+			.send({ plan: "PRO" })
+			.expect(404);
+
+		const res = await api(app)
+			.post(`/api/v1/admin/businesses/${free.businessId}/subscription`)
+			.set(auth(admin.token))
+			.send({ plan: "PRO", days: 30, note: "trial extension" })
+			.expect(200);
+		expect(res.body.data.subscription).toMatchObject({
+			plan: "PRO",
+			status: "ACTIVE",
+		});
+		expect(res.body.data.adminActions[0]).toMatchObject({
+			action: "SUBSCRIPTION_SET",
+			adminEmail: admin.email,
+			payload: { from: "FREE", to: "PRO", note: "trial extension" },
+		});
+
+		// The cached Free row was dropped: the feature opens without waiting a minute.
+		await api(app).get(expenses).set(auth(free.token)).expect(200);
+
+		await api(app)
+			.post(`/api/v1/admin/businesses/${free.businessId}/subscription`)
+			.set(auth(admin.token))
+			.send({ plan: "GOLD" })
+			.expect(400);
+	});
+
+	it("refuses to override a plan billed through Stripe", async () => {
+		const billed = await ownerWithShop(app);
+		await app.get(DataSource).query(
+			`UPDATE subscription SET stripe_subscription_id = $2 WHERE business_id = $1`,
+			// Unique per run: the id is unique across shops and the e2e database is reused.
+			[billed.businessId, `sub_e2e_${billed.businessId}`]
+		);
+		await api(app)
+			.post(`/api/v1/admin/businesses/${billed.businessId}/subscription`)
+			.set(auth(admin.token))
+			.send({ plan: "BUSINESS" })
+			.expect(409);
+	});
+
+	it("signs a person out of every device and shows it on their page", async () => {
+		const email = `signed-in-${Date.now()}@e2e.test`;
+		const first = await api(app)
+			.post("/api/v1/auth/register")
+			.send({ email, password: "Passw0rd!x", name: "Signed In" })
+			.expect(201);
+		await api(app)
+			.post("/api/v1/auth/login")
+			.send({ email, password: "Passw0rd!x" })
+			.expect(200);
+		const userId = first.body.data.user.id as string;
+
+		const before = await api(app)
+			.get(`/api/v1/admin/users/${userId}`)
+			.set(auth(admin.token))
+			.expect(200);
+		expect(before.body.data.sessions).toHaveLength(2);
+
+		const revoke = await api(app)
+			.post(`/api/v1/admin/users/${userId}/sessions/revoke`)
+			.set(auth(admin.token))
+			.send({})
+			.expect(200);
+		expect(revoke.body.data.revoked).toBe(2);
+
+		await api(app)
+			.post("/api/v1/auth/refresh")
+			.send({ refreshToken: first.body.data.refreshToken })
+			.expect(401);
+
+		const after = await api(app)
+			.get(`/api/v1/admin/users/${userId}`)
+			.set(auth(admin.token))
+			.expect(200);
+		expect(after.body.data.sessions).toHaveLength(0);
+		expect(after.body.data.actions[0]).toMatchObject({ action: "SESSIONS_REVOKED" });
+
+		const log = await api(app)
+			.get("/api/v1/admin/actions")
+			.set(auth(admin.token))
+			.expect(200);
+		expect(log.body.meta.total).toBeGreaterThanOrEqual(2);
+	});
 });

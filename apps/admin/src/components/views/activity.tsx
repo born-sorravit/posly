@@ -2,10 +2,11 @@
 
 import { DemoToggle, useDemoFilter } from "@/components/common/demo-filter";
 import { ErrorState, PageHeader, Pager, RowsSkeleton, SectionTitle, Surface } from "@/components/common/primitives";
+import { AdminActionsTable } from "@/components/common/admin-actions";
 import { AuditTable, OrdersTable } from "@/components/common/tables";
 import { useAdmin, useAdminPage } from "@/lib/admin-api";
 import { AUDIT_ACTION } from "@/lib/labels";
-import type { AdminAuditRow, AdminOrderRow } from "@/lib/types";
+import type { AdminActionRow, AdminAuditRow, AdminOrderRow } from "@/lib/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@posly/ui/components/select";
 import { usePageFor } from "@/hooks/use-page-for";
 import { useState } from "react";
@@ -15,6 +16,8 @@ export function ActivityView() {
 	const [action, setAction] = useState("all");
 	const [page, setPage] = usePageFor(JSON.stringify([action, includeDemo]));
 
+	const [actionsPage, setActionsPage] = useState(1);
+	const adminActions = useAdminPage<AdminActionRow>("actions", { page: actionsPage, limit: 10 }, 60_000);
 	const orders = useAdmin<AdminOrderRow[]>("orders/recent", { limit: 15, includeDemo }, 30_000);
 	const audit = useAdminPage<AdminAuditRow>(
 		"activity",
@@ -71,6 +74,27 @@ export function ActivityView() {
 					</>
 				) : (
 					<RowsSkeleton />
+				)}
+			</Surface>
+
+			<Surface>
+				<SectionTitle title="การเปลี่ยนแปลงโดยผู้ดูแล" hint="ทุก action ที่ทำจากหน้านี้ถูกบันทึกพร้อมอีเมลของผู้ดูแล" />
+				{adminActions.error && !adminActions.data ? (
+					<ErrorState error={adminActions.error} retry={() => adminActions.refetch()} />
+				) : adminActions.data ? (
+					<>
+						<AdminActionsTable rows={adminActions.data.data} />
+						{adminActions.data.meta.last_page > 1 ? (
+							<Pager
+								page={adminActions.data.meta.page}
+								lastPage={adminActions.data.meta.last_page}
+								total={adminActions.data.meta.total}
+								onPage={setActionsPage}
+							/>
+						) : null}
+					</>
+				) : (
+					<RowsSkeleton rows={3} />
 				)}
 			</Surface>
 		</div>

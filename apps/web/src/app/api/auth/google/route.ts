@@ -8,7 +8,11 @@ export async function POST(request: Request) {
 		return NextResponse.json({ message: "Invalid request body" }, { status: 400 });
 	}
 
-	const result = await callAuth<BackendSession>("google", { idToken: body.idToken });
+	const result = await callAuth<BackendSession>(
+		"google",
+		{ idToken: body.idToken },
+		{ userAgent: request.headers.get("user-agent") }
+	);
 
 	if (!result.ok) {
 		return NextResponse.json({ message: result.message }, { status: result.status });

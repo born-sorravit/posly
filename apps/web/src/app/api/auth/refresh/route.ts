@@ -14,13 +14,13 @@ import { NextResponse } from "next/server";
  * than leaving a token that can never succeed — the refresh token is single-use, so a
  * rejected one is dead for good.
  */
-export async function POST() {
+export async function POST(request: Request) {
 	const { refreshToken } = await readTokens();
 	if (!refreshToken) {
 		return NextResponse.json({ message: "No session" }, { status: 401 });
 	}
 
-	const result = await callAuth<BackendSession>("refresh", { refreshToken });
+	const result = await callAuth<BackendSession>("refresh", { refreshToken }, { userAgent: request.headers.get("user-agent") });
 
 	if (!result.ok) {
 		await clearSessionCookies();

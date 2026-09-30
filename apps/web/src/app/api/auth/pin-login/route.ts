@@ -17,7 +17,10 @@ export async function POST(request: Request) {
 		return NextResponse.json({ message: "Not signed in" }, { status: 401 });
 	}
 
-	const result = await callAuth<BackendSession>("pin-login", body, { accessToken });
+	const result = await callAuth<BackendSession>("pin-login", body, {
+		accessToken,
+		userAgent: request.headers.get("user-agent"),
+	});
 	if (!result.ok) {
 		return NextResponse.json({ message: result.message, details: result.details }, { status: result.status });
 	}

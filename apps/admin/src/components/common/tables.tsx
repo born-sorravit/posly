@@ -1,6 +1,6 @@
 "use client";
 
-import { EmptyState, StatusBadge } from "@/components/common/primitives";
+import { DesktopOnly, EmptyState, MobileList, MobileRow, StatusBadge } from "@/components/common/primitives";
 import { AUDIT_ACTION, ORDER_STATUS } from "@/lib/labels";
 import type { AdminAuditRow, AdminOrderRow } from "@/lib/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@posly/ui/components/table";
@@ -12,6 +12,27 @@ import Link from "next/link";
 export function OrdersTable({ rows, showShop = true }: { rows: AdminOrderRow[]; showShop?: boolean }) {
 	if (!rows.length) return <EmptyState title="ยังไม่มีออเดอร์" />;
 	return (
+		<>
+		<MobileList>
+			{rows.map((o) => {
+				const status = ORDER_STATUS[o.status] ?? { label: o.status, tone: "neutral" as const };
+				return (
+					<MobileRow
+						key={o.id}
+						href={showShop ? `/businesses/${o.businessId}` : undefined}
+						title={
+							<>
+								<span className="numeric">#{o.number}</span>
+								<StatusBadge tone={status.tone}>{status.label}</StatusBadge>
+							</>
+						}
+						meta={`${showShop ? `${o.businessName} · ` : ""}${o.employeeName} · ${formatDateTime(o.createdAt)}`}
+						aside={<span className="numeric font-medium">{formatBaht(o.total)}</span>}
+					/>
+				);
+			})}
+		</MobileList>
+		<DesktopOnly>
 		<Table>
 			<TableHeader>
 				<TableRow>
@@ -47,6 +68,8 @@ export function OrdersTable({ rows, showShop = true }: { rows: AdminOrderRow[]; 
 				})}
 			</TableBody>
 		</Table>
+		</DesktopOnly>
+		</>
 	);
 }
 
@@ -66,6 +89,23 @@ const payloadSummary = (row: AdminAuditRow) => {
 export function AuditTable({ rows, showShop = true }: { rows: AdminAuditRow[]; showShop?: boolean }) {
 	if (!rows.length) return <EmptyState title="ยังไม่มีกิจกรรม" />;
 	return (
+		<>
+		<MobileList>
+			{rows.map((a) => (
+				<MobileRow
+					key={a.id}
+					href={showShop ? `/businesses/${a.businessId}` : undefined}
+					title={
+						<StatusBadge tone={a.action === "STOCK_ADJUSTED" ? "info" : "warning"}>
+							{AUDIT_ACTION[a.action] ?? a.action}
+						</StatusBadge>
+					}
+					meta={`${showShop ? `${a.businessName} · ` : ""}${a.actorName} · ${formatDateTime(a.createdAt)}`}
+					aside={<span className="text-muted-foreground text-xs">{payloadSummary(a)}</span>}
+				/>
+			))}
+		</MobileList>
+		<DesktopOnly>
 		<Table>
 			<TableHeader>
 				<TableRow>
@@ -98,5 +138,7 @@ export function AuditTable({ rows, showShop = true }: { rows: AdminAuditRow[]; s
 				))}
 			</TableBody>
 		</Table>
+		</DesktopOnly>
+		</>
 	);
 }

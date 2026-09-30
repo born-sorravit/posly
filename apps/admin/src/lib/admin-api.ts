@@ -1,7 +1,7 @@
 "use client";
 
 import type { ApiEnvelope, Paginated } from "@posly/types/api";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export class AdminApiError extends Error {
 	constructor(
@@ -65,5 +65,28 @@ export function useAdminPage<T>(path: string, query?: Query, refetchInterval = 6
 		},
 		refetchInterval,
 		placeholderData: keepPreviousData,
+	});
+}
+
+/**
+ * An admin action (POST). On success every cached admin read is refetched, since an action
+ * can change several pages at once (a shop's plan shows on overview, lists and detail).
+ */
+export function useAdminAction<TBody, TResult>(path: string) {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: async (body: TBody): Promise<TResult> => {
+			const response = await fetch(`/api/backend/admin/${path}`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify(body),
+			});
+			const payload = (await response.json().catch(() => null)) as ApiEnvelope<TResult> | null;
+			if (!response.ok || !payload) {
+				throw new AdminApiError(payload?.message ?? response.statusText, response.status);
+			}
+			return payload.data;
+		},
+		onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin"] }),
 	});
 }

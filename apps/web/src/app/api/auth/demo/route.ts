@@ -11,7 +11,7 @@ export async function POST(request: Request) {
 		return NextResponse.json({ message: "Invalid request body" }, { status: 400 });
 	}
 
-	const result = await callAuth<BackendSession>("demo", { role: body.role });
+	const result = await callAuth<BackendSession>("demo", { role: body.role }, { userAgent: request.headers.get("user-agent") });
 
 	if (!result.ok) {
 		return NextResponse.json({ message: result.message }, { status: result.status });

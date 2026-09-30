@@ -23,6 +23,15 @@ export class RefreshToken extends BaseEntity {
 	@JoinColumn({ name: "user_id" })
 	user: User;
 
+	/**
+	 * One per sign-in: every token rotated from the same login shares it. A browser that
+	 * refreshes from several requests at once can be handed more than one successor inside
+	 * the reuse grace window; the family lets the next rotation retire the extras.
+	 */
+	@Index("idx_refresh_token_family_active", { where: '"revoked_at" IS NULL' })
+	@Column({ name: "family_id", type: "uuid", default: () => "uuid_generate_v4()" })
+	familyId: string;
+
 	@Column({ name: "expires_at", type: "timestamptz" })
 	expiresAt: Date;
 
@@ -37,9 +46,12 @@ export class RefreshToken extends BaseEntity {
 	 * once may still be holding it, so a reuse within seconds is a race, not a theft.
 	 * `logout` means the user asked to end the session, which is never forgiven.
 	 * `password` means a password change ended every session at once — also never forgiven.
+	 * `admin` means a platform admin signed the account out everywhere — never forgiven.
+	 * `superseded` means a sibling from a concurrent refresh that the client never kept,
+	 * retired at the family's next rotation — never forgiven.
 	 */
 	@Column({ name: "revoked_reason", type: "varchar", length: 16, nullable: true })
-	revokedReason: "rotated" | "logout" | "password" | null;
+	revokedReason: "rotated" | "logout" | "password" | "admin" | "superseded" | null;
 
 	/** Best-effort context for a "your sessions" screen later; never used for auth. */
 	@Column({ name: "user_agent", type: "varchar", length: 255, nullable: true })

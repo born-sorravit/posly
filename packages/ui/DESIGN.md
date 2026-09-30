@@ -4,8 +4,8 @@ Posly คือระบบ POS สำหรับร้านค้าไทย
 
 ไฟล์นี้คือกฎที่ทุกแอป (`apps/web`, `apps/admin`) ต้องทำตาม ค่าจริงอยู่ที่:
 
-- `packages/ui/src/styles/globals.css`: token สีทั้งสองธีม มุม เงา breakpoint และฟอนต์ ใช้ร่วมกันทุกแอป
-- `apps/web/src/app/globals.css`: utility ของแบรนด์ (`.surface`, `.brand-gradient`, `.hero-surface`, `.tint-surface`, `.numeric`)
+- `packages/ui/src/styles/globals.css`: token สีทั้งสองธีม มุม เงา breakpoint ฟอนต์ และ utility ของแบรนด์ (`.surface`, `.brand-gradient`, `.hero-surface`, `.hero-grid`, `.tint-surface`, `.tint-chip`, `.numeric`) ใช้ร่วมกันทุกแอป
+- `apps/web/src/app/globals.css`: utility ที่มีแค่ web ใช้ (ภาพสินค้า, การพิมพ์ใบเสร็จ)
 - `apps/*/src/lib/fonts.ts`: การโหลดฟอนต์
 
 ถ้าไฟล์นี้กับโค้ดไม่ตรงกัน ให้ถือโค้ดเป็นหลัก แล้วแก้ไฟล์นี้ตาม ในโค้ดให้เรียกผ่าน Tailwind class ที่ map กับ token เสมอ (`bg-primary`, `text-muted-foreground`, `rounded-2xl`) ห้าม hard-code ค่าสีหรือใช้สีของ Tailwind ตรง ๆ อย่าง `bg-green-600`
@@ -186,5 +186,7 @@ Posly คือระบบ POS สำหรับร้านค้าไทย
 
 - **shadcn:** component พื้นฐานเป็น shadcn (style `radix-nova`) อยู่ใน `packages/ui/src/components` import ด้วย `@posly/ui/components/<name>` มี accordion, alert, avatar, badge, button, card, checkbox, collapsible, command, dialog, dropdown-menu, input, input-group, label, pagination, popover, scroll-area, select, separator, sheet, skeleton, slider, sonner, switch, table, tabs, textarea, tooltip
 - **ระดับแอปของ web:** อยู่ใน `apps/web/src/components/common` มี `PageHeader`, `PageContainer`, `Surface`, `SectionTitle`, `MetricCard`, `StatusBadge`, `EmptyState`, `Segmented`, `DataTable`, `ConfirmDialog`
+- **admin ใช้ชุดเดียวกัน:** `apps/admin/src/components/common/primitives.tsx` และ `segmented.tsx` คัดลอกหน้าตามาจาก web (MetricCard → `StatCard`, `IconChip`, `Sparkline`, `StatusBadge`, `EmptyState`, `Segmented`) ถ้าแก้ฝั่งหนึ่งต้องแก้อีกฝั่งด้วย
+- **หน้าแรกของแอป:** ขึ้นต้นด้วยการ์ด `.hero-surface` หนึ่งใบ ตามด้วยการ์ดตัวเลขแบบ `tinted` 4 ใบ (`success`, `primary`, `info`, `warning`) ที่มี sparkline ทั้ง dashboard ของร้านและภาพรวมของ admin
 - **ก่อนสร้างใหม่:** ใช้ของที่มีอยู่ก่อนเสมอ
 - **เพิ่ม shadcn component:** ใส่ใน `packages/ui` ไม่ใช่ในแอป

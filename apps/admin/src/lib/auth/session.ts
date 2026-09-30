@@ -63,7 +63,7 @@ export async function callAuth<T>(
 	body: unknown,
 	// Only for the endpoints that both need a session *and* hand back new tokens, which is
 	// why they cannot go through the /api/backend proxy: it drops the response's cookies.
-	options: { method?: string; accessToken?: string } = {}
+	options: { method?: string; accessToken?: string; userAgent?: string | null } = {}
 ): Promise<
 	{ ok: true; data: T } | { ok: false; status: number; message: string; details?: Record<string, unknown> }
 > {
@@ -72,6 +72,8 @@ export async function callAuth<T>(
 		headers: {
 			"Content-Type": "application/json",
 			...(options.accessToken ? { Authorization: `Bearer ${options.accessToken}` } : {}),
+			// The browser's, not this server's: the API labels the session's device with it.
+			...(options.userAgent ? { "User-Agent": options.userAgent } : {}),
 		},
 		body: JSON.stringify(body),
 		cache: "no-store",

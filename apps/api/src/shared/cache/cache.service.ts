@@ -3,6 +3,25 @@ import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/commo
 import { ConfigService } from "@nestjs/config";
 import { Redis } from "ioredis";
 
+export interface CacheStats {
+	provider: "redis" | "memory";
+	/** Keys under this app's prefix, counted by their first segment (`dashboard`, `v`…). */
+	keys: { total: number; byKind: Record<string, number>; truncated: boolean };
+	/** Redis only: the server's own figures, which cover every client of that Redis. */
+	server: {
+		version: string | null;
+		usedMemoryMb: number | null;
+		maxMemoryMb: number | null;
+		hits: number | null;
+		misses: number | null;
+		evictedKeys: number | null;
+		uptimeSeconds: number | null;
+	} | null;
+}
+
+/** SCAN stops counting here: the admin page wants a picture, not an audit of a huge keyspace. */
+const STATS_SCAN_LIMIT = 10_000;
+
 interface MemoryEntry {
 	value: unknown;
 	expiresAt: number;
@@ -128,6 +147,73 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
 		} catch {
 			return { provider: "redis", up: false, latencyMs: null };
 		}
+	}
+
+	/** For the admin system page: what is cached, and how the Redis server is doing. */
+	async stats(): Promise<CacheStats> {
+		const byKind: Record<string, number> = {};
+		const count = (namespaced: string) => {
+			const kind =
+				namespaced.slice(this.config.prefix.length + 1).split(":")[0] || "?";
+			byKind[kind] = (byKind[kind] ?? 0) + 1;
+		};
+
+		if (!this.redis) {
+			for (const key of this.memory.keys()) count(key);
+			for (const key of this.versions.keys()) count(key);
+			const total = this.memory.size + this.versions.size;
+			return {
+				provider: "memory",
+				keys: { total, byKind, truncated: false },
+				server: null,
+			};
+		}
+
+		let total = 0;
+		let truncated = false;
+		let cursor = "0";
+		do {
+			const [next, batch] = await this.redis.scan(
+				cursor,
+				"MATCH",
+				`${this.config.prefix}:*`,
+				"COUNT",
+				500
+			);
+			cursor = next;
+			for (const key of batch) count(key);
+			total += batch.length;
+			if (total >= STATS_SCAN_LIMIT) {
+				truncated = cursor !== "0";
+				break;
+			}
+		} while (cursor !== "0");
+
+		const info = await this.redis.info();
+		const field = (name: string): string | null =>
+			new RegExp(`^${name}:(.*)$`, "m").exec(info)?.[1]?.trim() ?? null;
+		const number = (name: string): number | null => {
+			const value = field(name);
+			return value === null ? null : Number(value);
+		};
+		const mb = (bytes: number | null) =>
+			bytes === null ? null : Math.round((bytes / 1024 / 1024) * 10) / 10;
+		const maxMemory = number("maxmemory");
+
+		return {
+			provider: "redis",
+			keys: { total, byKind, truncated },
+			server: {
+				version: field("redis_version"),
+				usedMemoryMb: mb(number("used_memory")),
+				// 0 means "no limit" in Redis.
+				maxMemoryMb: maxMemory ? mb(maxMemory) : null,
+				hits: number("keyspace_hits"),
+				misses: number("keyspace_misses"),
+				evictedKeys: number("evicted_keys"),
+				uptimeSeconds: number("uptime_in_seconds"),
+			},
+		};
 	}
 
 	async forget(key: string): Promise<void> {

@@ -1,5 +1,7 @@
 import type { AppConfig } from "@/config/configuration";
+import { EntitlementsService } from "@/modules/subscriptions/entitlements.service";
 import { CacheService } from "@/shared/cache/cache.service";
+import type { AuthenticatedUser } from "@/shared/decorators/current-user.decorator";
 import { MemberRole } from "@/shared/enums/member-role.enum";
 import { MemberStatus } from "@/shared/enums/member-status.enum";
 import { OrderStatus } from "@/shared/enums/order.enum";
@@ -9,11 +11,13 @@ import {
 	PaginatedResponse,
 	getPaginationOptions,
 } from "@/shared/utils/pagination.util";
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { InjectDataSource } from "@nestjs/typeorm";
-import { DataSource } from "typeorm";
+import { DataSource, type EntityManager } from "typeorm";
 import {
+	AdminActionRow,
+	AdminActionsQueryDto,
 	AdminActivityQueryDto,
 	AdminAuditRow,
 	AdminBusinessDetail,
@@ -23,10 +27,13 @@ import {
 	AdminOverviewQueryDto,
 	AdminOverviewResponse,
 	AdminRecentOrdersQueryDto,
+	AdminRevokeSessionsDto,
+	AdminSetPlanDto,
 	AdminSubscriptionRow,
 	AdminSubscriptionSummary,
 	AdminSubscriptionsQueryDto,
 	AdminSystemResponse,
+	AdminUserDetail,
 	AdminUserRow,
 	AdminUsersQueryDto,
 } from "@/modules/admin/dto/admin.dto";
@@ -77,7 +84,8 @@ export class AdminService {
 	constructor(
 		@InjectDataSource() private readonly dataSource: DataSource,
 		private readonly cacheService: CacheService,
-		private readonly configService: ConfigService
+		private readonly configService: ConfigService,
+		private readonly entitlements: EntitlementsService
 	) {
 		this.timezone = configService.get<AppConfig>("app")?.timezone ?? "Asia/Bangkok";
 	}
@@ -407,6 +415,7 @@ export class AdminService {
 			})),
 			recentOrders,
 			recentActivity,
+			adminActions: await this.queryActions(`a.target_id = $1`, [id], 10, 0),
 		};
 	}
 
@@ -622,6 +631,7 @@ export class AdminService {
 			},
 			database,
 			cache: await this.cacheService.ping(),
+			cacheStats: await this.cacheService.stats().catch(() => null),
 			// Whether each integration is configured — never the values themselves.
 			integrations: {
 				stripe: !!config.get<string>("billing.stripeSecretKey"),
@@ -634,6 +644,204 @@ export class AdminService {
 				demo: !!config.get<boolean>("demo.enabled"),
 			},
 		};
+	}
+
+	async user(id: string): Promise<AdminUserDetail> {
+		const [user] = await this.dataSource.query(
+			`SELECT u.id, u.email, u.name, u.avatar_url AS "avatarUrl", u.provider,
+				u.is_verified AS "isVerified", u.is_platform_admin AS "isPlatformAdmin", u.locale,
+				u.created_at AS "createdAt", (u.email ILIKE ${DEMO_LIKE}) AS "isDemo",
+				(SELECT MAX(rt.created_at) FROM refresh_token rt WHERE rt.user_id = u.id) AS "lastSeenAt"
+			FROM "user" u WHERE u.id = $1 AND u.deleted_at IS NULL`,
+			[id]
+		);
+		if (!user) throw new NotFoundException("User not found");
+
+		const memberships = await this.dataSource.query(
+			`SELECT b.id AS "businessId", b.name AS "businessName", m.role, m.status,
+				s.plan_code AS plan, m.created_at AS "joinedAt"
+			FROM business_member m
+			JOIN business b ON b.id = m.business_id AND b.deleted_at IS NULL
+			LEFT JOIN subscription s ON s.business_id = b.id AND s.deleted_at IS NULL
+			WHERE m.user_id = $1 AND m.deleted_at IS NULL
+			ORDER BY m.created_at`,
+			[id]
+		);
+
+		const sessions = await this.dataSource.query(
+			`SELECT id, created_at AS "createdAt", expires_at AS "expiresAt", user_agent AS "userAgent"
+			FROM refresh_token
+			WHERE user_id = $1 AND revoked_at IS NULL AND expires_at > now() AND deleted_at IS NULL
+			ORDER BY created_at DESC
+			LIMIT 50`,
+			[id]
+		);
+
+		return {
+			user: {
+				...user,
+				isVerified: Boolean(user.isVerified),
+				isPlatformAdmin: Boolean(user.isPlatformAdmin),
+				isDemo: Boolean(user.isDemo),
+				createdAt: iso(user.createdAt) as string,
+				lastSeenAt: iso(user.lastSeenAt),
+			},
+			memberships: memberships.map((row: Record<string, unknown>) => ({
+				businessId: row.businessId as string,
+				businessName: row.businessName as string,
+				role: row.role as string,
+				status: row.status as string,
+				plan: (row.plan as string) ?? null,
+				joinedAt: iso(row.joinedAt) as string,
+			})),
+			sessions: sessions.map((row: Record<string, unknown>) => ({
+				id: row.id as string,
+				createdAt: iso(row.createdAt) as string,
+				expiresAt: iso(row.expiresAt) as string,
+				userAgent: (row.userAgent as string) ?? null,
+			})),
+			actions: await this.queryActions(`a.target_id = $1`, [id], 20, 0),
+		};
+	}
+
+	/**
+	 * Puts a shop on a plan by hand — what `pnpm subscription:set` does, from the monitor.
+	 * Refused for a shop billed through Stripe: its next webhook would overwrite the change,
+	 * so that plan is changed in Stripe instead.
+	 */
+	async setPlan(
+		admin: AuthenticatedUser,
+		businessId: string,
+		dto: AdminSetPlanDto
+	): Promise<AdminBusinessDetail> {
+		await this.dataSource.transaction(async (manager) => {
+			const [row] = await manager.query(
+				`SELECT b.id, s.plan_code AS "planCode", s.status, s.end_date AS "endDate",
+					s.stripe_subscription_id AS "stripeSubscriptionId"
+				FROM business b
+				LEFT JOIN subscription s ON s.business_id = b.id AND s.deleted_at IS NULL
+				WHERE b.id = $1 AND b.deleted_at IS NULL
+				FOR UPDATE OF b`,
+				[businessId]
+			);
+			if (!row) throw new NotFoundException("Business not found");
+			if (row.stripeSubscriptionId) {
+				throw new ConflictException(
+					"This shop is billed through Stripe; change its plan in Stripe"
+				);
+			}
+
+			const endDate = dto.days ? new Date(Date.now() + dto.days * 86_400_000) : null;
+			await manager.query(
+				`INSERT INTO subscription (business_id, plan_code, status, start_date, end_date)
+				 VALUES ($1, $2, '${SubscriptionStatus.ACTIVE}', now(), $3)
+				 ON CONFLICT (business_id) WHERE deleted_at IS NULL
+				 DO UPDATE SET plan_code = EXCLUDED.plan_code, status = '${SubscriptionStatus.ACTIVE}',
+				               start_date = now(), end_date = EXCLUDED.end_date,
+				               cancel_at_period_end = false, updated_at = now()`,
+				[businessId, dto.plan, endDate]
+			);
+			await this.log(manager, admin, "SUBSCRIPTION_SET", "business", businessId, {
+				from: row.planCode ?? null,
+				fromStatus: row.status ?? null,
+				to: dto.plan,
+				endDate: endDate?.toISOString() ?? null,
+				note: dto.note?.trim() || null,
+			});
+		});
+
+		await this.entitlements.forgetSubscription(businessId);
+		return this.business(businessId);
+	}
+
+	/**
+	 * Signs a person out of every device: their refresh tokens are revoked, so no device can
+	 * renew. An access token already issued stays valid until it expires (15 minutes).
+	 */
+	async revokeSessions(
+		admin: AuthenticatedUser,
+		userId: string,
+		dto: AdminRevokeSessionsDto
+	): Promise<{ revoked: number }> {
+		return this.dataSource.transaction(async (manager) => {
+			const [user] = await manager.query(
+				`SELECT id FROM "user" WHERE id = $1 AND deleted_at IS NULL`,
+				[userId]
+			);
+			if (!user) throw new NotFoundException("User not found");
+
+			const [rows] = (await manager.query(
+				`UPDATE refresh_token SET revoked_at = now(), revoked_reason = 'admin', updated_at = now()
+				WHERE user_id = $1 AND revoked_at IS NULL AND expires_at > now() AND deleted_at IS NULL
+				RETURNING id`,
+				[userId]
+			)) as [{ id: string }[], number];
+
+			await this.log(manager, admin, "SESSIONS_REVOKED", "user", userId, {
+				revoked: rows.length,
+				note: dto.note?.trim() || null,
+			});
+			return { revoked: rows.length };
+		});
+	}
+
+	async actions(
+		query: AdminActionsQueryDto
+	): Promise<PaginatedResponse<AdminActionRow>> {
+		const { page, limit, skip } = getPaginationOptions(query);
+		const [{ total }] = await this.dataSource.query(
+			`SELECT COUNT(*)::int AS total FROM admin_action_log`
+		);
+		const data = await this.queryActions("true", [], limit, skip);
+		return new PaginatedResponse(data, num(total), page, limit);
+	}
+
+	private async log(
+		manager: EntityManager,
+		admin: AuthenticatedUser,
+		action: string,
+		targetType: "business" | "user",
+		targetId: string,
+		payload: Record<string, unknown>
+	): Promise<void> {
+		await manager.query(
+			`INSERT INTO admin_action_log (admin_user_id, admin_email, action, target_type, target_id, payload)
+			VALUES ($1, $2, $3, $4, $5, $6)`,
+			[admin.id, admin.email, action, targetType, targetId, JSON.stringify(payload)]
+		);
+	}
+
+	private async queryActions(
+		where: string,
+		params: unknown[],
+		limit: number,
+		skip: number
+	): Promise<AdminActionRow[]> {
+		const rows = await this.dataSource.query(
+			`SELECT a.id, a.admin_email AS "adminEmail", a.action, a.target_type AS "targetType",
+				a.target_id AS "targetId", a.payload, a.created_at AS "createdAt",
+				CASE a.target_type
+					WHEN 'business' THEN (SELECT name FROM business WHERE id = a.target_id)
+					WHEN 'user' THEN (SELECT email FROM "user" WHERE id = a.target_id)
+				END AS "targetName"
+			FROM admin_action_log a
+			WHERE ${where}
+			ORDER BY a.created_at DESC, a.id DESC
+			LIMIT ${Number(limit)} OFFSET ${Number(skip)}`,
+			params
+		);
+		return rows.map(
+			(row: Record<string, unknown>): AdminActionRow => ({
+				id: row.id as string,
+				adminEmail: row.adminEmail as string,
+				action: row.action as string,
+				targetType: row.targetType as string,
+				targetId: row.targetId as string,
+				targetName: (row.targetName as string) ?? null,
+				payload: (row.payload as Record<string, unknown>) ?? {},
+				createdAt: iso(row.createdAt) as string,
+			})
+		);
 	}
 
 	private async queryOrders(

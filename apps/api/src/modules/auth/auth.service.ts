@@ -210,13 +210,30 @@ export class AuthService {
 		}
 
 		if (!stored.revokedAt) {
+			// Retire the presented token, and with it the siblings concurrent refreshes were
+			// handed inside the grace window: the client kept this one, so those were never
+			// stored and would otherwise stay valid for the whole TTL. Only siblings older than
+			// the grace window — a sibling minted this very moment may be the one a racing
+			// request is about to store, and it is cleared at the following rotation instead.
 			await this.refreshTokenRepository.update(stored.id, {
 				revokedAt: new Date(),
 				revokedReason: "rotated",
 			});
+			await this.refreshTokenRepository
+				.createQueryBuilder()
+				.update()
+				// Not "rotated": nobody holds these, so a late arrival gets no grace.
+				.set({ revokedAt: () => "now()", revokedReason: "superseded" })
+				.where("family_id = :familyId AND revoked_at IS NULL", {
+					familyId: stored.familyId,
+				})
+				.andWhere("created_at < now() - make_interval(secs => :graceSeconds)", {
+					graceSeconds: ROTATION_GRACE_MS / 1000,
+				})
+				.execute();
 		}
 
-		return this.issueSession(stored.user, userAgent);
+		return this.issueSession(stored.user, userAgent, stored.familyId);
 	}
 
 	private isWithinRotationGrace(stored: RefreshToken): boolean {
@@ -321,9 +338,15 @@ export class AuthService {
 	}
 
 	async logout(token: string): Promise<void> {
+		const stored = await this.refreshTokenRepository.findOne({
+			where: { tokenHash: this.hashToken(token) },
+			select: { id: true, familyId: true },
+		});
+		if (!stored) return;
+		// The whole sign-in, so a sibling from a concurrent refresh cannot outlive the logout.
 		// `IsNull()`, not `undefined`: TypeORM drops undefined keys from a where clause.
 		await this.refreshTokenRepository.update(
-			{ tokenHash: this.hashToken(token), revokedAt: IsNull() },
+			{ familyId: stored.familyId, revokedAt: IsNull() },
 			{ revokedAt: new Date(), revokedReason: "logout" }
 		);
 	}
@@ -510,9 +533,11 @@ export class AuthService {
 		return result.affected ?? 0;
 	}
 
+	/** `familyId` continues a sign-in (a refresh); without it this is a new one. */
 	private async issueSession(
 		user: User,
-		userAgent?: string
+		userAgent?: string,
+		familyId?: string
 	): Promise<AuthSessionResponse> {
 		const payload: AccessTokenPayload = { sub: user.id, email: user.email };
 		const accessToken = await this.jwtService.signAsync(payload);
@@ -526,6 +551,7 @@ export class AuthService {
 			userId: user.id,
 			expiresAt: new Date(Date.now() + ttlDays * 86_400_000),
 			userAgent: userAgent?.slice(0, 255) ?? null,
+			...(familyId ? { familyId } : {}),
 		});
 
 		return {

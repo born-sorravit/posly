@@ -1,19 +1,35 @@
 "use client";
 
 import { DemoToggle, useDemoFilter } from "@/components/common/demo-filter";
-import { EmptyState, ErrorState, PageHeader, Pager, RowsSkeleton, StatCard, StatusBadge, Surface } from "@/components/common/primitives";
+import {
+	DesktopOnly,
+	EmptyState,
+	ErrorState,
+	MobileList,
+	MobileRow,
+	PageHeader,
+	Pager,
+	RowsSkeleton,
+	StatCard,
+	StatusBadge,
+	Surface,
+} from "@/components/common/primitives";
+import { Segmented } from "@/components/common/segmented";
 import { useAdmin, useAdminPage } from "@/lib/admin-api";
 import { PLAN_LABEL, SUBSCRIPTION_STATUS } from "@/lib/labels";
 import type { AdminSubscriptionRow, AdminSubscriptionSummary } from "@/lib/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@posly/ui/components/table";
-import { Tabs, TabsList, TabsTrigger } from "@posly/ui/components/tabs";
 import { formatNumber, formatThaiDate } from "@posly/utils/format";
 import { formatBaht } from "@posly/utils/money";
+import { CircleCheck, CircleSlash, Clock3, Coins, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { usePageFor } from "@/hooks/use-page-for";
 import { useState } from "react";
 
 const STATUSES = ["ACTIVE", "TRIALING", "PAST_DUE", "CANCELLED"] as const;
+
+const STATUS_TONE = { ACTIVE: "success", TRIALING: "info", PAST_DUE: "warning", CANCELLED: "danger" } as const;
+const STATUS_ICON = { ACTIVE: CircleCheck, TRIALING: Clock3, PAST_DUE: TriangleAlert, CANCELLED: CircleSlash } as const;
 
 export function SubscriptionsView() {
 	const { includeDemo } = useDemoFilter();
@@ -33,11 +49,23 @@ export function SubscriptionsView() {
 		<div className="grid gap-6">
 			<PageHeader title="Subscriptions" description="แพ็กเกจของทุกร้าน" actions={<DemoToggle />} />
 
-			<div className="grid grid-cols-2 gap-4 desktop:grid-cols-5">
-				<StatCard label="MRR" loading={summary.isLoading} value={s ? formatBaht(s.mrr) : null} hint="รวมราคาต่อเดือนของแพ็กเกจที่ใช้งาน" />
+			<div className="grid grid-cols-2 gap-3 desktop:grid-cols-5 desktop:gap-4">
+				<StatCard
+					// Five cards, two to a row on a phone: MRR leads on a row of its own.
+					className="col-span-2 desktop:col-span-1"
+					tinted
+					tone="success"
+					icon={Coins}
+					label="MRR"
+					loading={summary.isLoading}
+					value={s ? formatBaht(s.mrr) : null}
+					hint="ราคาต่อเดือนของแพ็กเกจที่ใช้งาน"
+				/>
 				{STATUSES.map((key) => (
 					<StatCard
 						key={key}
+						tone={STATUS_TONE[key]}
+						icon={STATUS_ICON[key]}
 						label={SUBSCRIPTION_STATUS[key].label}
 						loading={summary.isLoading}
 						value={s ? formatNumber(s.byStatus[key] ?? 0) : null}
@@ -47,16 +75,14 @@ export function SubscriptionsView() {
 
 			<Surface>
 				<div className="overflow-x-auto border-b p-4">
-					<Tabs value={status} onValueChange={setStatus}>
-						<TabsList>
-							<TabsTrigger value="all">ทั้งหมด</TabsTrigger>
-							{STATUSES.map((key) => (
-								<TabsTrigger key={key} value={key}>
-									{SUBSCRIPTION_STATUS[key].label}
-								</TabsTrigger>
-							))}
-						</TabsList>
-					</Tabs>
+					<Segmented
+						value={status}
+						onChange={setStatus}
+						options={[
+							{ value: "all", label: "ทั้งหมด" },
+							...STATUSES.map((key) => ({ value: key, label: SUBSCRIPTION_STATUS[key].label })),
+						]}
+					/>
 				</div>
 				{error && !data ? (
 					<ErrorState error={error} retry={() => refetch()} />
@@ -66,6 +92,26 @@ export function SubscriptionsView() {
 					<EmptyState title="ไม่มี subscription ในสถานะนี้" />
 				) : (
 					<>
+						<MobileList>
+							{data.data.map((row) => {
+								const st = SUBSCRIPTION_STATUS[row.status] ?? { label: row.status, tone: "neutral" as const };
+								return (
+									<MobileRow
+										key={row.id}
+										href={`/businesses/${row.businessId}`}
+										title={
+											<>
+												<span className="truncate">{row.businessName}</span>
+												<StatusBadge tone={st.tone}>{st.label}</StatusBadge>
+											</>
+										}
+										meta={`${row.planName ?? PLAN_LABEL[row.plan] ?? row.plan} · ${row.endDate ? `ถึง ${formatThaiDate(row.endDate)}` : "ไม่มีกำหนด"}`}
+										aside={<span className="numeric">{formatBaht(row.monthlyPrice)}</span>}
+									/>
+								);
+							})}
+						</MobileList>
+						<DesktopOnly>
 						<Table>
 							<TableHeader>
 								<TableRow>
@@ -107,6 +153,7 @@ export function SubscriptionsView() {
 								})}
 							</TableBody>
 						</Table>
+						</DesktopOnly>
 						<Pager page={data.meta.page} lastPage={data.meta.last_page} total={data.meta.total} onPage={setPage} />
 					</>
 				)}

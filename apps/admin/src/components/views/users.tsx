@@ -1,17 +1,31 @@
 "use client";
 
 import { DemoToggle, useDemoFilter } from "@/components/common/demo-filter";
-import { EmptyState, ErrorState, PageHeader, Pager, RowsSkeleton, StatusBadge, Surface } from "@/components/common/primitives";
+import {
+	DesktopOnly,
+	EmptyState,
+	ErrorState,
+	MobileList,
+	MobileRow,
+	PageHeader,
+	Pager,
+	RowsSkeleton,
+	StatusBadge,
+	Surface,
+} from "@/components/common/primitives";
 import { SearchInput } from "@/components/common/search-input";
 import { useDebounced } from "@/hooks/use-debounced";
 import { useAdminPage } from "@/lib/admin-api";
 import type { AdminUserRow } from "@/lib/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@posly/ui/components/table";
 import { formatNumber, formatRelative, formatThaiDate } from "@posly/utils/format";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { usePageFor } from "@/hooks/use-page-for";
 import { useState } from "react";
 
 export function UsersView() {
+	const router = useRouter();
 	const { includeDemo } = useDemoFilter();
 	const [search, setSearch] = useState("");
 	const q = useDebounced(search);
@@ -39,6 +53,28 @@ export function UsersView() {
 					<EmptyState title="ไม่พบผู้ใช้" />
 				) : (
 					<>
+						<MobileList>
+							{data.data.map((u) => (
+								<MobileRow
+									key={u.id}
+									href={`/users/${u.id}`}
+									title={
+										<>
+											<span className="truncate">{u.name}</span>
+											{u.isPlatformAdmin ? <StatusBadge tone="info">admin</StatusBadge> : null}
+											{u.isDemo ? <StatusBadge tone="neutral">demo</StatusBadge> : null}
+										</>
+									}
+									meta={u.email}
+									aside={
+										<span className="text-muted-foreground text-xs">
+											{u.lastSeenAt ? formatRelative(u.lastSeenAt) : "—"}
+										</span>
+									}
+								/>
+							))}
+						</MobileList>
+						<DesktopOnly>
 						<Table>
 							<TableHeader>
 								<TableRow>
@@ -51,10 +87,12 @@ export function UsersView() {
 							</TableHeader>
 							<TableBody>
 								{data.data.map((u) => (
-									<TableRow key={u.id}>
+									<TableRow key={u.id} className="cursor-pointer" onClick={() => router.push(`/users/${u.id}`)}>
 										<TableCell className="pl-5">
 											<div className="flex items-center gap-2 font-medium">
-												{u.name}
+												<Link href={`/users/${u.id}`} className="hover:underline">
+													{u.name}
+												</Link>
 												{u.isPlatformAdmin ? <StatusBadge tone="info">admin</StatusBadge> : null}
 												{u.isDemo ? <StatusBadge tone="neutral">demo</StatusBadge> : null}
 											</div>
@@ -75,6 +113,7 @@ export function UsersView() {
 								))}
 							</TableBody>
 						</Table>
+						</DesktopOnly>
 						<Pager page={data.meta.page} lastPage={data.meta.last_page} total={data.meta.total} onPage={setPage} />
 					</>
 				)}

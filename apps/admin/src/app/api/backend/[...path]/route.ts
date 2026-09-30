@@ -11,8 +11,8 @@ import { NextResponse } from "next/server";
 /**
  * The browser's only way to the API, so it never handles a token.
  *
- * Narrower than the web app's proxy on purpose: the monitor is read-only, so only GETs under
- * `/admin/*` pass. A stolen admin page cannot be turned into a way to act inside a shop.
+ * Narrower than the web app's proxy on purpose: only `/admin/*` passes (reads, plus the few
+ * admin actions as POST), so an admin session here cannot be used to act inside a shop.
  */
 
 /**
@@ -24,14 +24,14 @@ import { NextResponse } from "next/server";
  */
 let refreshInFlight: Promise<BackendSession | null> | null = null;
 
-async function refreshOnce(): Promise<BackendSession | null> {
+async function refreshOnce(userAgent: string | null): Promise<BackendSession | null> {
 	if (refreshInFlight) return refreshInFlight;
 
 	refreshInFlight = (async () => {
 		const { refreshToken } = await readTokens();
 		if (!refreshToken) return null;
 
-		const result = await callAuth<BackendSession>("refresh", { refreshToken });
+		const result = await callAuth<BackendSession>("refresh", { refreshToken }, { userAgent });
 		if (!result.ok) {
 			await clearSessionCookies();
 			return null;
@@ -81,7 +81,7 @@ async function handle(request: Request, context: { params: Promise<{ path: strin
 	// A 401 means the access token expired, not that the session ended — rotate once and
 	// retry. Only once: a second 401 after a fresh token is a real authorisation failure.
 	if (upstream.status === 401) {
-		const session = await refreshOnce();
+		const session = await refreshOnce(request.headers.get("user-agent"));
 		if (session) {
 			upstream = await forward(request, path, session.accessToken);
 		}
@@ -100,3 +100,4 @@ async function handle(request: Request, context: { params: Promise<{ path: strin
 }
 
 export const GET = handle;
+export const POST = handle;

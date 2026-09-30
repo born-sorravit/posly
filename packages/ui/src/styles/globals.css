@@ -217,3 +217,91 @@
     line-height: 1.6;
   }
 }
+
+/*
+ * Brand utilities every app uses (moved here from apps/web so apps/admin renders the same
+ * surfaces, CTA ramp, hero and tints). App-specific ones stay in each app's globals.css.
+ */
+@layer utilities {
+  /** Every card, panel and tile: one definition of "raised". */
+  .surface {
+    background-color: var(--card);
+    box-shadow: var(--surface-shadow), 0 0 0 1px var(--surface-edge);
+  }
+  .surface-hover {
+    transition: box-shadow 180ms ease, transform 180ms ease;
+  }
+  .surface-hover:hover {
+    box-shadow: var(--surface-hover-shadow), 0 0 0 1px var(--surface-edge);
+  }
+
+  /**
+   * The filled brand surface: the POS checkout button and primary CTAs, nothing else.
+   * A flat fill at that size reads as a coloured slab; the ramp gives it a lit top edge.
+   */
+  .brand-gradient {
+    background-image: linear-gradient(
+      100deg,
+      color-mix(in oklab, var(--primary), black 6%),
+      color-mix(in oklab, var(--primary), white 12%)
+    );
+  }
+
+  /**
+   * The dashboard greeting: deep indigo lit from the top-right, a whisper of the accent
+   * green below. The same in both themes — it is the one branded surface on the page.
+   */
+  .hero-surface {
+    background-color: #1e1b4b;
+    background-image:
+      radial-gradient(ellipse 70% 140% at 100% 0%, color-mix(in oklab, #7c75ff 85%, transparent), transparent 60%),
+      radial-gradient(ellipse 50% 120% at 0% 100%, color-mix(in oklab, #4338ca 70%, transparent), transparent 65%),
+      radial-gradient(ellipse 40% 80% at 75% 130%, color-mix(in oklab, #22c55e 35%, transparent), transparent 60%);
+    box-shadow: 0 20px 40px -20px color-mix(in oklab, #635bff 55%, transparent), inset 0 1px 0 0 oklch(1 0 0 / 0.12);
+  }
+  /* A fine dot grid that fades out toward the left, for texture at close range. */
+  .hero-grid {
+    background-image: radial-gradient(oklch(1 0 0 / 0.14) 1px, transparent 1px);
+    background-size: 18px 18px;
+    mask-image: linear-gradient(to left, black, transparent 70%);
+  }
+
+  /** A metric's soft tint, as on the dashboard cards. The hue arrives as `--tint`. */
+  .tint-surface {
+    box-shadow: 0 0 0 1px var(--surface-edge);
+    background-image: linear-gradient(
+      150deg,
+      color-mix(in oklab, var(--tint), transparent 88%),
+      color-mix(in oklab, var(--tint), transparent 96%)
+    );
+  }
+
+  /** A metric's icon chip, same `--tint` contract. */
+  .tint-chip {
+    background-color: color-mix(in oklab, var(--tint), transparent 84%);
+    color: color-mix(in oklab, var(--tint), black 12%);
+  }
+  .dark .tint-chip {
+    color: color-mix(in oklab, var(--tint), white 18%);
+  }
+
+  /* Tabular figures for anything a reader scans down a column: prices, totals, counts. */
+  .numeric {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  /* Horizontal chip rails scroll without a scrollbar eating the touch target's height. */
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Touch surfaces: no grey flash on tap, no double-tap zoom delay. */
+  .touch-target {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+}

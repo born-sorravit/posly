@@ -1,6 +1,8 @@
 "use client";
 
+import { SetPlanDialog } from "@/components/actions/set-plan-dialog";
 import { DailyChart } from "@/components/charts/daily-chart";
+import { AdminActionsTable } from "@/components/common/admin-actions";
 import { EmptyState, ErrorState, PageHeader, SectionTitle, StatCard, StatusBadge, Surface } from "@/components/common/primitives";
 import { AuditTable, OrdersTable } from "@/components/common/tables";
 import { AdminApiError, useAdmin } from "@/lib/admin-api";
@@ -10,7 +12,7 @@ import { Button } from "@posly/ui/components/button";
 import { Skeleton } from "@posly/ui/components/skeleton";
 import { formatNumber, formatThaiDate } from "@posly/utils/format";
 import { formatBaht } from "@posly/utils/money";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Coins, Package, ReceiptText, UserRound } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -82,19 +84,42 @@ export function BusinessDetailView({ id }: { id: string }) {
 						{business.isDemo ? <StatusBadge tone="neutral">demo</StatusBadge> : null}
 					</span>
 				}
+				actions={
+					<div className="grid w-full justify-items-stretch gap-1 tablet:w-auto tablet:justify-items-end">
+						<SetPlanDialog detail={data} />
+						{subscription?.hasStripe ? (
+							<p className="text-muted-foreground text-xs">ร้านนี้จ่ายผ่าน Stripe เปลี่ยนแพ็กเกจได้ที่ Stripe</p>
+						) : null}
+					</div>
+				}
 			/>
 
-			<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 desktop:grid-cols-4">
-				<StatCard label="ยอดขาย 30 วัน" value={formatBaht(stats.gmv30d)} hint={`${formatNumber(stats.orders30d)} ออเดอร์`} />
-				<StatCard label="ยอดขายสะสม" value={formatBaht(stats.gmvAllTime)} hint={`${formatNumber(stats.ordersAllTime)} ออเดอร์`} />
-				<StatCard label="สินค้า" value={formatNumber(stats.products)} />
-				<StatCard label="ลูกค้า" value={formatNumber(stats.customers)} />
+			<div className="grid grid-cols-2 gap-3 desktop:grid-cols-4 desktop:gap-4">
+				<StatCard
+					tinted
+					tone="success"
+					icon={Coins}
+					label="ยอดขาย 30 วัน"
+					value={formatBaht(stats.gmv30d)}
+					hint={`${formatNumber(stats.orders30d)} ออเดอร์`}
+					trend={data.series.map((d) => d.gmv)}
+				/>
+				<StatCard
+					tinted
+					tone="primary"
+					icon={ReceiptText}
+					label="ยอดขายสะสม"
+					value={formatBaht(stats.gmvAllTime)}
+					hint={`${formatNumber(stats.ordersAllTime)} ออเดอร์`}
+				/>
+				<StatCard tinted tone="info" icon={Package} label="สินค้า" value={formatNumber(stats.products)} />
+				<StatCard tinted tone="warning" icon={UserRound} label="ลูกค้า" value={formatNumber(stats.customers)} />
 			</div>
 
 			<Surface>
 				<SectionTitle title="ยอดขายรายวัน (30 วัน)" hint={`ตามเวลาของร้าน (${business.timezone})`} />
 				<div className="px-3 pb-4">
-					<DailyChart data={data.series} dataKey="gmv" kind="money" label="ยอดขาย" />
+					<DailyChart data={data.series} dataKey="gmv" kind="money" label="ยอดขาย" color="var(--success)" />
 				</div>
 			</Surface>
 
@@ -139,7 +164,7 @@ export function BusinessDetailView({ id }: { id: string }) {
 								</div>
 								<StatusBadge tone="neutral">{ROLE_LABEL[m.role] ?? m.role}</StatusBadge>
 								{m.status !== "ACTIVE" ? (
-									<StatusBadge tone={m.status === "INVITED" ? "info" : "critical"}>
+									<StatusBadge tone={m.status === "INVITED" ? "info" : "danger"}>
 										{MEMBER_STATUS[m.status] ?? m.status}
 									</StatusBadge>
 								) : null}
@@ -167,6 +192,11 @@ export function BusinessDetailView({ id }: { id: string }) {
 			<Surface>
 				<SectionTitle title="กิจกรรมล่าสุด" hint="คืนเงิน ยกเลิกออเดอร์ และปรับสต็อก" />
 				<AuditTable rows={data.recentActivity} showShop={false} />
+			</Surface>
+
+			<Surface>
+				<SectionTitle title="การเปลี่ยนแปลงโดยผู้ดูแล" />
+				<AdminActionsTable rows={data.adminActions} showTarget={false} />
 			</Surface>
 		</div>
 	);

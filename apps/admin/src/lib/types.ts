@@ -3,6 +3,20 @@
  * apps/api/src/modules/admin/dto/admin.dto.ts. Money is satang.
  */
 
+export interface CacheStats {
+	provider: "redis" | "memory";
+	keys: { total: number; byKind: Record<string, number>; truncated: boolean };
+	server: {
+		version: string | null;
+		usedMemoryMb: number | null;
+		maxMemoryMb: number | null;
+		hits: number | null;
+		misses: number | null;
+		evictedKeys: number | null;
+		uptimeSeconds: number | null;
+	} | null;
+}
+
 export interface DailyPoint {
 	date: string;
 	orders: number;
@@ -94,6 +108,8 @@ export interface AdminBusinessDetail {
 	series: { date: string; orders: number; gmv: number }[];
 	recentOrders: AdminOrderRow[];
 	recentActivity: AdminAuditRow[];
+	/** What platform admins changed on this shop, newest first. */
+	adminActions: AdminActionRow[];
 }
 
 export interface AdminUserRow {
@@ -171,6 +187,7 @@ export interface AdminSystemResponse {
 		tables: { name: string; rows: number }[];
 	};
 	cache: { provider: "redis" | "memory"; up: boolean; latencyMs: number | null };
+	cacheStats: CacheStats | null;
 	integrations: {
 		stripe: boolean;
 		stripeWebhook: boolean;
@@ -179,4 +196,47 @@ export interface AdminSystemResponse {
 		googleSignIn: boolean;
 		demo: boolean;
 	};
+}
+
+export interface AdminUserDetail {
+	user: {
+		id: string;
+		email: string;
+		name: string;
+		avatarUrl: string | null;
+		provider: string;
+		isVerified: boolean;
+		isPlatformAdmin: boolean;
+		isDemo: boolean;
+		locale: string;
+		createdAt: string;
+		lastSeenAt: string | null;
+	};
+	memberships: {
+		businessId: string;
+		businessName: string;
+		role: string;
+		status: string;
+		plan: string | null;
+		joinedAt: string;
+	}[];
+	/** Refresh tokens not revoked and not expired: one per signed-in device. */
+	sessions: {
+		id: string;
+		createdAt: string;
+		expiresAt: string;
+		userAgent: string | null;
+	}[];
+	actions: AdminActionRow[];
+}
+
+export interface AdminActionRow {
+	id: string;
+	adminEmail: string;
+	action: string;
+	targetType: string;
+	targetId: string;
+	targetName: string | null;
+	payload: Record<string, unknown>;
+	createdAt: string;
 }

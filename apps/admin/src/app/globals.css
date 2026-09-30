@@ -1,14 +1,2 @@
-/* Theme tokens, fonts and base styles are shared with every app via @posly/ui. */
+/* Theme tokens, fonts, base styles and brand utilities are shared with every app via @posly/ui. */
 @import "@posly/ui/styles/globals.css";
-
-@layer utilities {
-  /** Every card, panel and tile: one definition of "raised" (same as apps/web). */
-  .surface {
-    background-color: var(--card);
-    box-shadow: var(--surface-shadow), 0 0 0 1px var(--surface-edge);
-  }
-  /** Tabular figures, so columns of numbers line up. */
-  .numeric {
-    font-variant-numeric: tabular-nums;
-  }
-}

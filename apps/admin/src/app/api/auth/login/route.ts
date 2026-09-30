@@ -16,7 +16,7 @@ export async function POST(request: Request) {
 	const result = await callAuth<BackendSession>("login", {
 		email: body.email,
 		password: body.password,
-	});
+	}, { userAgent: request.headers.get("user-agent") });
 
 	if (!result.ok) {
 		return NextResponse.json({ message: result.message }, { status: result.status });

@@ -1,7 +1,8 @@
+import type { CacheStats } from "@/shared/cache/cache.service";
 import { PaginationDto } from "@/shared/dto/pagination.dto";
 import { AuditAction } from "@/shared/enums/audit-action.enum";
 import { PlanCode, SubscriptionStatus } from "@/shared/enums/subscription.enum";
-import { ApiPropertyOptional } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Transform, Type } from "class-transformer";
 import {
 	IsBoolean,
@@ -113,6 +114,41 @@ export class AdminRecentOrdersQueryDto extends DemoFilterDto {
 	limit: number = 30;
 }
 
+export class AdminSetPlanDto {
+	@ApiProperty({ enum: PlanCode })
+	@IsEnum(PlanCode)
+	plan: PlanCode;
+
+	@ApiPropertyOptional({
+		minimum: 1,
+		maximum: 3650,
+		description:
+			"Ends after this many days and falls back to Free; omit for open-ended.",
+	})
+	@IsOptional()
+	@IsInt()
+	@Min(1)
+	@Max(3650)
+	@Type(() => Number)
+	days?: number;
+
+	@ApiPropertyOptional({ description: "Why, for the action log." })
+	@IsOptional()
+	@IsString()
+	@MaxLength(200)
+	note?: string;
+}
+
+export class AdminRevokeSessionsDto {
+	@ApiPropertyOptional({ description: "Why, for the action log." })
+	@IsOptional()
+	@IsString()
+	@MaxLength(200)
+	note?: string;
+}
+
+export class AdminActionsQueryDto extends PaginationDto {}
+
 /*
  * Responses. The admin monitor is an internal, read-only screen, so these are plain shapes
  * (mirrored in apps/admin/src/lib/types.ts). Money is satang, as everywhere else.
@@ -209,6 +245,8 @@ export interface AdminBusinessDetail {
 	series: { date: string; orders: number; gmv: number }[];
 	recentOrders: AdminOrderRow[];
 	recentActivity: AdminAuditRow[];
+	/** What platform admins changed on this shop, newest first. */
+	adminActions: AdminActionRow[];
 }
 
 export interface AdminUserRow {
@@ -286,6 +324,7 @@ export interface AdminSystemResponse {
 		tables: { name: string; rows: number }[];
 	};
 	cache: { provider: "redis" | "memory"; up: boolean; latencyMs: number | null };
+	cacheStats: CacheStats | null;
 	integrations: {
 		stripe: boolean;
 		stripeWebhook: boolean;
@@ -294,4 +333,47 @@ export interface AdminSystemResponse {
 		googleSignIn: boolean;
 		demo: boolean;
 	};
+}
+
+export interface AdminUserDetail {
+	user: {
+		id: string;
+		email: string;
+		name: string;
+		avatarUrl: string | null;
+		provider: string;
+		isVerified: boolean;
+		isPlatformAdmin: boolean;
+		isDemo: boolean;
+		locale: string;
+		createdAt: string;
+		lastSeenAt: string | null;
+	};
+	memberships: {
+		businessId: string;
+		businessName: string;
+		role: string;
+		status: string;
+		plan: string | null;
+		joinedAt: string;
+	}[];
+	/** Refresh tokens not revoked and not expired: one per signed-in device. */
+	sessions: {
+		id: string;
+		createdAt: string;
+		expiresAt: string;
+		userAgent: string | null;
+	}[];
+	actions: AdminActionRow[];
+}
+
+export interface AdminActionRow {
+	id: string;
+	adminEmail: string;
+	action: string;
+	targetType: string;
+	targetId: string;
+	targetName: string | null;
+	payload: Record<string, unknown>;
+	createdAt: string;
 }

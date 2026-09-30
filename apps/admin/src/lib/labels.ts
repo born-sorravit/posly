@@ -7,19 +7,19 @@ export const PLAN_LABEL: Record<string, string> = {
 	BUSINESS: "Business",
 };
 
-export const SUBSCRIPTION_STATUS: Record<string, { label: string; tone: "good" | "info" | "warning" | "neutral" }> = {
-	ACTIVE: { label: "ใช้งาน", tone: "good" },
+export const SUBSCRIPTION_STATUS: Record<string, { label: string; tone: "success" | "info" | "warning" | "neutral" }> = {
+	ACTIVE: { label: "ใช้งาน", tone: "success" },
 	TRIALING: { label: "ทดลองใช้", tone: "info" },
 	PAST_DUE: { label: "ค้างชำระ", tone: "warning" },
 	CANCELLED: { label: "ยกเลิกแล้ว", tone: "neutral" },
 };
 
-export const ORDER_STATUS: Record<string, { label: string; tone: "good" | "warning" | "critical" | "neutral" }> = {
-	PAID: { label: "ชำระแล้ว", tone: "good" },
+export const ORDER_STATUS: Record<string, { label: string; tone: "success" | "warning" | "danger" | "neutral" }> = {
+	PAID: { label: "ชำระแล้ว", tone: "success" },
 	PENDING_PAYMENT: { label: "รอชำระ", tone: "warning" },
 	DRAFT: { label: "ร่าง", tone: "neutral" },
 	CANCELLED: { label: "ยกเลิก", tone: "neutral" },
-	REFUNDED: { label: "คืนเงิน", tone: "critical" },
+	REFUNDED: { label: "คืนเงิน", tone: "danger" },
 	PARTIALLY_REFUNDED: { label: "คืนเงินบางส่วน", tone: "warning" },
 };
 
@@ -50,4 +50,9 @@ export const BUSINESS_TYPE: Record<string, string> = {
 	RETAIL: "ร้านค้าปลีก",
 	SERVICE: "บริการ",
 	OTHER: "อื่น ๆ",
+};
+
+export const ADMIN_ACTION: Record<string, string> = {
+	SUBSCRIPTION_SET: "เปลี่ยนแพ็กเกจ",
+	SESSIONS_REVOKED: "ออกจากระบบทุกอุปกรณ์",
 };

@@ -45,6 +45,77 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 	);
 }
 
+/** What each key family under the app's prefix holds (see apps/api/src/shared/cache/cache-keys.ts). */
+const CACHE_KIND: Record<string, string> = {
+	dashboard: "Dashboard ของร้าน (5 นาที)",
+	subscription: "แพ็กเกจของร้าน (1 นาที)",
+	v: "ตัวนับ version ของ dashboard",
+	admin: "ภาพรวมของ admin (1 นาที)",
+};
+
+function CacheCard({ data }: { data: AdminSystemResponse }) {
+	const stats = data.cacheStats;
+	const server = stats?.server;
+	const lookups = server && server.hits !== null && server.misses !== null ? server.hits + server.misses : null;
+	const hitRate = lookups ? (server?.hits ?? 0) / lookups : null;
+	const kinds = Object.entries(stats?.keys.byKind ?? {}).sort((a, b) => b[1] - a[1]);
+
+	return (
+		<Surface>
+			<SectionTitle
+				title="Cache"
+				hint={
+					stats?.provider === "redis"
+						? "นับเฉพาะ key ของแอปนี้ ส่วนตัวเลขของเซิร์ฟเวอร์รวมทุกโปรแกรมที่ใช้ Redis ตัวนี้"
+						: "ไม่ได้ตั้ง REDIS_URL จึงเก็บในหน่วยความจำของ API แต่ละตัว"
+				}
+			/>
+			{!stats ? (
+				<p className="px-5 pb-5 text-muted-foreground text-sm">อ่านสถานะ cache ไม่ได้ (Redis อาจเชื่อมต่อไม่ได้)</p>
+			) : (
+				<div className="grid gap-x-8 px-5 pb-4 desktop:grid-cols-2">
+					<div>
+						<Row label="Key ทั้งหมด">
+							{formatNumber(stats.keys.total)}
+							{stats.keys.truncated ? "+" : ""}
+						</Row>
+						{kinds.length === 0 ? (
+							<Row label="ตอนนี้">ยังไม่มีข้อมูลใน cache</Row>
+						) : (
+							kinds.map(([kind, count]) => (
+								<Row key={kind} label={CACHE_KIND[kind] ?? kind}>
+									{formatNumber(count)}
+								</Row>
+							))
+						)}
+					</div>
+					{server ? (
+						<div>
+							<Row label="Hit rate">
+								{hitRate === null ? "—" : `${(hitRate * 100).toFixed(1)}%`}
+								{lookups ? (
+									<span className="ml-1 text-muted-foreground text-xs">
+										({formatNumber(server.hits ?? 0)} / {formatNumber(lookups)})
+									</span>
+								) : null}
+							</Row>
+							<Row label="Memory">
+								{server.usedMemoryMb ?? "—"} MB
+								{server.maxMemoryMb ? ` / ${server.maxMemoryMb} MB` : ""}
+							</Row>
+							<Row label="Key ที่ถูกไล่ออก (evicted)">{formatNumber(server.evictedKeys ?? 0)}</Row>
+							<Row label="Redis">
+								{server.version ?? "—"}
+								{server.uptimeSeconds !== null ? ` · ${uptime(server.uptimeSeconds)}` : ""}
+							</Row>
+						</div>
+					) : null}
+				</div>
+			)}
+		</Surface>
+	);
+}
+
 export function SystemView() {
 	const { data, error, isLoading, refetch, dataUpdatedAt } = useAdmin<AdminSystemResponse>("system", undefined, 15_000);
 
@@ -99,7 +170,7 @@ export function SystemView() {
 									) : data.database.migrations.pending ? (
 										<StatusBadge tone="warning">มี migration ค้าง</StatusBadge>
 									) : (
-										<StatusBadge tone="good">ไม่มี</StatusBadge>
+										<StatusBadge tone="success">ไม่มี</StatusBadge>
 									)}
 								</Row>
 							</div>
@@ -124,6 +195,8 @@ export function SystemView() {
 							</div>
 						</Surface>
 					</div>
+
+					<CacheCard data={data} />
 
 					<Surface>
 						<SectionTitle title="ตาราง" hint="จำนวนแถวโดยประมาณจาก pg_stat_user_tables" />

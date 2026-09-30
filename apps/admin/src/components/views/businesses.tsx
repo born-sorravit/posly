@@ -1,7 +1,18 @@
 "use client";
 
 import { DemoToggle, useDemoFilter } from "@/components/common/demo-filter";
-import { EmptyState, ErrorState, PageHeader, Pager, RowsSkeleton, StatusBadge, Surface } from "@/components/common/primitives";
+import {
+	DesktopOnly,
+	EmptyState,
+	ErrorState,
+	MobileList,
+	MobileRow,
+	PageHeader,
+	Pager,
+	RowsSkeleton,
+	StatusBadge,
+	Surface,
+} from "@/components/common/primitives";
 import { SearchInput } from "@/components/common/search-input";
 import { useDebounced } from "@/hooks/use-debounced";
 import { useAdminPage } from "@/lib/admin-api";
@@ -86,6 +97,23 @@ export function BusinessesView() {
 					<EmptyState title="ไม่พบร้านค้า" description={includeDemo ? undefined : "ร้าน demo ถูกซ่อนอยู่ — เปิด “รวมร้าน demo” เพื่อดู"} />
 				) : (
 					<>
+						<MobileList>
+							{data.data.map((b) => (
+								<MobileRow
+									key={b.id}
+									href={`/businesses/${b.id}`}
+									title={
+										<>
+											<span className="truncate">{b.name}</span>
+											{b.isDemo ? <StatusBadge tone="neutral">demo</StatusBadge> : null}
+										</>
+									}
+									meta={`${b.plan ? (PLAN_LABEL[b.plan] ?? b.plan) : "—"} · ${formatNumber(b.orders30d)} ออเดอร์ 30 วัน`}
+									aside={<span className="numeric font-medium">{formatBaht(b.gmv30d)}</span>}
+								/>
+							))}
+						</MobileList>
+						<DesktopOnly>
 						<Table>
 							<TableHeader>
 								<TableRow>
@@ -140,6 +168,7 @@ export function BusinessesView() {
 								})}
 							</TableBody>
 						</Table>
+						</DesktopOnly>
 						<Pager page={data.meta.page} lastPage={data.meta.last_page} total={data.meta.total} onPage={setPage} />
 					</>
 				)}
