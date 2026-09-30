@@ -32,6 +32,7 @@ import {
 	ChartNoAxesColumn,
 	Check,
 	Clock3,
+	ChevronLeft,
 	ChevronRight,
 	CreditCard,
 	Gauge,
@@ -73,7 +74,8 @@ export function SettingsNav({ variant = "rail" }: { variant?: "rail" | "list" })
 				return (
 					<Link
 						key={key}
-						href={href}
+						// Employees is a page of its own; the flag tells it to offer a way back here.
+						href={key === "employees" ? { pathname: href, query: { from: "settings" } } : href}
 						className={cn(
 							"flex items-center gap-3 rounded-xl px-3 font-medium text-sm transition-colors",
 							variant === "list" ? "h-14 bg-card shadow-xs" : "h-10",
@@ -90,6 +92,23 @@ export function SettingsNav({ variant = "rail" }: { variant?: "rail" | "list" })
 	);
 }
 
+/**
+ * "‹ Settings", phones only. There is no settings rail on a phone, so a section page — and
+ * the employees page when opened from the settings list — needs its own way back.
+ */
+export function SettingsBackLink() {
+	const t = useTranslations("settings");
+	return (
+		<Link
+			href="/settings"
+			className="-ml-2 flex h-9 w-fit items-center gap-0.5 rounded-lg pr-3 pl-1 font-medium text-muted-foreground text-sm transition-colors hover:text-foreground active:bg-muted tablet:hidden"
+		>
+			<ChevronLeft className="size-5" />
+			{t("title")}
+		</Link>
+	);
+}
+
 export function SettingsLayout({ children }: { children: ReactNode }) {
 	const t = useTranslations("settings");
 	const pathname = usePathname();
@@ -99,7 +118,10 @@ export function SettingsLayout({ children }: { children: ReactNode }) {
 	return (
 		<PageContainer>
 			{section ? (
-				<h1 className="font-semibold text-2xl tracking-tight tablet:hidden">{t(`sections.${section.key}`)}</h1>
+				<div className="grid gap-1 tablet:hidden">
+					<SettingsBackLink />
+					<h1 className="font-semibold text-2xl tracking-tight">{t(`sections.${section.key}`)}</h1>
+				</div>
 			) : null}
 			<h1 className={cn("font-semibold text-2xl tracking-tight", section && "hidden tablet:block")}>{t("title")}</h1>
 			<div className="grid gap-6 tablet:grid-cols-[220px_1fr]">
@@ -122,11 +144,12 @@ function Field({ label, htmlFor, hint, children }: { label: string; htmlFor: str
 	);
 }
 
+/** Full width on a phone, where the thumb reaches the whole row; right-aligned from tablet up. */
 function SaveBar({ onSave, pending }: { onSave: () => void; pending?: boolean }) {
 	const t = useTranslations("common");
 	return (
 		<div className="flex justify-end">
-			<Button size="lg" className="brand-gradient min-w-28" disabled={pending} onClick={onSave}>
+			<Button size="lg" className="brand-gradient h-11 w-full min-w-28 tablet:h-9 tablet:w-auto" disabled={pending} onClick={onSave}>
 				{t("save")}
 			</Button>
 		</div>
@@ -399,7 +422,7 @@ export function TaxSettings() {
 				</Surface>
 				{editable ? (
 					<div className="flex justify-end">
-						<Button size="lg" className="brand-gradient min-w-28" disabled={!valid || update.isPending} onClick={save}>
+						<Button size="lg" className="brand-gradient h-11 w-full min-w-28 tablet:h-9 tablet:w-auto" disabled={!valid || update.isPending} onClick={save}>
 							{tCommon("save")}
 						</Button>
 					</div>

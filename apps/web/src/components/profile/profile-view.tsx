@@ -203,7 +203,7 @@ function DetailsSection({ disabled }: { disabled: boolean }) {
 					</Field>
 				</div>
 				<div className="flex justify-end">
-					<Button type="submit" size="lg" className="brand-gradient min-w-28" disabled={disabled || !changed || !trimmed || pending}>
+					<Button type="submit" size="lg" className="brand-gradient h-11 w-full min-w-28 tablet:h-9 tablet:w-auto" disabled={disabled || !changed || !trimmed || pending}>
 						{pending ? <Loader2 className="size-4 animate-spin" /> : null}
 						{tCommon("save")}
 					</Button>
@@ -323,7 +323,7 @@ function PasswordSection({ disabled }: { disabled: boolean }) {
 					</Field>
 				</div>
 				<div className="flex justify-end">
-					<Button type="submit" size="lg" className="brand-gradient min-w-28" disabled={disabled || !valid || pending}>
+					<Button type="submit" size="lg" className="brand-gradient h-11 w-full min-w-28 tablet:h-9 tablet:w-auto" disabled={disabled || !valid || pending}>
 						{pending ? <Loader2 className="size-4 animate-spin" /> : null}
 						{t("save")}
 					</Button>

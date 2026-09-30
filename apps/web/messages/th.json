@@ -104,7 +104,7 @@
 		"reports": "รายงาน",
 		"sell": "เปิดขาย",
 		"notifications": "แจ้งเตือน",
-		"profile": "โปรไฟล์"
+		"menu": "เมนู"
 	},
 	"command": {
 		"title": "ค้นหาคำสั่ง",
@@ -1361,6 +1361,11 @@
 			"signup": "เริ่มใช้ฟรี",
 			"app": "ไปที่ร้านของฉัน",
 			"menu": "เมนู",
+			"close": "ปิดเมนู",
+			"theme": "ธีม",
+			"themeLight": "สว่าง",
+			"themeDark": "มืด",
+			"themeSystem": "ตามระบบ",
 			"demo": "ทดลองใช้"
 		},
 		"hero": {

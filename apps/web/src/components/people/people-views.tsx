@@ -40,7 +40,9 @@ import type { Employee, MemberRole } from "@posly/types/domain";
 import { Ban, Check, Copy, KeyRound, Link2, Mail, MoreHorizontal, RotateCcw, ShieldCheck, UserPlus, UserX } from "lucide-react";
 import { PermissionsDialog } from "@/components/people/permissions-dialog";
 import { PinBadge, useSwitchUser } from "@/components/pin/switch-user";
+import { SettingsBackLink } from "@/components/settings/settings-views";
 import { useTranslations } from "next-intl";
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -183,6 +185,7 @@ function InviteDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (op
 
 /** Employees (plan §21): invite by email with a role; PIN login is the phase-3 affordance. */
 export function EmployeesView() {
+	const fromSettings = useSearchParams().get("from") === "settings";
 	const t = useTranslations("employees");
 	const tRole = useTranslations("roles");
 	const [inviting, setInviting] = useState(false);
@@ -368,39 +371,43 @@ export function EmployeesView() {
 
 	return (
 		<PageContainer>
-			<PageHeader
-				title={t("title")}
-				description={t("description")}
-				actions={
-					<>
-						<Button variant="outline" size="lg" onClick={() => openSwitch(true)}>
-							<KeyRound />
-							{tPin("switch")}
-						</Button>
-						<Tooltip>
-							<TooltipTrigger asChild>
-								{/* A span keeps the tooltip working while the button is disabled. */}
-								<span tabIndex={seatsFull ? 0 : -1}>
-									<Button
-										size="lg"
-										className="brand-gradient"
-										disabled={seatsFull}
-										onClick={() => setInviting(true)}
-									>
-										<UserPlus />
-										{t("invite")}
-									</Button>
-								</span>
-							</TooltipTrigger>
-							{seatsFull ? (
-								<TooltipContent side="bottom" className="max-w-64">
-									{t("seatsFull", { limit: limits.members ?? 0 })}
-								</TooltipContent>
-							) : null}
-						</Tooltip>
-					</>
-				}
-			/>
+			{/* Grouped with the title, as on the settings pages it came from. */}
+			<div className="grid gap-1">
+				{fromSettings ? <SettingsBackLink /> : null}
+				<PageHeader
+					title={t("title")}
+					description={t("description")}
+					actions={
+						<>
+							<Button variant="outline" size="lg" onClick={() => openSwitch(true)}>
+								<KeyRound />
+								{tPin("switch")}
+							</Button>
+							<Tooltip>
+								<TooltipTrigger asChild>
+									{/* A span keeps the tooltip working while the button is disabled. */}
+									<span tabIndex={seatsFull ? 0 : -1}>
+										<Button
+											size="lg"
+											className="brand-gradient"
+											disabled={seatsFull}
+											onClick={() => setInviting(true)}
+										>
+											<UserPlus />
+											{t("invite")}
+										</Button>
+									</span>
+								</TooltipTrigger>
+								{seatsFull ? (
+									<TooltipContent side="bottom" className="max-w-64">
+										{t("seatsFull", { limit: limits.members ?? 0 })}
+									</TooltipContent>
+								) : null}
+							</Tooltip>
+						</>
+					}
+				/>
+			</div>
 			{limits.members !== null ? (
 				<p className="text-muted-foreground text-sm">
 					{t("seats", { used: usage.members, limit: limits.members })}

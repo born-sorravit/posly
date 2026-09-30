@@ -81,12 +81,16 @@ function ModifierBody({
 	product,
 	editing,
 	onConfirm,
+	onCancel,
 }: {
 	product: Product;
 	editing?: EditingLine;
 	onConfirm: (modifiers: OrderItemModifier[], note: string | null) => void;
+	/** Phone only: a cancel button beside the main one, where the thumb already is. */
+	onCancel?: () => void;
 }) {
 	const t = useTranslations("pos");
+	const tCommon = useTranslations("common");
 	const [selection, setSelection] = useState<Selection>(() =>
 		editing ? fromLine(product.modifierGroups, editing.modifiers) : defaults(product.modifierGroups)
 	);
@@ -171,11 +175,16 @@ function ModifierBody({
 				</label>
 			</div>
 
-			<div className="border-t p-4">
+			<div className="flex gap-2 border-t p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+				{onCancel ? (
+					<Button variant="outline" size="lg" className="h-13 rounded-xl px-5 text-base" onClick={onCancel}>
+						{tCommon("cancel")}
+					</Button>
+				) : null}
 				<Button
 					size="lg"
 					disabled={missing}
-					className="brand-gradient h-13 w-full rounded-xl font-semibold text-base"
+					className="brand-gradient h-13 min-w-0 flex-1 rounded-xl font-semibold text-base"
 					onClick={() => onConfirm(chosen, note.trim() || null)}
 				>
 					{editing ? t("updateFor", { price: formatBaht(price) }) : t("addFor", { price: formatBaht(price) })}
@@ -212,6 +221,7 @@ export function ModifierDialog({
 			product={product}
 			editing={editing}
 			onConfirm={(modifiers, note) => onConfirm(product, modifiers, note)}
+			onCancel={wide ? undefined : () => onOpenChange(false)}
 		/>
 	) : null;
 
@@ -229,7 +239,8 @@ export function ModifierDialog({
 
 	return (
 		<Sheet open={open} onOpenChange={onOpenChange}>
-			<SheetContent side="bottom" className="gap-0 rounded-t-3xl p-0">
+			{/* No corner X: on a phone the cancel button sits beside "add", in thumb reach. */}
+			<SheetContent side="bottom" showCloseButton={false} className="gap-0 rounded-t-3xl p-0">
 				<SheetTitle className="sr-only">{product?.name}</SheetTitle>
 				<SheetDescription className="sr-only">{t("customise")}</SheetDescription>
 				{body}

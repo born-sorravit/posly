@@ -22,10 +22,17 @@ export function SidebarBody({
 	collapsed = false,
 	onNavigate,
 	layoutId,
+	showAccount = true,
 }: {
 	collapsed?: boolean;
 	onNavigate?: () => void;
 	layoutId?: string;
+	/**
+	 * The store and person at the foot. Off in the phone drawer: the phone header already has
+	 * both, as bottom sheets built for a thumb, and a second desktop-style copy here only
+	 * crowded the list.
+	 */
+	showAccount?: boolean;
 }) {
 	return (
 		<div className="flex h-full min-h-0 flex-col">
@@ -37,10 +44,12 @@ export function SidebarBody({
 				<SidebarNav collapsed={collapsed} onNavigate={onNavigate} layoutId={layoutId} />
 			</div>
 
-			<div className={cn("surface m-2 grid gap-1 rounded-2xl p-1.5", collapsed && "justify-items-center")}>
-				<StoreSwitcher collapsed={collapsed} />
-				<UserMenu variant={collapsed ? "avatar" : "row"} />
-			</div>
+			{showAccount ? (
+				<div className={cn("surface m-2 grid gap-1 rounded-2xl p-1.5", collapsed && "justify-items-center")}>
+					<StoreSwitcher collapsed={collapsed} />
+					<UserMenu variant={collapsed ? "avatar" : "row"} />
+				</div>
+			) : null}
 		</div>
 	);
 }
