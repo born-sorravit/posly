@@ -39,7 +39,9 @@ export function CommandMenu() {
 	const router = useRouter();
 	const { open, setOpen } = useCommandMenu();
 	const [query, setQuery] = useState("");
-	const products = useProducts();
+	// Only while the menu is open: mounted on every screen, an always-on query made each sale's
+	// "orders" event re-download the whole menu on the kitchen board, the reports, everywhere.
+	const products = useProducts(open);
 	const { can } = useActiveBusiness();
 	const orderNumber = /^#?\d{1,6}$/.test(query.trim()) ? query.trim().replace("#", "") : null;
 

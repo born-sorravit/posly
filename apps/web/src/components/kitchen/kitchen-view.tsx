@@ -14,7 +14,7 @@ import { TABLET_UP, useMediaQuery } from "@/hooks/use-media-query";
 import type { KitchenStatus, KitchenTicketDto } from "@/lib/api/posly";
 import { formatClock } from "@posly/utils/format";
 import { cn } from "@/lib/utils";
-import { ArrowRight, Bell, BellOff, Check, ChevronDown, History, RotateCcw, Undo2, WifiOff } from "lucide-react";
+import { ArrowRight, Bell, BellOff, Check, ChefHat, ChevronDown, History, Loader2, RotateCcw, Undo2, WifiOff } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useTranslations } from "next-intl";
 import { type ReactNode, useEffect, useRef, useState, useSyncExternalStore } from "react";
@@ -296,50 +296,109 @@ function ScrollColumn({ children }: { children: ReactNode }) {
 /** Served in the last quarter hour, for when "served" was tapped on the wrong ticket. */
 function RecentSheet({ tickets }: { tickets: KitchenTicketDto[] }) {
 	const t = useTranslations("kitchen");
+	const tTag = useTranslations("pos.tag");
 	const { setStatus } = useKitchenMutations();
+	const wide = useMediaQuery(TABLET_UP);
+	const now = useNow(30_000);
+	const [recalling, setRecalling] = useState<string | null>(null);
+
+	const recall = (ticket: KitchenTicketDto) => {
+		setRecalling(ticket.id);
+		setStatus.mutate(
+			{ orderId: ticket.id, status: "READY" },
+			{
+				onSuccess: () => toast.success(t("recalled", { number: ticket.number })),
+				onError: (e) => toast.error(e.message),
+				onSettled: () => setRecalling(null),
+			}
+		);
+	};
+
 	return (
 		<Sheet>
 			<SheetTrigger asChild>
 				<Button variant="outline" size="lg" data-tour="kitchen-recent">
 					<History />
 					{t("recent")}
-					{tickets.length ? <span className="numeric text-muted-foreground">{tickets.length}</span> : null}
+					{tickets.length ? (
+						<span className="numeric rounded-full bg-muted px-1.5 text-muted-foreground text-xs leading-5">
+							{tickets.length}
+						</span>
+					) : null}
 				</Button>
 			</SheetTrigger>
-			<SheetContent className="gap-0 p-0 sm:max-w-md">
-				<SheetHeader className="border-b px-5 py-4">
-					<SheetTitle>{t("recent")}</SheetTitle>
-					<SheetDescription className="sr-only">{t("recent")}</SheetDescription>
+			{/* A side panel beside the board from tablet up; a drawer from the bottom on a phone. */}
+			<SheetContent
+				side={wide ? "right" : "bottom"}
+				className={cn(
+					"gap-0 p-0",
+					wide ? "w-full sm:max-w-sm" : "rounded-t-3xl data-[side=bottom]:max-h-[85svh]"
+				)}
+			>
+				{wide ? null : <span aria-hidden className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-muted-foreground/30" />}
+				<SheetHeader className="gap-1 px-5 pt-5 pb-4 pr-12 text-left">
+					<SheetTitle className="flex items-center gap-2 text-lg">
+						<span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+							<History className="size-4" />
+						</span>
+						{t("recent")}
+					</SheetTitle>
+					<SheetDescription className="text-pretty">{t("recentHint")}</SheetDescription>
 				</SheetHeader>
-				<ul className="divide-y overflow-y-auto">
-					{tickets.length === 0 ? (
-						<li className="px-5 py-10 text-center text-muted-foreground text-sm">{t("recentEmpty")}</li>
-					) : (
-						tickets.map((ticket) => (
-							<li key={ticket.id} className="flex items-center gap-3 px-5 py-3">
-								<span className="min-w-0 flex-1">
-									<span className="numeric block font-semibold">#{ticket.number}</span>
-									<span className="block truncate text-muted-foreground text-xs">
-										{ticket.lines.map((l) => `${l.quantity}× ${l.name}`).join(", ")}
-									</span>
-								</span>
-								<Button
-									variant="outline"
-									size="sm"
-									onClick={() =>
-										setStatus.mutate(
-											{ orderId: ticket.id, status: "READY" },
-											{ onError: (e) => toast.error(e.message) }
-										)
-									}
-								>
-									<RotateCcw />
-									{t("recall")}
-								</Button>
-							</li>
-						))
-					)}
-				</ul>
+
+				{tickets.length === 0 ? (
+					<div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 pt-6 pb-12 text-center">
+						<span className="flex size-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+							<ChefHat className="size-7" />
+						</span>
+						<p className="font-medium">{t("recentEmptyTitle")}</p>
+						<p className="max-w-60 text-muted-foreground text-sm">{t("recentEmpty")}</p>
+					</div>
+				) : (
+					<ul className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+						{tickets.map((ticket) => {
+							const minutes = Math.max(0, Math.floor((now.getTime() - new Date(ticket.updatedAt).getTime()) / 60_000));
+							return (
+								<li key={ticket.id} className="surface rounded-2xl p-3.5">
+									<div className="flex items-center gap-2">
+										<span className="numeric font-bold">#{ticket.number}</span>
+										{ticket.serviceType ? (
+											<span className="rounded-full bg-muted px-2 py-0.5 font-medium text-[11px] text-muted-foreground">
+												{tTag(ticket.serviceType)}
+											</span>
+										) : null}
+										{ticket.label ? <span className="font-semibold text-sm">{ticket.label}</span> : null}
+										<span className="ml-auto flex items-center gap-1 text-success text-xs" suppressHydrationWarning>
+											<Check className="size-3.5" />
+											{minutes < 1 ? t("servedJustNow") : t("servedAgo", { count: minutes })}
+										</span>
+									</div>
+									{/* Items and the recall side by side: a full-width button per ticket was heavier than the ticket. */}
+									<div className="mt-2 flex items-end gap-3">
+										<ul className="min-w-0 flex-1 space-y-0.5 text-sm">
+											{ticket.lines.map((l) => (
+												<li key={l.id} className="flex gap-2">
+													<span className="numeric w-6 shrink-0 text-muted-foreground">{l.quantity}×</span>
+													<span className="min-w-0 flex-1 truncate">{l.name}</span>
+												</li>
+											))}
+										</ul>
+										<Button
+											variant="outline"
+											size="sm"
+											className="h-8 shrink-0 rounded-lg"
+											disabled={recalling === ticket.id}
+											onClick={() => recall(ticket)}
+										>
+											{recalling === ticket.id ? <Loader2 className="animate-spin" /> : <RotateCcw />}
+											{t("recall")}
+										</Button>
+									</div>
+								</li>
+							);
+						})}
+					</ul>
+				)}
 			</SheetContent>
 		</Sheet>
 	);

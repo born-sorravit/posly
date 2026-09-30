@@ -21,7 +21,7 @@ import { useState } from "react";
  * The top bar. The same component at every width, rearranged:
  *
  *   desktop (≥1280)  search · clock · bell           (sidebar carries brand, store, user)
- *   tablet  (768+)   ☰ · search · clock · bell · avatar
+ *   tablet  (768+)   ☰ · search · bell · avatar       (clock from desktop up)
  *   mobile  (<768)   store · search icon · avatar    (bell moves to the bottom nav; no
  *                                                     sidebar, so the store switcher lives here)
  */
@@ -80,7 +80,9 @@ export function AppHeader() {
 					<Search className="size-5" />
 				</Button>
 
-				<div className="hidden flex-col items-end leading-tight tablet:flex" suppressHydrationWarning>
+				{/* The clock only where there is room for it on one line: at 768 it squeezed the date
+				    onto two lines and crowded the icons. */}
+				<div className="hidden flex-col items-end whitespace-nowrap leading-tight desktop:flex" suppressHydrationWarning>
 					<span className="numeric font-semibold text-sm">{formatClock(now)}</span>
 					<span className="text-muted-foreground text-xs">{formatThaiDate(now)}</span>
 				</div>

@@ -40,13 +40,14 @@ export function useCategories() {
 	});
 }
 
-export function useProducts() {
+export function useProducts(enabled = true) {
 	const id = useBusinessId();
 	return useQuery({
 		queryKey: queryKeys.products(id),
 		queryFn: ({ signal }) => api.catalog.products(id, signal),
 		// The POS menu: fresh enough, and usable from cache when the network blips.
 		staleTime: 30_000,
+		enabled,
 	});
 }
 
@@ -549,8 +550,10 @@ export function useKitchenBoard(enabled = true) {
 	return useQuery({
 		queryKey: ["business", id, "kitchen", branchId],
 		queryFn: ({ signal }) => api.kitchen.board(id, branchId, signal),
-		// Live events redraw the board; the poll is only a safety net while they flow.
-		refetchInterval: live ? 30_000 : 4000,
+		// Live events redraw the board, so while the stream is up the poll is only a rare safety
+		// net (events are in-process: a second API instance would not relay its own). Without
+		// the stream, a fast poll keeps new orders coming.
+		refetchInterval: live ? 5 * 60_000 : 4000,
 		refetchIntervalInBackground: true,
 		enabled,
 	});
@@ -571,7 +574,13 @@ export function useKitchenMutations() {
 					}
 				: board
 		);
-	const settle = () => void queryClient.invalidateQueries({ queryKey: key });
+	// A successful change is announced on the live stream too (after it commits), which
+	// refetches the board; refetching here as well raced it, and React Query cancelled one of
+	// the two. So re-read here only on failure (to undo the optimistic change) or when the
+	// stream is down and nothing else will.
+	const settle = (_data: unknown, error: Error | null) => {
+		if (error || !useRealtime.getState().connected) void queryClient.invalidateQueries({ queryKey: key });
+	};
 	return {
 		setStatus: useMutation({
 			mutationFn: ({ orderId, status }: { orderId: string; status: KitchenStatus }) =>
