@@ -2,7 +2,7 @@ import { ProductThumb } from "@/components/common/product-thumb";
 import { formatBaht } from "@posly/utils/money";
 import { cn } from "@/lib/utils";
 import type { ProductArt } from "@posly/types/domain";
-import { Banknote, Check, CreditCard, QrCode, Search, TrendingUp, TriangleAlert } from "lucide-react";
+import { ArrowRight, Check, Minus, Plus, Search, ShoppingBasket, SlidersHorizontal, TrendingUp, TriangleAlert } from "lucide-react";
 import { CountUp, DrawnChart, GrowBars } from "@/components/landing/motion";
 import { getTranslations } from "next-intl/server";
 
@@ -22,15 +22,15 @@ import { getTranslations } from "next-intl/server";
 // Versioned names: replacing a photo must not be masked by a browser or image-optimizer cache.
 const photo = (file: string) => `/landing/menu/${file}.v2.jpg`;
 
-const MENU: { name: string; price: number; art: ProductArt; image: string }[] = [
-	{ name: "Latte", price: 7000, art: "latte", image: photo("latte") },
-	{ name: "Americano", price: 6000, art: "coffee", image: photo("americano") },
-	{ name: "Matcha Latte", price: 7500, art: "matcha", image: photo("matcha") },
-	{ name: "Thai Tea", price: 6500, art: "tea", image: photo("thai-tea") },
+const MENU: { name: string; price: number; art: ProductArt; image: string; options?: boolean }[] = [
+	{ name: "Latte", options: true, price: 7000, art: "latte", image: photo("latte") },
+	{ name: "Americano", options: true, price: 6000, art: "coffee", image: photo("americano") },
+	{ name: "Matcha Latte", options: true, price: 7500, art: "matcha", image: photo("matcha") },
+	{ name: "Thai Tea", options: true, price: 6500, art: "tea", image: photo("thai-tea") },
 	{ name: "Croissant", price: 6500, art: "croissant", image: photo("croissant") },
 	{ name: "Pistachio Cake", price: 9500, art: "cake", image: photo("pistachio-cake") },
-	{ name: "Iced Latte", price: 7500, art: "latte", image: photo("iced-latte") },
-	{ name: "Iced Americano", price: 6500, art: "coffee", image: photo("iced-americano") },
+	{ name: "Iced Latte", options: true, price: 7500, art: "latte", image: photo("iced-latte") },
+	{ name: "Iced Americano", options: true, price: 6500, art: "coffee", image: photo("iced-americano") },
 ];
 
 const CART = [
@@ -63,6 +63,9 @@ export async function PosMockup() {
 	return (
 		<WindowFrame>
 			{/* Phones get the app's phone layout: the menu full width, the cart as a bar below. */}
+			{/* Laid out by its own width, not the screen's: the same mockup sits full width in the
+			    hero and in half a column beside the showcase copy. */}
+			<div className="@container">
 			<div className="grid gap-3 bg-muted/30 p-3 tablet:grid-cols-[1fr_240px]">
 				<div className="min-w-0 space-y-2.5">
 					<div className="flex h-8 items-center gap-2 rounded-lg bg-card px-2.5 text-[11px] text-muted-foreground shadow-sm">
@@ -82,48 +85,57 @@ export async function PosMockup() {
 							</span>
 						))}
 					</div>
-					<div className="grid grid-cols-3 gap-2 tablet:grid-cols-4 [&>*:nth-child(n+7)]:hidden tablet:[&>*:nth-child(n+7)]:block">
+					<div className="grid grid-cols-3 gap-2 @min-[46rem]:grid-cols-4 [&>*:nth-child(n+7)]:hidden @min-[46rem]:[&>*:nth-child(n+7)]:block">
 						{MENU.map((p) => (
+							// As the till draws a product: name, bold price with an options mark, and the ⊕.
 							<div key={p.name} className="rounded-xl bg-card p-1.5 shadow-sm">
 								<ProductThumb art={p.art} imageUrl={p.image} name={p.name} className="aspect-square w-full ring-1 ring-foreground/6" rounded="rounded-lg" />
-								<p className="mt-1.5 truncate px-0.5 font-medium text-[10px]">{p.name}</p>
-								<p className="numeric px-0.5 pb-0.5 text-[10px] text-muted-foreground">{formatBaht(p.price)}</p>
+								<div className="mt-1.5 flex items-end justify-between gap-1 px-0.5 pb-0.5">
+									<div className="min-w-0">
+										<p className="truncate font-medium text-[10px]">{p.name}</p>
+										<p className="flex items-center gap-1 text-[10px]">
+											<span className="numeric font-semibold">{formatBaht(p.price)}</span>
+											{p.options ? <SlidersHorizontal className="size-2.5 text-muted-foreground" aria-hidden /> : null}
+										</p>
+									</div>
+									<span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-accent text-primary">
+										<Plus className="size-2.5" />
+									</span>
+								</div>
 							</div>
 						))}
 					</div>
 				</div>
-				<div className="flex items-center gap-3 rounded-xl bg-card p-2.5 shadow-sm tablet:hidden">
-					<div className="-space-x-2 flex">
-						{CART.map((l) => (
-							<ProductThumb
-								key={l.name}
-								art={l.art}
-								imageUrl={l.image}
-								name={l.name}
-								className="size-8 ring-2 ring-card"
-								rounded="rounded-full"
-							/>
-						))}
-					</div>
-					<div className="min-w-0 flex-1 leading-tight">
-						<p className="text-[10px] text-muted-foreground">{t("cartItems", { count: CART.reduce((n, l) => n + l.qty, 0) })}</p>
-						<p className="numeric font-bold text-sm">{formatBaht(subtotal - discount)}</p>
-					</div>
-					<span className="brand-gradient flex h-9 items-center rounded-lg px-4 font-semibold text-[11px] text-white">
-						{t("pay")}
+				{/* The phone's cart bar, as the till shows it. */}
+				<div className="brand-gradient flex items-center gap-2.5 rounded-xl px-3 py-2.5 font-semibold text-[11px] text-white shadow-sm tablet:hidden">
+					<span className="flex size-6 items-center justify-center rounded-md bg-white/20">
+						<ShoppingBasket className="size-3.5" />
 					</span>
+					<span className="flex-1">{t("viewCart", { count: CART.reduce((n, l) => n + l.qty, 0) })}</span>
+					<span className="numeric">{formatBaht(subtotal - discount)}</span>
 				</div>
 				<div className="hidden flex-col rounded-xl bg-card p-2.5 shadow-sm tablet:flex">
 					<p className="font-semibold text-[11px]">{t("cart")}</p>
 					<div className="mt-2 flex-1 space-y-2">
-						{CART.map((l) => (
-							<div key={l.name} className="flex items-center gap-2">
+						{CART.map((l, i) => (
+							// The first line is the selected one, as the till highlights the line last touched.
+							<div
+								key={l.name}
+								className={cn("flex gap-2 rounded-lg p-1", i === 0 && "bg-accent/60 ring-1 ring-primary/40 ring-inset")}
+							>
 								<ProductThumb art={l.art} imageUrl={l.image} name={l.name} className="size-7 shrink-0" rounded="rounded-md" />
 								<div className="min-w-0 flex-1">
-									<p className="truncate font-medium text-[10px]">{l.name}</p>
+									<div className="flex items-start justify-between gap-1">
+										<p className="truncate font-medium text-[10px]">{l.name}</p>
+										<span className="numeric font-semibold text-[10px]">{formatBaht(l.price * l.qty)}</span>
+									</div>
 									{l.detail ? <p className="truncate text-[9px] text-muted-foreground">{l.detail}</p> : null}
+									<div className="mt-1 flex items-center gap-1 text-[9px]">
+										<span className="flex size-4 items-center justify-center rounded bg-muted"><Minus className="size-2.5" /></span>
+										<span className="numeric w-3 text-center font-semibold">{l.qty}</span>
+										<span className="flex size-4 items-center justify-center rounded bg-muted"><Plus className="size-2.5" /></span>
+									</div>
 								</div>
-								<span className="numeric text-[10px] text-muted-foreground">×{l.qty}</span>
 							</div>
 						))}
 					</div>
@@ -141,23 +153,16 @@ export async function PosMockup() {
 							<span className="numeric font-bold text-sm">{formatBaht(subtotal - discount)}</span>
 						</div>
 					</div>
-					<div className="mt-2 grid grid-cols-3 gap-1">
-						{[Banknote, QrCode, CreditCard].map((Icon, i) => (
-							<span
-								key={Icon.displayName ?? i}
-								className={cn(
-									"flex h-6 items-center justify-center rounded-md",
-									i === 1 ? "bg-primary/12 text-primary" : "bg-muted text-muted-foreground"
-								)}
-							>
-								<Icon className="size-3" />
-							</span>
-						))}
-					</div>
-					<span className="brand-gradient mt-2 flex h-8 items-center justify-center rounded-lg font-semibold text-[11px] text-white">
-						{t("pay")} {formatBaht(subtotal - discount)}
+					{/* The method is picked in checkout now, so the cart ends with one button, as in the app. */}
+					<span className="brand-gradient mt-2 flex h-8 items-center justify-between rounded-lg px-2.5 font-semibold text-[11px] text-white">
+						{t("pay")}
+						<span className="numeric flex items-center gap-1">
+							{formatBaht(subtotal - discount)}
+							<ArrowRight className="size-3" />
+						</span>
 					</span>
 				</div>
+			</div>
 			</div>
 		</WindowFrame>
 	);

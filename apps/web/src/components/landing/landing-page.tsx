@@ -100,7 +100,13 @@ function Showcase({
 	reverse?: boolean;
 }) {
 	return (
-		<div className="grid items-center gap-10 desktop:grid-cols-2 desktop:gap-16">
+		// The picture gets the wider column: a product screen shrunk to half the page was cramped.
+		<div
+			className={cn(
+				"grid items-center gap-10 desktop:gap-14",
+				reverse ? "desktop:grid-cols-[1.4fr_1fr]" : "desktop:grid-cols-[1fr_1.4fr]"
+			)}
+		>
 			<Reveal className={cn(reverse && "desktop:order-2")}>
 				<p className="font-semibold text-primary text-sm">{eyebrow}</p>
 				<h3 className="mt-2 text-balance font-semibold text-2xl tracking-tight tablet:text-3xl">{title}</h3>

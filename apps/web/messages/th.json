@@ -1390,7 +1390,8 @@
 			"paid": "ชำระเงินสำเร็จ",
 			"lowStock": "ใกล้หมด",
 			"left": "เหลือ {count}",
-			"cartItems": "{count} รายการในตะกร้า"
+			"cartItems": "{count} รายการในตะกร้า",
+			"viewCart": "ดูตะกร้า · {count} รายการ"
 		},
 		"types": {
 			"label": "เหมาะกับร้านทุกแบบ",
