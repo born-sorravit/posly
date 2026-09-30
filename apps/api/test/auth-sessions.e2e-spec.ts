@@ -1,4 +1,5 @@
 import { api, bootApp } from "./helpers";
+import { SessionCleanupService } from "@/modules/auth/session-cleanup.service";
 import type { INestApplication } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 import { DataSource } from "typeorm";
@@ -101,5 +102,37 @@ describe("refresh token families", () => {
 		await refresh(token).expect(200);
 		// The login on the other device keeps its session.
 		expect(await active(userId)).toHaveLength(2);
+	});
+
+	it("sweeps only tokens that can never be used again", async () => {
+		const { userId, token } = await signUp();
+		const db = app.get(DataSource);
+		const insert = (expires: string, revoked: string | null) =>
+			db.query(
+				`INSERT INTO refresh_token (token_hash, user_id, expires_at, revoked_at, revoked_reason)
+				VALUES (md5(random()::text) || md5(random()::text), $1, now() + $2::interval,
+					CASE WHEN $3::text IS NULL THEN NULL ELSE now() + $3::interval END,
+					CASE WHEN $3::text IS NULL THEN NULL ELSE 'logout' END)`,
+				[userId, expires, revoked]
+			);
+		await insert("-8 days", null); // expired over a week ago: goes
+		await insert("-1 day", null); // expired yesterday: kept a little longer
+		await insert("20 days", "-31 days"); // revoked over a month ago: goes
+		await insert("20 days", "-2 days"); // revoked recently: kept
+
+		const before = await db.query(
+			`SELECT COUNT(*)::int AS n FROM refresh_token WHERE user_id = $1`,
+			[userId]
+		);
+		const result = await app.get(SessionCleanupService).run();
+		const after = await db.query(
+			`SELECT COUNT(*)::int AS n FROM refresh_token WHERE user_id = $1`,
+			[userId]
+		);
+
+		expect(result.refreshTokens).toBeGreaterThanOrEqual(2);
+		expect(after[0].n).toBe(before[0].n - 2);
+		// The live session is untouched.
+		await refresh(token).expect(200);
 	});
 });

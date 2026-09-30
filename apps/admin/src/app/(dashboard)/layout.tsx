@@ -1,6 +1,6 @@
 import { NoAccess } from "@/components/auth/no-access";
 import { AppShell } from "@/components/shell/app-shell";
-import { getCurrentUser } from "@/lib/auth/session";
+import { adminAccess, getCurrentUser } from "@/lib/auth/session";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
@@ -12,5 +12,8 @@ export default async function DashboardLayout({ children }: { children: ReactNod
 	const user = await getCurrentUser();
 	if (!user) redirect("/login");
 	if (!user.isPlatformAdmin) return <NoAccess email={user.email} />;
+	const access = await adminAccess();
+	if (access === "google-required") return <NoAccess email={user.email} reason="google" />;
+	if (access !== "ok") return <NoAccess email={user.email} />;
 	return <AppShell user={user}>{children}</AppShell>;
 }

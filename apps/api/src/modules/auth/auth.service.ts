@@ -11,7 +11,10 @@ const escapeHtml = (value: string) =>
 				c
 			] as string
 	);
-import { RefreshToken } from "@/models/auth/entities/refresh-token.entity";
+import {
+	type AuthMethod,
+	RefreshToken,
+} from "@/models/auth/entities/refresh-token.entity";
 import { RefreshTokenRepository } from "@/models/auth/refresh-token.repository";
 import { User } from "@/models/users/entities/user.entity";
 import { UsersRepository } from "@/models/users/user.repository";
@@ -130,7 +133,7 @@ export class AuthService {
 			throw error;
 		}
 
-		return this.issueSession(user, userAgent);
+		return this.issueSession(user, userAgent, { method: "password" });
 	}
 
 	async login(dto: LoginDto, userAgent?: string): Promise<AuthSessionResponse> {
@@ -148,7 +151,7 @@ export class AuthService {
 			throw new UnauthorizedException(INVALID_CREDENTIALS);
 		}
 
-		return this.issueSession(user, userAgent);
+		return this.issueSession(user, userAgent, { method: "password" });
 	}
 
 	/**
@@ -188,7 +191,7 @@ export class AuthService {
 			});
 		}
 
-		return this.issueSession(user, userAgent);
+		return this.issueSession(user, userAgent, { method: "google" });
 	}
 
 	/**
@@ -233,7 +236,10 @@ export class AuthService {
 				.execute();
 		}
 
-		return this.issueSession(stored.user, userAgent, stored.familyId);
+		return this.issueSession(stored.user, userAgent, {
+			method: stored.authMethod,
+			familyId: stored.familyId,
+		});
 	}
 
 	private isWithinRotationGrace(stored: RefreshToken): boolean {
@@ -334,7 +340,7 @@ export class AuthService {
 			where: { id: target.userId },
 		});
 		if (!user) throw new UnauthorizedException("Account no longer exists");
-		return this.issueSession(user, userAgent);
+		return this.issueSession(user, userAgent, { method: "pin" });
 	}
 
 	async logout(token: string): Promise<void> {
@@ -422,7 +428,7 @@ export class AuthService {
 			{ revokedAt: new Date(), revokedReason: "password" }
 		);
 
-		return this.issueSession(user, userAgent);
+		return this.issueSession(user, userAgent, { method: "password" });
 	}
 
 	/**
@@ -444,7 +450,7 @@ export class AuthService {
 		});
 		// Not seeded yet, or the nightly reset is between removing and recreating.
 		if (!user) throw new ServiceUnavailableException("บัญชีทดลองยังไม่พร้อม");
-		return this.issueSession(user, userAgent);
+		return this.issueSession(user, userAgent, { method: "demo" });
 	}
 
 	async forgotPassword(dto: ForgotPasswordDto): Promise<void> {
@@ -533,13 +539,20 @@ export class AuthService {
 		return result.affected ?? 0;
 	}
 
-	/** `familyId` continues a sign-in (a refresh); without it this is a new one. */
+	/**
+	 * `method` is how the sign-in was proven; a refresh carries it on. `familyId` continues a
+	 * sign-in (a refresh); without it this is a new one.
+	 */
 	private async issueSession(
 		user: User,
-		userAgent?: string,
-		familyId?: string
+		userAgent: string | undefined,
+		{ method, familyId }: { method: AuthMethod; familyId?: string }
 	): Promise<AuthSessionResponse> {
-		const payload: AccessTokenPayload = { sub: user.id, email: user.email };
+		const payload: AccessTokenPayload = {
+			sub: user.id,
+			email: user.email,
+			amr: method,
+		};
 		const accessToken = await this.jwtService.signAsync(payload);
 
 		// Opaque and high-entropy: nothing to verify, nothing to forge, only its hash stored.
@@ -551,6 +564,7 @@ export class AuthService {
 			userId: user.id,
 			expiresAt: new Date(Date.now() + ttlDays * 86_400_000),
 			userAgent: userAgent?.slice(0, 255) ?? null,
+			authMethod: method,
 			...(familyId ? { familyId } : {}),
 		});
 

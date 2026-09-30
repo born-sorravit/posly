@@ -134,6 +134,11 @@ export interface SecurityConfig {
 	refreshTtlDays: number;
 	bcryptRounds: number;
 	throttle: { ttlSeconds: number; limit: number };
+	/**
+	 * The admin monitor accepts only sessions signed in with Google. On by default in
+	 * production; ADMIN_REQUIRE_GOOGLE=true/false overrides it anywhere.
+	 */
+	adminRequireGoogle: boolean;
 	/** OAuth client id Google ID tokens must be minted for. Empty disables Google sign-in. */
 	googleClientId: string;
 }
@@ -224,6 +229,10 @@ export default (): Configuration => ({
 			limit: toInt(process.env.THROTTLE_LIMIT, 120),
 		},
 		googleClientId: process.env.GOOGLE_CLIENT_ID ?? "",
+		adminRequireGoogle: toBool(
+			process.env.ADMIN_REQUIRE_GOOGLE,
+			process.env.NODE_ENV === "production"
+		),
 	},
 	storage: {
 		endpoint: (process.env.S3_ENDPOINT ?? "").replace(/\/+$/, ""),

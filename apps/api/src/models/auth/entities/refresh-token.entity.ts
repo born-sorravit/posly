@@ -2,6 +2,8 @@ import { BaseEntity } from "@/models/base.entity";
 import { User } from "@/models/users/entities/user.entity";
 import { Column, Entity, Index, JoinColumn, ManyToOne } from "typeorm";
 
+export type AuthMethod = "password" | "google" | "pin" | "demo";
+
 /**
  * One row per issued refresh token.
  *
@@ -31,6 +33,10 @@ export class RefreshToken extends BaseEntity {
 	@Index("idx_refresh_token_family_active", { where: '"revoked_at" IS NULL' })
 	@Column({ name: "family_id", type: "uuid", default: () => "uuid_generate_v4()" })
 	familyId: string;
+
+	/** How the sign-in was proven; the admin monitor requires "google" (plan: admin hardening). */
+	@Column({ name: "auth_method", type: "varchar", length: 16, default: "password" })
+	authMethod: AuthMethod;
 
 	@Column({ name: "expires_at", type: "timestamptz" })
 	expiresAt: Date;

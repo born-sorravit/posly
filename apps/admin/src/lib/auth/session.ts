@@ -121,3 +121,23 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
 	return payload.data;
 }
 
+
+/**
+ * Whether the API lets this session use the monitor: "ok", or "google-required" when the
+ * account is an admin but signed in some other way (the API's ADMIN_REQUIRE_GOOGLE), or
+ * "denied" for anyone else.
+ */
+export async function adminAccess(): Promise<"ok" | "google-required" | "denied"> {
+	const { accessToken } = await readTokens();
+	if (!accessToken) return "denied";
+	const response = await fetch(`${env.apiBaseUrl}/admin/session`, {
+		headers: { Authorization: `Bearer ${accessToken}` },
+		cache: "no-store",
+	});
+	if (response.ok) return "ok";
+	if (response.status === 403) {
+		const payload = (await response.json().catch(() => null)) as { details?: { code?: string } } | null;
+		if (payload?.details?.code === "ADMIN_GOOGLE_REQUIRED") return "google-required";
+	}
+	return "denied";
+}

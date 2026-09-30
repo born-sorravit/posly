@@ -56,6 +56,16 @@ import {
 export class AdminController {
 	constructor(private readonly adminService: AdminService) {}
 
+	/** A cheap "may this session use the monitor?" for the admin app's layout. */
+	@Get("session")
+	@ApiOperation({ summary: "Whether this session may use the admin monitor" })
+	session(@CurrentUser() admin: AuthenticatedUser): {
+		ok: true;
+		authMethod: string | null;
+	} {
+		return { ok: true, authMethod: admin.authMethod ?? null };
+	}
+
 	@Get("overview")
 	@ApiOperation({ summary: "Platform KPIs and daily series" })
 	overview(@Query() query: AdminOverviewQueryDto): Promise<AdminOverviewResponse> {

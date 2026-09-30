@@ -1,3 +1,4 @@
+import type { AuthMethod } from "@/models/auth/entities/refresh-token.entity";
 import { ExecutionContext, createParamDecorator } from "@nestjs/common";
 
 /**
@@ -9,6 +10,8 @@ import { ExecutionContext, createParamDecorator } from "@nestjs/common";
 export interface AuthenticatedUser {
 	id: string;
 	email: string;
+	/** How this session was signed in; absent on tokens issued before it was recorded. */
+	authMethod?: AuthMethod;
 }
 
 export const CurrentUser = createParamDecorator(

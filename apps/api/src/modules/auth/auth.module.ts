@@ -1,6 +1,7 @@
 import { AuthController } from "@/modules/auth/auth.controller";
 import { AuthService } from "@/modules/auth/auth.service";
 import { GoogleIdentity } from "@/modules/auth/google-identity.service";
+import { SessionCleanupService } from "@/modules/auth/session-cleanup.service";
 import { JwtStrategy } from "@/modules/auth/strategies/jwt.strategy";
 import { Module } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
@@ -26,7 +27,7 @@ import { PassportModule } from "@nestjs/passport";
 		}),
 	],
 	controllers: [AuthController],
-	providers: [AuthService, GoogleIdentity, JwtStrategy],
+	providers: [AuthService, GoogleIdentity, JwtStrategy, SessionCleanupService],
 	exports: [AuthService],
 })
 export class AuthModule {}
