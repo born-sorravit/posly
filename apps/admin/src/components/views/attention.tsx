@@ -10,6 +10,7 @@ import {
 	StatusBadge,
 	Surface,
 } from "@/components/common/primitives";
+import { Stagger, StaggerItem } from "@/components/motion/reveal";
 import { PLAN_LABEL } from "@/lib/labels";
 import type { AdminAttentionResponse, AdminAttentionRow } from "@/lib/types";
 import { useAttention } from "@/lib/use-attention";
@@ -119,11 +120,12 @@ export function AttentionView() {
 					<ErrorState error={error} retry={() => refetch()} />
 				</Surface>
 			) : (
-				<div className="grid gap-4 desktop:grid-cols-2">
+				<Stagger trigger="mount" className="grid gap-4 desktop:grid-cols-2">
 					{SECTIONS.map((section) => {
 						const rows = data?.[section.key] ?? [];
 						return (
-							<Surface key={section.key}>
+							<StaggerItem key={section.key}>
+							<Surface className="h-full">
 								<div className="flex items-start gap-3 px-5 pt-5 pb-4">
 									<IconChip icon={section.icon} tone={section.tone} className="size-9 rounded-lg [&_svg]:size-5" />
 									<div className="min-w-0 flex-1">
@@ -156,9 +158,10 @@ export function AttentionView() {
 									</ul>
 								)}
 							</Surface>
+							</StaggerItem>
 						);
 					})}
-				</div>
+				</Stagger>
 			)}
 		</div>
 	);

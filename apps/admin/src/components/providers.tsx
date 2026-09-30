@@ -3,6 +3,7 @@
 import { Toaster } from "@posly/ui/components/sonner";
 import { TooltipProvider } from "@posly/ui/components/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MotionConfig } from "motion/react";
 import { ThemeProvider } from "next-themes";
 import { type ReactNode, useState } from "react";
 
@@ -28,12 +29,19 @@ export function Providers({ children }: { children: ReactNode }) {
 			disableTransitionOnChange
 			scriptProps={themeScriptProps}
 		>
-			<QueryClientProvider client={queryClient}>
-				<TooltipProvider delayDuration={300}>
-					{children}
-					<Toaster richColors position="top-center" />
-				</TooltipProvider>
-			</QueryClientProvider>
+			{/*
+			 * As in apps/web: one place decides how motion behaves. A reader who asked for less
+			 * keeps an identical tree (nothing mismatches on hydration) with the transforms
+			 * dropped, and durations stay short everywhere.
+			 */}
+			<MotionConfig reducedMotion="user" transition={{ duration: 0.2, ease: [0.2, 0, 0, 1] }}>
+				<QueryClientProvider client={queryClient}>
+					<TooltipProvider delayDuration={300}>
+						{children}
+						<Toaster richColors position="top-center" />
+					</TooltipProvider>
+				</QueryClientProvider>
+			</MotionConfig>
 		</ThemeProvider>
 	);
 }

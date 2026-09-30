@@ -1,5 +1,7 @@
 "use client";
 
+import { CountUp } from "@/components/motion/count-up";
+import { Stagger } from "@/components/motion/reveal";
 import { DemoToggle, useDemoFilter } from "@/components/common/demo-filter";
 import {
 	DesktopOnly,
@@ -16,6 +18,7 @@ import {
 } from "@/components/common/primitives";
 import { Segmented } from "@/components/common/segmented";
 import { useAdmin, useAdminPage } from "@/lib/admin-api";
+import { PLAN_COLOR } from "@/lib/chart-colors";
 import { PLAN_LABEL, SUBSCRIPTION_STATUS } from "@/lib/labels";
 import type { AdminSubscriptionRow, AdminSubscriptionSummary } from "@/lib/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@posly/ui/components/table";
@@ -49,7 +52,7 @@ export function SubscriptionsView() {
 		<div className="grid gap-6">
 			<PageHeader title="Subscriptions" description="แพ็กเกจของทุกร้าน" actions={<DemoToggle />} />
 
-			<div className="grid grid-cols-2 gap-3 desktop:grid-cols-5 desktop:gap-4">
+			<Stagger trigger="mount" className="grid grid-cols-2 gap-3 desktop:grid-cols-5 desktop:gap-4">
 				<StatCard
 					// Five cards, two to a row on a phone: MRR leads on a row of its own.
 					className="col-span-2 desktop:col-span-1"
@@ -58,7 +61,7 @@ export function SubscriptionsView() {
 					icon={Coins}
 					label="MRR"
 					loading={summary.isLoading}
-					value={s ? formatBaht(s.mrr) : null}
+					value={s ? <CountUp value={s.mrr} format={formatBaht} /> : null}
 					hint="ราคาต่อเดือนของแพ็กเกจที่ใช้งาน"
 				/>
 				{STATUSES.map((key) => (
@@ -68,10 +71,10 @@ export function SubscriptionsView() {
 						icon={STATUS_ICON[key]}
 						label={SUBSCRIPTION_STATUS[key].label}
 						loading={summary.isLoading}
-						value={s ? formatNumber(s.byStatus[key] ?? 0) : null}
+						value={s ? <CountUp value={s.byStatus[key] ?? 0} format={formatNumber} /> : null}
 					/>
 				))}
-			</div>
+			</Stagger>
 
 			<Surface>
 				<div className="overflow-x-auto border-b p-4">
@@ -134,6 +137,11 @@ export function SubscriptionsView() {
 												</Link>
 											</TableCell>
 											<TableCell>
+												<span
+													className="mr-2 inline-block size-2.5 rounded-full align-middle"
+													style={{ backgroundColor: PLAN_COLOR[row.plan] ?? "var(--muted-foreground)" }}
+													aria-hidden
+												/>
 												{row.planName ?? PLAN_LABEL[row.plan] ?? row.plan}
 												{row.hasStripe ? <span className="ml-2 text-muted-foreground text-xs">Stripe</span> : null}
 											</TableCell>

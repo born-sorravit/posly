@@ -1,5 +1,8 @@
 "use client";
 
+import { CountUp } from "@/components/motion/count-up";
+import { Stagger } from "@/components/motion/reveal";
+import { MEASURE_COLOR } from "@/lib/chart-colors";
 import { SetPlanDialog } from "@/components/actions/set-plan-dialog";
 import { DailyChart } from "@/components/charts/daily-chart";
 import { AdminActionsTable } from "@/components/common/admin-actions";
@@ -95,13 +98,13 @@ export function BusinessDetailView({ id }: { id: string }) {
 				}
 			/>
 
-			<div className="grid grid-cols-2 gap-3 desktop:grid-cols-4 desktop:gap-4">
+			<Stagger trigger="mount" className="grid grid-cols-2 gap-3 desktop:grid-cols-4 desktop:gap-4">
 				<StatCard
 					tinted
 					tone="success"
 					icon={Coins}
 					label="ยอดขาย 30 วัน"
-					value={formatBaht(stats.gmv30d)}
+					value={<CountUp value={stats.gmv30d} format={formatBaht} />}
 					hint={`${formatNumber(stats.orders30d)} ออเดอร์`}
 					trend={data.series.map((d) => d.gmv)}
 				/>
@@ -110,17 +113,17 @@ export function BusinessDetailView({ id }: { id: string }) {
 					tone="primary"
 					icon={ReceiptText}
 					label="ยอดขายสะสม"
-					value={formatBaht(stats.gmvAllTime)}
+					value={<CountUp value={stats.gmvAllTime} format={formatBaht} />}
 					hint={`${formatNumber(stats.ordersAllTime)} ออเดอร์`}
 				/>
-				<StatCard tinted tone="info" icon={Package} label="สินค้า" value={formatNumber(stats.products)} />
-				<StatCard tinted tone="warning" icon={UserRound} label="ลูกค้า" value={formatNumber(stats.customers)} />
-			</div>
+				<StatCard tinted tone="info" icon={Package} label="สินค้า" value={<CountUp value={stats.products} format={formatNumber} />} />
+				<StatCard tinted tone="warning" icon={UserRound} label="ลูกค้า" value={<CountUp value={stats.customers} format={formatNumber} />} />
+			</Stagger>
 
 			<Surface>
 				<SectionTitle title="ยอดขายรายวัน (30 วัน)" hint={`ตามเวลาของร้าน (${business.timezone})`} />
 				<div className="px-3 pb-4">
-					<DailyChart data={data.series} dataKey="gmv" kind="money" label="ยอดขาย" color="var(--success)" />
+					<DailyChart data={data.series} dataKey="gmv" kind="money" label="ยอดขาย" color={MEASURE_COLOR.gmv} />
 				</div>
 			</Surface>
 

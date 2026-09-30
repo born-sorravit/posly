@@ -8,6 +8,7 @@ import { Button } from "@posly/ui/components/button";
 import { Textarea } from "@posly/ui/components/textarea";
 import { formatDateTime } from "@posly/utils/format";
 import { LoaderCircle, StickyNote, Trash2 } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import { type FormEvent, useState } from "react";
 import { toast } from "sonner";
 
@@ -73,8 +74,17 @@ export function NotesPanel({ targetType, targetId }: { targetType: "business" | 
 
 			{notes.data && notes.data.length > 0 ? (
 				<ul className="divide-y border-t">
+					<AnimatePresence initial={false}>
 					{notes.data.map((note) => (
-						<li key={note.id} className="flex gap-3 px-5 py-3">
+						<motion.li
+							key={note.id}
+							layout
+							initial={{ opacity: 0, y: -6 }}
+							animate={{ opacity: 1, y: 0 }}
+							exit={{ opacity: 0, x: 24, transition: { duration: 0.15 } }}
+							transition={{ duration: 0.18 }}
+							className="flex gap-3 px-5 py-3"
+						>
 							<StickyNote className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
 							<div className="min-w-0 flex-1">
 								<p className="whitespace-pre-wrap break-words text-sm">{note.body}</p>
@@ -99,8 +109,9 @@ export function NotesPanel({ targetType, targetId }: { targetType: "business" | 
 									<Trash2 />
 								</Button>
 							) : null}
-						</li>
+						</motion.li>
 					))}
+					</AnimatePresence>
 				</ul>
 			) : notes.data ? (
 				<p className="border-t px-5 py-4 text-muted-foreground text-sm">ยังไม่มีบันทึก</p>

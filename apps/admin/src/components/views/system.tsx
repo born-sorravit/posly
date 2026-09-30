@@ -1,6 +1,7 @@
 "use client";
 
 import { ErrorState, PageHeader, SectionTitle, StatusBadge, Surface } from "@/components/common/primitives";
+import { Stagger, StaggerItem } from "@/components/motion/reveal";
 import { useAdmin } from "@/lib/admin-api";
 import type { AdminSystemResponse } from "@/lib/types";
 import { Skeleton } from "@posly/ui/components/skeleton";
@@ -139,8 +140,9 @@ export function SystemView() {
 				</div>
 			) : (
 				<>
-					<div className="grid gap-4 desktop:grid-cols-3">
-						<Surface>
+					<Stagger trigger="mount" className="grid gap-4 desktop:grid-cols-3">
+						<StaggerItem>
+						<Surface className="h-full">
 							<SectionTitle title="API" action={<Health state="up" />} />
 							<div className="px-5 pb-4">
 								<Row label="Environment">{data.api.env}</Row>
@@ -153,8 +155,10 @@ export function SystemView() {
 								<Row label="Timezone">{data.api.timezone}</Row>
 							</div>
 						</Surface>
+						</StaggerItem>
 
-						<Surface>
+						<StaggerItem>
+						<Surface className="h-full">
 							<SectionTitle title="Database" action={<Health state={data.database.up ? "up" : "down"} />} />
 							<div className="px-5 pb-4">
 								<Row label="Latency">{data.database.latencyMs != null ? `${data.database.latencyMs} ms` : "—"}</Row>
@@ -175,8 +179,10 @@ export function SystemView() {
 								</Row>
 							</div>
 						</Surface>
+						</StaggerItem>
 
-						<Surface>
+						<StaggerItem>
+						<Surface className="h-full">
 							<SectionTitle
 								title={`Cache (${data.cache.provider === "redis" ? "Redis" : "in-memory"})`}
 								action={<Health state={data.cache.up ? "up" : "down"} />}
@@ -194,7 +200,8 @@ export function SystemView() {
 								<Row label="Demo"><Health state={data.integrations.demo ? "up" : "off"} /></Row>
 							</div>
 						</Surface>
-					</div>
+						</StaggerItem>
+					</Stagger>
 
 					<CacheCard data={data} />
 

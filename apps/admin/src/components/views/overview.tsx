@@ -1,10 +1,14 @@
 "use client";
 
+import { CountUp } from "@/components/motion/count-up";
+import { Stagger } from "@/components/motion/reveal";
+import { motion } from "motion/react";
 import { DailyChart } from "@/components/charts/daily-chart";
 import { DemoToggle, useDemoFilter } from "@/components/common/demo-filter";
 import { EmptyState, ErrorState, SectionTitle, StatCard, Surface } from "@/components/common/primitives";
 import { useAdmin } from "@/lib/admin-api";
 import { PLAN_LABEL } from "@/lib/labels";
+import { MEASURE_COLOR, PLAN_COLOR } from "@/lib/chart-colors";
 import type { AdminOverviewResponse } from "@/lib/types";
 import { Skeleton } from "@posly/ui/components/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@posly/ui/components/select";
@@ -30,13 +34,16 @@ function PlanBreakdown({ rows }: { rows: AdminOverviewResponse["subscriptions"] 
 			{plans.map(({ plan, count }) => (
 				<li key={plan} className="grid gap-1.5">
 					<div className="flex items-center justify-between text-sm">
-						<span>{PLAN_LABEL[plan] ?? plan}</span>
+						<span className="flex items-center gap-2">
+							<span className="size-2.5 rounded-full" style={{ backgroundColor: PLAN_COLOR[plan] }} aria-hidden />
+							{PLAN_LABEL[plan] ?? plan}
+						</span>
 						<span className="numeric font-medium">{formatNumber(count)}</span>
 					</div>
 					<div className="h-2 rounded-full bg-muted">
 						<div
-							className="h-2 rounded-full bg-primary"
-							style={{ width: `${(count / max) * 100}%`, minWidth: count ? 8 : 0 }}
+							className="h-2 rounded-full"
+							style={{ width: `${(count / max) * 100}%`, minWidth: count ? 8 : 0, backgroundColor: PLAN_COLOR[plan] }}
 						/>
 					</div>
 				</li>
@@ -55,7 +62,11 @@ export function OverviewView() {
 	return (
 		<div className="grid gap-6">
 			{/* The same branded hero as the shop dashboard in apps/web: the one dark surface. */}
-			<section className="hero-surface relative overflow-hidden rounded-3xl px-6 py-7 text-white tablet:px-8 tablet:py-8">
+			<motion.section
+				initial={{ opacity: 0, y: 6 }}
+				animate={{ opacity: 1, y: 0 }}
+				className="hero-surface relative overflow-hidden rounded-3xl px-6 py-7 text-white tablet:px-8 tablet:py-8"
+			>
 				<div aria-hidden className="hero-grid pointer-events-none absolute inset-0" />
 				<div className="relative flex flex-col gap-4 tablet:flex-row tablet:items-start tablet:justify-between">
 					<div className="space-y-1">
@@ -84,7 +95,7 @@ export function OverviewView() {
 				<div className="relative mt-6 flex flex-col gap-4 tablet:flex-row tablet:items-end tablet:justify-between">
 					<div>
 						<p className="text-sm text-white/60">ยอดขายวันนี้ทั้งแพลตฟอร์ม</p>
-						<p className="numeric font-semibold text-4xl tracking-tight">{t ? formatBaht(t.gmvToday) : "—"}</p>
+						<p className="numeric font-semibold text-4xl tracking-tight">{t ? <CountUp value={t.gmvToday} format={formatBaht} /> : "—"}</p>
 						<p className="mt-1 text-sm text-white/60">
 							{t ? `${formatNumber(t.ordersToday)} ออเดอร์วันนี้` : "กำลังโหลด…"}
 						</p>
@@ -93,7 +104,7 @@ export function OverviewView() {
 						<DemoToggle />
 					</div>
 				</div>
-			</section>
+			</motion.section>
 
 			{error && !data ? (
 				<Surface>
@@ -101,14 +112,14 @@ export function OverviewView() {
 				</Surface>
 			) : (
 				<>
-					<div className="grid grid-cols-2 gap-3 desktop:grid-cols-4 desktop:gap-4">
+					<Stagger trigger="mount" className="grid grid-cols-2 gap-3 desktop:grid-cols-4 desktop:gap-4">
 						<StatCard
 							tinted
 							tone="success"
 							icon={Coins}
 							label={`ยอดขาย ${days} วัน`}
 							loading={isLoading}
-							value={t ? formatBaht(t.gmvPeriod) : null}
+							value={t ? <CountUp value={t.gmvPeriod} format={formatBaht} /> : null}
 							hint={t ? `${formatNumber(t.activeShopsPeriod)} ร้านที่มียอดขาย` : null}
 							trend={series?.map((d) => d.gmv)}
 						/>
@@ -118,7 +129,7 @@ export function OverviewView() {
 							icon={ShoppingBag}
 							label={`ออเดอร์ ${days} วัน`}
 							loading={isLoading}
-							value={t ? formatNumber(t.ordersPeriod) : null}
+							value={t ? <CountUp value={t.ordersPeriod} format={formatNumber} /> : null}
 							hint={t ? `สะสม ${formatNumber(t.ordersAllTime)} ออเดอร์` : null}
 							trend={series?.map((d) => d.orders)}
 						/>
@@ -128,7 +139,7 @@ export function OverviewView() {
 							icon={Store}
 							label="ร้านค้าทั้งหมด"
 							loading={isLoading}
-							value={t ? formatNumber(t.businesses) : null}
+							value={t ? <CountUp value={t.businesses} format={formatNumber} /> : null}
 							hint={t ? `ใหม่ ${formatNumber(t.newBusinesses)} ร้านใน ${days} วัน` : null}
 							trend={series?.map((d) => d.newBusinesses)}
 						/>
@@ -138,19 +149,19 @@ export function OverviewView() {
 							icon={Users}
 							label="ผู้ใช้ทั้งหมด"
 							loading={isLoading}
-							value={t ? formatNumber(t.users) : null}
+							value={t ? <CountUp value={t.users} format={formatNumber} /> : null}
 							hint={t ? `สมัครใหม่ ${formatNumber(t.newUsers)} คนใน ${days} วัน` : null}
 							trend={series?.map((d) => d.signups)}
 						/>
-					</div>
+					</Stagger>
 
-					<div className="grid grid-cols-2 gap-3 desktop:grid-cols-3 desktop:gap-4">
+					<Stagger trigger="mount" className="grid grid-cols-2 gap-3 desktop:grid-cols-3 desktop:gap-4">
 						<StatCard
 							tone="danger"
 							icon={Undo2}
 							label={`คืนเงิน ${days} วัน`}
 							loading={isLoading}
-							value={t ? formatBaht(t.refundedAmountPeriod) : null}
+							value={t ? <CountUp value={t.refundedAmountPeriod} format={formatBaht} /> : null}
 							hint={t ? `${formatNumber(t.refundsPeriod)} ออเดอร์ · ยกเลิก ${formatNumber(t.cancelledPeriod)}` : null}
 						/>
 						<StatCard
@@ -158,7 +169,7 @@ export function OverviewView() {
 							icon={ReceiptText}
 							label="เฉลี่ยต่อออเดอร์"
 							loading={isLoading}
-							value={t ? formatBaht(t.ordersPeriod ? Math.round(t.gmvPeriod / t.ordersPeriod) : 0) : null}
+							value={t ? <CountUp value={t.ordersPeriod ? Math.round(t.gmvPeriod / t.ordersPeriod) : 0} format={formatBaht} /> : null}
 							hint={`${days} วันล่าสุด`}
 						/>
 						<StatCard
@@ -169,17 +180,17 @@ export function OverviewView() {
 							label="ยอดขายเฉลี่ยต่อร้าน"
 							loading={isLoading}
 							value={
-								t ? formatBaht(t.activeShopsPeriod ? Math.round(t.gmvPeriod / t.activeShopsPeriod) : 0) : null
+								t ? <CountUp value={t.activeShopsPeriod ? Math.round(t.gmvPeriod / t.activeShopsPeriod) : 0} format={formatBaht} /> : null
 							}
 							hint={`เฉพาะร้านที่มียอดขาย ${days} วัน`}
 						/>
-					</div>
+					</Stagger>
 
 					<Surface>
 						<SectionTitle title="ยอดขายรายวัน" hint="ออเดอร์ที่ชำระแล้ว ตามวันในเวลาไทย" />
 						<div className="px-3 pb-4">
 							{data ? (
-								<DailyChart data={data.series} dataKey="gmv" kind="money" label="ยอดขาย" color="var(--success)" height={280} />
+								<DailyChart data={data.series} dataKey="gmv" kind="money" label="ยอดขาย" color={MEASURE_COLOR.gmv} height={280} />
 							) : (
 								<Skeleton className="mx-2 h-[280px]" />
 							)}
@@ -191,7 +202,7 @@ export function OverviewView() {
 							<SectionTitle title="ออเดอร์รายวัน" />
 							<div className="px-3 pb-4">
 								{data ? (
-									<DailyChart data={data.series} dataKey="orders" kind="count" label="ออเดอร์" color="var(--chart-1)" />
+									<DailyChart data={data.series} dataKey="orders" kind="count" label="ออเดอร์" color={MEASURE_COLOR.orders} />
 								) : (
 									<Skeleton className="mx-2 h-[240px]" />
 								)}
@@ -201,7 +212,7 @@ export function OverviewView() {
 							<SectionTitle title="ผู้ใช้สมัครใหม่รายวัน" />
 							<div className="px-3 pb-4">
 								{data ? (
-									<DailyChart data={data.series} dataKey="signups" kind="count" label="สมัครใหม่" color="var(--chart-2)" />
+									<DailyChart data={data.series} dataKey="signups" kind="count" label="สมัครใหม่" color={MEASURE_COLOR.signups} />
 								) : (
 									<Skeleton className="mx-2 h-[240px]" />
 								)}
@@ -226,7 +237,7 @@ export function OverviewView() {
 												href={`/businesses/${b.id}`}
 												className="flex min-h-11 items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-muted"
 											>
-												<span className="numeric flex size-7 shrink-0 items-center justify-center rounded-lg bg-accent font-semibold text-accent-foreground text-xs">
+												<span className="numeric flex size-7 shrink-0 items-center justify-center rounded-lg bg-muted font-semibold text-muted-foreground text-xs">
 													{i + 1}
 												</span>
 												<span className="min-w-0 flex-1 truncate font-medium text-sm">{b.name}</span>

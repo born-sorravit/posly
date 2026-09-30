@@ -1,5 +1,6 @@
 "use client";
 
+import { item } from "@/components/motion/reveal";
 import { cn } from "@/lib/utils";
 import { Badge } from "@posly/ui/components/badge";
 import { Button } from "@posly/ui/components/button";
@@ -7,6 +8,7 @@ import { Skeleton } from "@posly/ui/components/skeleton";
 import type { Tone } from "@posly/types/domain";
 import { ChevronLeft, ChevronRight, Inbox, type LucideIcon, RotateCcw, TriangleAlert } from "lucide-react";
 import Link from "next/link";
+import { motion } from "motion/react";
 import { type CSSProperties, type ReactNode, useId } from "react";
 
 /*
@@ -122,7 +124,9 @@ export function StatCard({
 	loading?: boolean;
 }) {
 	return (
-		<div
+		// A `Stagger` item: inside one, cards arrive in sequence; on its own it simply renders.
+		<motion.div
+			variants={item}
 			className={cn(
 				"flex min-w-0 flex-col gap-2.5 rounded-2xl p-4 tablet:gap-3 tablet:p-5",
 				tinted ? "tint-surface" : "surface",
@@ -143,7 +147,7 @@ export function StatCard({
 			)}
 			{hint && !loading ? <span className="text-muted-foreground text-xs">{hint}</span> : null}
 			{trend && !loading ? <Sparkline values={trend} tone={tone} className="-mx-1 -mb-1 mt-auto" /> : null}
-		</div>
+		</motion.div>
 	);
 }
 
@@ -288,7 +292,8 @@ export function MobileRow({
 		</>
 	);
 	return (
-		<li>
+		// Rows arrive with a short drop, as lines do in apps/web's cart.
+		<motion.li initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.18 }}>
 			{href ? (
 				<Link href={href} className="flex min-h-14 items-center gap-3 px-4 py-3 active:bg-muted">
 					{body}
@@ -296,7 +301,7 @@ export function MobileRow({
 			) : (
 				<div className="flex min-h-14 items-center gap-3 px-4 py-3">{body}</div>
 			)}
-		</li>
+		</motion.li>
 	);
 }
 

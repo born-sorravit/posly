@@ -1,5 +1,8 @@
 "use client";
 
+import { CountUp } from "@/components/motion/count-up";
+import { Stagger } from "@/components/motion/reveal";
+import { MEASURE_COLOR } from "@/lib/chart-colors";
 import { DailyChart } from "@/components/charts/daily-chart";
 import { DemoToggle, useDemoFilter } from "@/components/common/demo-filter";
 import { ErrorState, PageHeader, SectionTitle, StatCard, Surface } from "@/components/common/primitives";
@@ -89,14 +92,14 @@ export function GrowthView() {
 				</Surface>
 			) : (
 				<>
-					<div className="grid grid-cols-2 gap-3 desktop:grid-cols-4 desktop:gap-4">
+					<Stagger trigger="mount" className="grid grid-cols-2 gap-3 desktop:grid-cols-4 desktop:gap-4">
 						<StatCard
 							tinted
 							tone="success"
 							icon={Coins}
 							label="MRR ตอนนี้"
 							loading={isLoading}
-							value={data ? formatBaht(data.now.mrr) : null}
+							value={data ? <CountUp value={data.now.mrr} format={formatBaht} /> : null}
 							hint={data ? `${formatNumber(data.now.paidBusinesses)} ร้านที่จ่ายเงิน` : null}
 							trend={data?.daily.map((d) => d.mrr)}
 						/>
@@ -106,7 +109,7 @@ export function GrowthView() {
 							icon={Store}
 							label={last ? `ร้าน active ${monthLabel(last.month)}` : "ร้าน active"}
 							loading={isLoading}
-							value={last ? formatNumber(last.activeBusinesses) : null}
+							value={last ? <CountUp value={last.activeBusinesses} format={formatNumber} /> : null}
 							hint={
 								last && before && change(last.activeBusinesses, before.activeBusinesses) !== null
 									? `${change(last.activeBusinesses, before.activeBusinesses)}% จากเดือนก่อน`
@@ -120,7 +123,7 @@ export function GrowthView() {
 							icon={TrendingUp}
 							label={last ? `ร้านใหม่ ${monthLabel(last.month)}` : "ร้านใหม่"}
 							loading={isLoading}
-							value={last ? formatNumber(last.newBusinesses) : null}
+							value={last ? <CountUp value={last.newBusinesses} format={formatNumber} /> : null}
 							trend={data?.months.map((m) => m.newBusinesses)}
 						/>
 						<StatCard
@@ -129,10 +132,10 @@ export function GrowthView() {
 							icon={Users}
 							label={last ? `ผู้ใช้ใหม่ ${monthLabel(last.month)}` : "ผู้ใช้ใหม่"}
 							loading={isLoading}
-							value={last ? formatNumber(last.signups) : null}
+							value={last ? <CountUp value={last.signups} format={formatNumber} /> : null}
 							trend={data?.months.map((m) => m.signups)}
 						/>
-					</div>
+					</Stagger>
 
 					<Surface>
 						<SectionTitle
@@ -142,7 +145,7 @@ export function GrowthView() {
 						<div className="px-3 pb-4">
 							{daily ? (
 								daily.length > 1 ? (
-									<DailyChart data={daily} dataKey="mrr" kind="money" label="MRR" color="var(--success)" />
+									<DailyChart data={daily} dataKey="mrr" kind="money" label="MRR" color={MEASURE_COLOR.mrr} />
 								) : (
 									<p className="px-2 pb-2 text-muted-foreground text-sm">
 										เริ่มเก็บเมื่อ {daily[0] ? formatThaiDate(`${daily[0].day}T12:00:00+07:00`) : "วันนี้"} กราฟจะขึ้นเมื่อมีข้อมูลตั้งแต่ 2 วัน
@@ -159,7 +162,7 @@ export function GrowthView() {
 							<SectionTitle title="ร้าน active รายเดือน" hint="ร้านที่มีออเดอร์ที่ชำระแล้วอย่างน้อย 1 ใบในเดือนนั้น" />
 							<div className="px-3 pb-4">
 								{months ? (
-									<DailyChart data={months} dataKey="activeBusinesses" kind="count" label="ร้าน active" granularity="month" color="var(--chart-1)" />
+									<DailyChart data={months} dataKey="activeBusinesses" kind="count" label="ร้าน active" granularity="month" color={MEASURE_COLOR.activeBusinesses} />
 								) : (
 									<Skeleton className="mx-2 h-[240px]" />
 								)}
@@ -169,7 +172,7 @@ export function GrowthView() {
 							<SectionTitle title="ยอดขายรายเดือน" hint="ยอดขายรวมทุกร้าน" />
 							<div className="px-3 pb-4">
 								{months ? (
-									<DailyChart data={months} dataKey="gmv" kind="money" label="ยอดขาย" granularity="month" color="var(--success)" />
+									<DailyChart data={months} dataKey="gmv" kind="money" label="ยอดขาย" granularity="month" color={MEASURE_COLOR.gmv} />
 								) : (
 									<Skeleton className="mx-2 h-[240px]" />
 								)}
@@ -179,7 +182,7 @@ export function GrowthView() {
 							<SectionTitle title="ร้านใหม่รายเดือน" />
 							<div className="px-3 pb-4">
 								{months ? (
-									<DailyChart data={months} dataKey="newBusinesses" kind="count" label="ร้านใหม่" granularity="month" color="var(--chart-2)" />
+									<DailyChart data={months} dataKey="newBusinesses" kind="count" label="ร้านใหม่" granularity="month" color={MEASURE_COLOR.newBusinesses} />
 								) : (
 									<Skeleton className="mx-2 h-[240px]" />
 								)}
@@ -189,7 +192,7 @@ export function GrowthView() {
 							<SectionTitle title="ผู้ใช้ใหม่รายเดือน" />
 							<div className="px-3 pb-4">
 								{months ? (
-									<DailyChart data={months} dataKey="signups" kind="count" label="ผู้ใช้ใหม่" granularity="month" color="var(--chart-3)" />
+									<DailyChart data={months} dataKey="signups" kind="count" label="ผู้ใช้ใหม่" granularity="month" color={MEASURE_COLOR.signups} />
 								) : (
 									<Skeleton className="mx-2 h-[240px]" />
 								)}
