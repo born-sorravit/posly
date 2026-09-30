@@ -55,13 +55,17 @@ describe("reports", () => {
 		const data = res.body.data;
 		expect(data).toMatchObject({ range: "custom", compare: "previous", days: 1 });
 		// Midnight in Bangkok is 17:00 UTC the day before.
-		expect(new Date(data.to).getTime() - new Date(data.from).getTime()).toBe(86_400_000);
+		expect(new Date(data.to).getTime() - new Date(data.from).getTime()).toBe(
+			86_400_000
+		);
 		expect(new Date(data.from).toISOString()).toMatch(/T17:00:00\.000Z$/);
 		expect(data.metrics.orders).toBe(2);
 		// A one-day window is charted by the hour.
 		expect(data.series).toHaveLength(24);
 		// The previous period is the day before, the same length.
-		expect(new Date(data.from).getTime() - new Date(data.previousFrom).getTime()).toBe(86_400_000);
+		expect(
+			new Date(data.from).getTime() - new Date(data.previousFrom).getTime()
+		).toBe(86_400_000);
 	});
 
 	it("compares against the same dates a year earlier", async () => {
@@ -95,9 +99,13 @@ describe("reports", () => {
 		expect(days).toBe(7);
 		expect(heatmap.weeks).toHaveLength(7);
 		expect(heatmap.weeks.reduce((s: number, n: number) => s + n, 0)).toBe(7);
-		expect(heatmap.cells.reduce((s: number, c: { orders: number }) => s + c.orders, 0)).toBe(2);
+		expect(
+			heatmap.cells.reduce((s: number, c: { orders: number }) => s + c.orders, 0)
+		).toBe(2);
 
-		const line = products.find((p: { productId: string }) => p.productId === croissant.id);
+		const line = products.find(
+			(p: { productId: string }) => p.productId === croissant.id
+		);
 		expect(line).toMatchObject({ sold: 4, revenue: 4 * croissant.price });
 		expect(line.profit).toBe(line.revenue - line.cost);
 		expect(
@@ -111,7 +119,11 @@ describe("reports", () => {
 			newCustomers: 1,
 			returningCustomers: 0,
 		});
-		expect(customers.top[0]).toMatchObject({ id: customerId, name: "Regular", orders: 1 });
+		expect(customers.top[0]).toMatchObject({
+			id: customerId,
+			name: "Regular",
+			orders: 1,
+		});
 		expect(customers.lapsed).toEqual([]);
 	});
 });
