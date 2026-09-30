@@ -2,7 +2,18 @@
 
 import { cn } from "@/lib/utils";
 import { useAttention } from "@/lib/use-attention";
-import { Activity, BellRing, CreditCard, LayoutGrid, type LucideIcon, Server, Store, Users } from "lucide-react";
+import {
+	Activity,
+	BellRing,
+	CreditCard,
+	LayoutGrid,
+	type LucideIcon,
+	Megaphone,
+	Server,
+	Store,
+	TrendingUp,
+	Users,
+} from "lucide-react";
 import { motion } from "motion/react";
 import Image from "next/image";
 import Link from "next/link";
@@ -14,6 +25,7 @@ const SECTIONS: { title?: string; items: { href: string; label: string; icon: Lu
 		items: [
 			{ href: "/", label: "ภาพรวม", icon: LayoutGrid },
 			{ href: "/attention", label: "ต้องดูแล", icon: BellRing },
+			{ href: "/growth", label: "การเติบโต", icon: TrendingUp },
 			{ href: "/businesses", label: "ร้านค้า", icon: Store },
 			{ href: "/users", label: "ผู้ใช้", icon: Users },
 			{ href: "/subscriptions", label: "Subscriptions", icon: CreditCard },
@@ -22,6 +34,7 @@ const SECTIONS: { title?: string; items: { href: string; label: string; icon: Lu
 	{
 		title: "ระบบ",
 		items: [
+			{ href: "/announcements", label: "ประกาศ", icon: Megaphone },
 			{ href: "/activity", label: "กิจกรรม", icon: Activity },
 			{ href: "/system", label: "สถานะระบบ", icon: Server },
 		],

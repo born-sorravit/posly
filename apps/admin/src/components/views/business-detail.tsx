@@ -3,6 +3,7 @@
 import { SetPlanDialog } from "@/components/actions/set-plan-dialog";
 import { DailyChart } from "@/components/charts/daily-chart";
 import { AdminActionsTable } from "@/components/common/admin-actions";
+import { NotesPanel } from "@/components/common/notes-panel";
 import { EmptyState, ErrorState, PageHeader, SectionTitle, StatCard, StatusBadge, Surface } from "@/components/common/primitives";
 import { AuditTable, OrdersTable } from "@/components/common/tables";
 import { AdminApiError, useAdmin } from "@/lib/admin-api";
@@ -183,6 +184,8 @@ export function BusinessDetailView({ id }: { id: string }) {
 					</ul>
 				</Surface>
 			</div>
+
+			<NotesPanel targetType="business" targetId={business.id} />
 
 			<Surface>
 				<SectionTitle title="ออเดอร์ล่าสุด" />

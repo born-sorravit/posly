@@ -10,7 +10,7 @@ import type { NotificationDto, NotificationKind } from "@/lib/api/posly";
 import { formatRelative, formatThaiDate } from "@posly/utils/format";
 import { formatBaht } from "@posly/utils/money";
 import { cn } from "@/lib/utils";
-import { Ban, Bell, BellOff, ChartNoAxesColumn, CreditCard, Gauge, PackageMinus, PackageX, Undo2 } from "lucide-react";
+import { Ban, Bell, BellOff, ChartNoAxesColumn, CreditCard, Gauge, Megaphone, PackageMinus, PackageX, Undo2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 
@@ -22,6 +22,7 @@ const KIND: Record<NotificationKind, { icon: typeof Bell; tint: string }> = {
 	DAILY_SUMMARY: { icon: ChartNoAxesColumn, tint: "var(--success)" },
 	ORDER_QUOTA: { icon: Gauge, tint: "var(--warning)" },
 	PAYMENT_FAILED: { icon: CreditCard, tint: "var(--danger)" },
+	ANNOUNCEMENT: { icon: Megaphone, tint: "var(--primary)" },
 };
 
 /** Where a notification leads: the thing it is about. */
@@ -38,6 +39,8 @@ const hrefOf = (n: NotificationDto): string => {
 		case "ORDER_QUOTA":
 		case "PAYMENT_FAILED":
 			return "/settings/subscription";
+		case "ANNOUNCEMENT":
+			return "/notifications";
 	}
 };
 
@@ -73,6 +76,9 @@ function useWording() {
 				};
 			case "PAYMENT_FAILED":
 				return { title: t("paymentFailedTitle"), body: t("paymentFailedBody", { plan: str("plan") }) };
+			// Written by the Posly team in the admin monitor, already in Thai.
+			case "ANNOUNCEMENT":
+				return { title: str("title") || t("announcementTitle"), body: str("body") };
 			case "ORDER_QUOTA":
 				return d.full
 					? { title: t("quotaFullTitle", { limit: num("limit") }), body: t("quotaFullBody") }

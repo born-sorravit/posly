@@ -268,3 +268,57 @@ export interface AdminAttentionResponse {
 	/** Signed up over 3 days ago and never finished setting up. */
 	notOnboarded: AdminAttentionRow[];
 }
+
+export interface AdminSearchResponse {
+	businesses: {
+		id: string;
+		name: string;
+		ownerEmail: string | null;
+		plan: string | null;
+		isDemo: boolean;
+	}[];
+	users: { id: string; email: string; name: string; isDemo: boolean }[];
+	orders: {
+		id: string;
+		businessId: string;
+		businessName: string;
+		number: number;
+		status: string;
+		total: number;
+		createdAt: string;
+	}[];
+}
+
+export interface AdminNoteRow {
+	id: string;
+	adminUserId: string;
+	adminEmail: string;
+	body: string;
+	createdAt: string;
+}
+
+export interface AdminGrowthResponse {
+	/** The last 12 calendar months (Bangkok), oldest first. */
+	months: {
+		month: string;
+		newBusinesses: number;
+		signups: number;
+		/** Shops with at least one paid order that month. */
+		activeBusinesses: number;
+		gmv: number;
+	}[];
+	/**
+	 * Shops by the month they signed up (last 6), and how many of them sold anything in
+	 * each month since: `active[k]` is month k after signing up (0 = the signup month).
+	 */
+	cohorts: { month: string; size: number; active: number[] }[];
+	/** One snapshot per day, recorded from the day this feature shipped. */
+	daily: {
+		day: string;
+		mrr: number;
+		paidBusinesses: number;
+		businesses: number;
+		users: number;
+	}[];
+	now: { mrr: number; paidBusinesses: number };
+}

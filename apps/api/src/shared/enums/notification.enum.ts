@@ -8,4 +8,6 @@ export enum NotificationKind {
 	ORDER_QUOTA = "ORDER_QUOTA",
 	/** A plan renewal was declined; the shop is on Free limits until the card is fixed. */
 	PAYMENT_FAILED = "PAYMENT_FAILED",
+	/** A message from Posly to shops, sent from the admin monitor: `{ title, body }`. */
+	ANNOUNCEMENT = "ANNOUNCEMENT",
 }

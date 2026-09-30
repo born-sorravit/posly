@@ -275,7 +275,8 @@ export type NotificationKind =
 	| "CANCELLED"
 	| "DAILY_SUMMARY"
 	| "ORDER_QUOTA"
-	| "PAYMENT_FAILED";
+	| "PAYMENT_FAILED"
+	| "ANNOUNCEMENT";
 
 /** An event, as facts; the words are written here from `kind` + `data`. */
 export interface NotificationDto {

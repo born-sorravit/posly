@@ -101,3 +101,5 @@ async function handle(request: Request, context: { params: Promise<{ path: strin
 
 export const GET = handle;
 export const POST = handle;
+// Only for removing one's own support note.
+export const DELETE = handle;

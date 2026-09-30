@@ -883,6 +883,19 @@ export class AdminService {
 		return new PaginatedResponse(data, num(total), page, limit);
 	}
 
+	/** Announcements already sent, from the action log (each send is logged once). */
+	async announcements(
+		query: AdminActionsQueryDto
+	): Promise<PaginatedResponse<AdminActionRow>> {
+		const { page, limit, skip } = getPaginationOptions(query);
+		const where = `a.action = 'ANNOUNCEMENT_SENT'`;
+		const [{ total }] = await this.dataSource.query(
+			`SELECT COUNT(*)::int AS total FROM admin_action_log a WHERE ${where}`
+		);
+		const data = await this.queryActions(where, [], limit, skip);
+		return new PaginatedResponse(data, num(total), page, limit);
+	}
+
 	private async log(
 		manager: EntityManager,
 		admin: AuthenticatedUser,

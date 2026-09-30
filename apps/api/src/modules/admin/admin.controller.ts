@@ -7,6 +7,7 @@ import { PaginatedResponse } from "@/shared/utils/pagination.util";
 import {
 	Body,
 	Controller,
+	Delete,
 	Get,
 	HttpCode,
 	Param,
@@ -16,10 +17,20 @@ import {
 } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { SkipThrottle } from "@nestjs/throttler";
+import { AdminGrowthService } from "@/modules/admin/admin-growth.service";
+import { AdminSupportService } from "@/modules/admin/admin-support.service";
 import { AdminService } from "@/modules/admin/admin.service";
 import {
 	AdminActionRow,
 	AdminActionsQueryDto,
+	AdminAnnouncementAudienceDto,
+	AdminAnnouncementDto,
+	AdminCreateNoteDto,
+	AdminGrowthResponse,
+	AdminNoteRow,
+	AdminNotesQueryDto,
+	AdminSearchQueryDto,
+	AdminSearchResponse,
 	AdminAttentionResponse,
 	AdminActivityQueryDto,
 	AdminAuditRow,
@@ -55,7 +66,11 @@ import {
 @SkipThrottle()
 @Controller("admin")
 export class AdminController {
-	constructor(private readonly adminService: AdminService) {}
+	constructor(
+		private readonly adminService: AdminService,
+		private readonly support: AdminSupportService,
+		private readonly growthService: AdminGrowthService
+	) {}
 
 	/** A cheap "may this session use the monitor?" for the admin app's layout. */
 	@Get("session")
@@ -163,6 +178,73 @@ export class AdminController {
 		@Query() query: AdminActionsQueryDto
 	): Promise<PaginatedResponse<AdminActionRow>> {
 		return this.adminService.actions(query);
+	}
+
+	@Get("search")
+	@ApiOperation({
+		summary: "Shops, accounts and orders matching one query (the ⌘K box)",
+	})
+	search(@Query() query: AdminSearchQueryDto): Promise<AdminSearchResponse> {
+		return this.support.search(query.q);
+	}
+
+	@Get("notes")
+	@ApiOperation({ summary: "The support team's notes on a shop or an account" })
+	notes(@Query() query: AdminNotesQueryDto): Promise<AdminNoteRow[]> {
+		return this.support.notes(query);
+	}
+
+	@Post("notes")
+	@ApiOperation({ summary: "Add a note to a shop or an account" })
+	createNote(
+		@CurrentUser() admin: AuthenticatedUser,
+		@Body() dto: AdminCreateNoteDto
+	): Promise<AdminNoteRow> {
+		return this.support.createNote(admin, dto);
+	}
+
+	@Delete("notes/:id")
+	@HttpCode(204)
+	@ApiOperation({ summary: "Remove one of your own notes" })
+	deleteNote(
+		@CurrentUser() admin: AuthenticatedUser,
+		@Param("id", ParseUUIDPipe) id: string
+	): Promise<void> {
+		return this.support.deleteNote(admin, id);
+	}
+
+	@Get("growth")
+	@ApiOperation({
+		summary: "Monthly growth, signup cohorts and daily MRR snapshots",
+	})
+	growth(@Query() query: AdminOverviewQueryDto): Promise<AdminGrowthResponse> {
+		return this.growthService.growth(query.includeDemo);
+	}
+
+	@Get("announcements/audience")
+	@ApiOperation({ summary: "How many shops an announcement would reach" })
+	announcementAudience(
+		@Query() query: AdminAnnouncementAudienceDto
+	): Promise<{ shops: number }> {
+		return this.support.audienceSize(query);
+	}
+
+	@Get("announcements")
+	@ApiOperation({ summary: "Announcements already sent" })
+	announcements(
+		@Query() query: AdminActionsQueryDto
+	): Promise<PaginatedResponse<AdminActionRow>> {
+		return this.adminService.announcements(query);
+	}
+
+	@Post("announcements")
+	@HttpCode(200)
+	@ApiOperation({ summary: "Send an announcement into shops' notifications" })
+	announce(
+		@CurrentUser() admin: AuthenticatedUser,
+		@Body() dto: AdminAnnouncementDto
+	): Promise<{ sent: number }> {
+		return this.support.announce(admin, dto);
 	}
 
 	@Get("orders/recent")

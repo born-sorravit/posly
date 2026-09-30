@@ -38,6 +38,7 @@ import {
 	Gauge,
 	ImagePlus,
 	Loader2,
+	Megaphone,
 	PackageMinus,
 	PackageX,
 	Percent,
@@ -867,6 +868,7 @@ const NOTIFICATION_ICON: Record<NotificationKind, typeof Bell> = {
 	DAILY_SUMMARY: ChartNoAxesColumn,
 	ORDER_QUOTA: Gauge,
 	PAYMENT_FAILED: CreditCard,
+	ANNOUNCEMENT: Megaphone,
 };
 
 /**

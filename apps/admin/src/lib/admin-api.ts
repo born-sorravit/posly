@@ -44,12 +44,19 @@ async function adminGet<T>(path: string, query?: Query): Promise<ApiEnvelope<T>>
 }
 
 /** One admin resource, polled while the tab is visible (react-query pauses in background). */
-export function useAdmin<T>(path: string, query?: Query, refetchInterval = 60_000) {
+export function useAdmin<T>(
+	path: string,
+	query?: Query,
+	/** 0 turns polling off. */
+	refetchInterval = 60_000,
+	options: { enabled?: boolean } = {}
+) {
 	return useQuery({
 		queryKey: ["admin", path, query],
 		queryFn: async () => (await adminGet<T>(path, query)).data,
-		refetchInterval,
+		refetchInterval: refetchInterval || false,
 		placeholderData: keepPreviousData,
+		enabled: options.enabled ?? true,
 	});
 }
 
@@ -72,15 +79,18 @@ export function useAdminPage<T>(path: string, query?: Query, refetchInterval = 6
  * An admin action (POST). On success every cached admin read is refetched, since an action
  * can change several pages at once (a shop's plan shows on overview, lists and detail).
  */
-export function useAdminAction<TBody, TResult>(path: string) {
+export function useAdminAction<TBody, TResult>(path: string | ((body: TBody) => string), method: "POST" | "DELETE" = "POST") {
 	const queryClient = useQueryClient();
 	return useMutation({
 		mutationFn: async (body: TBody): Promise<TResult> => {
-			const response = await fetch(`/api/backend/admin/${path}`, {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify(body),
+			const target = typeof path === "function" ? path(body) : path;
+			const response = await fetch(`/api/backend/admin/${target}`, {
+				method,
+				headers: method === "POST" ? { "Content-Type": "application/json" } : undefined,
+				body: method === "POST" ? JSON.stringify(body) : undefined,
 			});
+			// 204 No Content has no envelope.
+			if (response.status === 204) return undefined as TResult;
 			const payload = (await response.json().catch(() => null)) as ApiEnvelope<TResult> | null;
 			if (!response.ok || !payload) {
 				throw new AdminApiError(payload?.message ?? response.statusText, response.status);

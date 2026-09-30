@@ -1,6 +1,8 @@
 "use client";
 
+import { AdminUserProvider } from "@/components/shell/admin-user";
 import { Brand, SidebarNav } from "@/components/shell/nav";
+import { SearchMenu } from "@/components/shell/search-menu";
 import { Button } from "@posly/ui/components/button";
 import {
 	DropdownMenu,
@@ -135,6 +137,7 @@ function Clock() {
 export function AppShell({ user, children }: { user: AuthUser; children: ReactNode }) {
 	const [open, setOpen] = useState(false);
 	return (
+		<AdminUserProvider user={user}>
 		<div className="flex min-h-svh">
 			<aside className="sticky top-0 hidden h-svh w-64 shrink-0 border-sidebar-border border-r bg-sidebar desktop:block">
 				<div className="flex h-full min-h-0 flex-col">
@@ -170,10 +173,12 @@ export function AppShell({ user, children }: { user: AuthUser; children: ReactNo
 							</div>
 						</SheetContent>
 					</Sheet>
-					<div className="min-w-0 desktop:hidden">
+					<div className="min-w-0 tablet:hidden">
 						<Brand />
 					</div>
-					<div className="ml-auto flex items-center gap-1 tablet:gap-2">
+					<SearchMenu />
+					{/* On a phone the search icon above takes the free space; from tablet this does. */}
+					<div className="flex items-center gap-1 tablet:ml-auto tablet:gap-2">
 						<Clock />
 						<ThemeToggle />
 						<div className="desktop:hidden">
@@ -184,5 +189,6 @@ export function AppShell({ user, children }: { user: AuthUser; children: ReactNo
 				<main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 desktop:px-8 desktop:py-8">{children}</main>
 			</div>
 		</div>
+		</AdminUserProvider>
 	);
 }

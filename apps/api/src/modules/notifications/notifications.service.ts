@@ -14,8 +14,11 @@ import { RealtimeService } from "@/modules/realtime/realtime.service";
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { Brackets, DataSource, EntityManager, In } from "typeorm";
 
-/** Who may see each kind: the same people who could find it out on the matching screen. */
-const AUDIENCE: Record<NotificationKind, Permission> = {
+/**
+ * Who may see each kind: the same people who could find it out on the matching screen.
+ * `null` is everyone in the shop.
+ */
+const AUDIENCE: Record<NotificationKind, Permission | null> = {
 	[NotificationKind.LOW_STOCK]: Permission.PRODUCTS_READ,
 	[NotificationKind.OUT_OF_STOCK]: Permission.PRODUCTS_READ,
 	[NotificationKind.REFUND]: Permission.ORDERS_READ_ALL,
@@ -23,6 +26,8 @@ const AUDIENCE: Record<NotificationKind, Permission> = {
 	[NotificationKind.DAILY_SUMMARY]: Permission.REPORTS_READ,
 	[NotificationKind.ORDER_QUOTA]: Permission.SUBSCRIPTION_MANAGE,
 	[NotificationKind.PAYMENT_FAILED]: Permission.SUBSCRIPTION_MANAGE,
+	// Posly speaking to the shop (maintenance, new features): everyone who works there.
+	[NotificationKind.ANNOUNCEMENT]: null,
 };
 
 interface StockProduct {
@@ -176,9 +181,10 @@ export class NotificationsService {
 
 	/** The kinds this member's permissions let them hear about, whether muted or not. */
 	private audibleKinds(membership: ResolvedMembership): NotificationKind[] {
-		return (Object.keys(AUDIENCE) as NotificationKind[]).filter((kind) =>
-			membership.permissions.includes(AUDIENCE[kind])
-		);
+		return (Object.keys(AUDIENCE) as NotificationKind[]).filter((kind) => {
+			const permission = AUDIENCE[kind];
+			return permission === null || membership.permissions.includes(permission);
+		});
 	}
 
 	async preferences(

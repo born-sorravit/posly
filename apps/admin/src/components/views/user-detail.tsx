@@ -2,6 +2,7 @@
 
 import { RevokeSessionsDialog } from "@/components/actions/revoke-sessions-dialog";
 import { AdminActionsTable } from "@/components/common/admin-actions";
+import { NotesPanel } from "@/components/common/notes-panel";
 import {
 	EmptyState,
 	ErrorState,
@@ -135,6 +136,8 @@ export function UserDetailView({ id, currentUserId }: { id: string; currentUserI
 					</div>
 				</dl>
 			</Surface>
+
+			<NotesPanel targetType="user" targetId={user.id} />
 
 			<div className="grid gap-4 desktop:grid-cols-2">
 				<Surface>
