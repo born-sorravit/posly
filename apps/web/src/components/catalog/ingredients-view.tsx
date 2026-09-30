@@ -9,8 +9,8 @@ import {
 	PageHeader,
 	StatusBadge,
 	Surface,
-	TableSkeleton,
 } from "@/components/common/primitives";
+import { IngredientRowsSkeleton } from "@/components/catalog/inventory-skeletons";
 import { Button } from "@posly/ui/components/button";
 import {
 	Dialog,
@@ -538,7 +538,9 @@ export function IngredientsView() {
 			/>
 			<InventoryTabs />
 			{ingredients.isPending ? (
-				<TableSkeleton />
+				<Surface className="overflow-hidden p-0">
+					<IngredientRowsSkeleton cost={canEdit} />
+				</Surface>
 			) : rows.length === 0 ? (
 				<Surface>
 					<EmptyState icon={Carrot} title={t("empty")} description={t("emptyHint")} />

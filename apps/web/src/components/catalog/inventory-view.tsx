@@ -14,6 +14,8 @@ import { ProductThumb } from "@/components/common/product-thumb";
 import { Button } from "@posly/ui/components/button";
 import { StockAdjustDialog } from "@/components/catalog/stock-adjust-dialog";
 import { InventoryTabs } from "@/components/catalog/ingredients-view";
+import { PagerSkeleton, StockRowsSkeleton } from "@/components/catalog/inventory-skeletons";
+import { Skeleton } from "@posly/ui/components/skeleton";
 import { useActiveBusiness, useFeature } from "@/hooks/use-workspace";
 import { Link } from "@/i18n/navigation";
 import { useProducts } from "@/hooks/use-posly";
@@ -50,6 +52,8 @@ export function InventoryView() {
 			(!search || p.name.toLowerCase().includes(search) || p.sku?.toLowerCase().includes(search))
 	);
 	const paged = usePagedRows(rows, `${filter}|${search}`);
+	// Until the products land, the counts are unknown, not zero.
+	const count = (n: number) => (products.isPending ? <Skeleton className="h-6 w-10 tablet:h-7" aria-hidden /> : n);
 
 	if (!enabled) {
 		return (
@@ -144,9 +148,9 @@ export function InventoryView() {
 			/>
 			<InventoryTabs />
 			<div className="grid grid-cols-3 gap-3" data-tour="inventory-status">
-				<MetricCard icon={PackageCheck} tone="success" label={t("inStock")} value={counts.in} />
-				<MetricCard icon={TriangleAlert} tone="warning" label={t("lowStock")} value={counts.low} />
-				<MetricCard icon={PackageX} tone="danger" label={t("outOfStock")} value={counts.out} />
+				<MetricCard icon={PackageCheck} tone="success" label={t("inStock")} value={count(counts.in)} />
+				<MetricCard icon={TriangleAlert} tone="warning" label={t("lowStock")} value={count(counts.low)} />
+				<MetricCard icon={PackageX} tone="danger" label={t("outOfStock")} value={count(counts.out)} />
 			</div>
 			<Surface className="overflow-hidden p-0">
 				<FilterBar
@@ -167,7 +171,12 @@ export function InventoryView() {
 						]}
 					/>
 				</FilterBar>
-				{rows.length === 0 ? (
+				{products.isPending ? (
+					<>
+						<StockRowsSkeleton />
+						<PagerSkeleton />
+					</>
+				) : rows.length === 0 ? (
 					<EmptyState icon={Boxes} title={t("emptyFilter")} />
 				) : (
 					<>

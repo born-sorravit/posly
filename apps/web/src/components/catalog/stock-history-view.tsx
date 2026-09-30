@@ -1,7 +1,8 @@
 "use client";
 
 import { type Column, DataTable, FilterBar, FilterMenu, Pager } from "@/components/common/controls";
-import { EmptyState, PageContainer, StatusBadge, Surface, TableSkeleton } from "@/components/common/primitives";
+import { EmptyState, PageContainer, StatusBadge, Surface } from "@/components/common/primitives";
+import { PagerSkeleton, StockHistoryRowsSkeleton } from "@/components/catalog/inventory-skeletons";
 import { ProductThumb } from "@/components/common/product-thumb";
 import { Button } from "@posly/ui/components/button";
 import { useProducts, useStockAdjustments } from "@/hooks/use-posly";
@@ -191,7 +192,10 @@ export function StockHistoryView() {
 				</FilterBar>
 
 				{history.isPending ? (
-					<TableSkeleton />
+					<>
+						<StockHistoryRowsSkeleton />
+						<PagerSkeleton />
+					</>
 				) : rows.length === 0 ? (
 					<EmptyState
 						icon={History}

@@ -1,9 +1,9 @@
 "use client";
 
 import { EmptyState } from "@/components/common/primitives";
+import { NotificationRowsSkeleton } from "@/components/layout/notifications-skeletons";
 import { Button } from "@posly/ui/components/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@posly/ui/components/popover";
-import { Skeleton } from "@posly/ui/components/skeleton";
 import { useMarkNotificationsRead, useNotifications } from "@/hooks/use-posly";
 import { Link } from "@/i18n/navigation";
 import type { NotificationDto, NotificationKind } from "@/lib/api/posly";
@@ -97,13 +97,8 @@ export function NotificationList({ limit, onNavigate }: { limit?: number; onNavi
 	const word = useWording();
 
 	if (notifications.isPending) {
-		return (
-			<div className="grid gap-1 p-1">
-				{[0, 1, 2].map((i) => (
-					<Skeleton key={i} className="h-14 rounded-xl" />
-				))}
-			</div>
-		);
+		// The popover keeps its short height; the page shows a fuller list.
+		return <NotificationRowsSkeleton rows={limit ? 3 : 6} />;
 	}
 	if (notifications.isError) {
 		return <p className="px-3 py-8 text-center text-muted-foreground text-sm">{t("loadFailed")}</p>;

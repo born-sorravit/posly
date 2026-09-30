@@ -16,7 +16,7 @@ import {
 } from "@/hooks/use-posly";
 import type { NotificationKind, PlanCode, PlanDto } from "@/lib/api/posly";
 import { useSubscription } from "@/components/providers/workspace-provider";
-import { Skeleton } from "@posly/ui/components/skeleton";
+import { NotificationRowsSkeleton, PlanCardsSkeleton } from "@/components/settings/settings-skeletons";
 import { useActiveBusiness } from "@/hooks/use-workspace";
 import { uploadImage } from "@/lib/api/uploads";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
@@ -759,7 +759,7 @@ export function SubscriptionSettings() {
 
 			<div className="grid gap-3 tablet:grid-cols-2 desktop:grid-cols-4">
 				{plans.isPending
-					? [0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-80 rounded-2xl" />)
+					? <PlanCardsSkeleton />
 					: (plans.data ?? []).map((plan) => {
 							const isCurrent = plan.code === (subscription.billedOnline ? subscription.subscribedPlan : subscription.plan);
 							const featured = plan.code === "PRO";
@@ -894,11 +894,7 @@ export function NotificationSettings() {
 				<p className="-mt-2 text-muted-foreground text-sm">{t("hint")}</p>
 			</div>
 			{prefs.isPending ? (
-				<div className="grid gap-2">
-					{[0, 1, 2, 3].map((i) => (
-						<Skeleton key={i} className="h-16 rounded-xl" />
-					))}
-				</div>
+				<NotificationRowsSkeleton />
 			) : (
 				<ul className="divide-y rounded-xl border">
 					{(prefs.data ?? []).map((p) => {

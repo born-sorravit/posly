@@ -2,7 +2,9 @@
 
 import { type Column, ConfirmDialog, DataTable, FilterBar, FilterMenu, Pager } from "@/components/common/controls";
 import { FeatureLocked } from "@/components/common/feature-locked";
-import { EmptyState, PageContainer, PageHeader, Surface, TableSkeleton } from "@/components/common/primitives";
+import { EmptyState, PageContainer, PageHeader, Surface } from "@/components/common/primitives";
+import { PagerSkeleton } from "@/components/catalog/inventory-skeletons";
+import { ExpenseRowsSkeleton, ExpenseSplitSkeleton, ExpenseTotalSkeleton } from "@/components/expenses/expense-skeletons";
 import { Button } from "@posly/ui/components/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@posly/ui/components/dialog";
 import {
@@ -319,11 +321,17 @@ export function ExpensesView() {
 				<div className="flex items-end justify-between gap-4">
 					<div>
 						<p className="text-muted-foreground text-sm">{t("total")}</p>
-						<p className="numeric font-bold text-3xl tracking-tight">{formatBaht(total)}</p>
+						{summary.isPending ? (
+							<ExpenseTotalSkeleton />
+						) : (
+							<p className="numeric font-bold text-3xl tracking-tight">{formatBaht(total)}</p>
+						)}
 					</div>
 					<Wallet className="size-8 text-muted-foreground/40" />
 				</div>
-				{split.length ? (
+				{summary.isPending ? (
+					<ExpenseSplitSkeleton />
+				) : split.length ? (
 					<>
 						<div className="flex h-2.5 gap-0.5 overflow-hidden rounded-full">
 							{split.map((c) => (
@@ -374,7 +382,10 @@ export function ExpensesView() {
 					/>
 				</FilterBar>
 				{expenses.isPending ? (
-					<TableSkeleton />
+					<>
+						<ExpenseRowsSkeleton />
+						<PagerSkeleton />
+					</>
 				) : rows.length === 0 ? (
 					<EmptyState icon={Wallet} title={t("empty")} description={t("emptyHint")} />
 				) : (

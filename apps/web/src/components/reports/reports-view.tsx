@@ -1,11 +1,12 @@
 "use client";
 
 import { type Column, DataTable, Segmented } from "@/components/common/controls";
-import { ChartSkeleton, EmptyState, MetricCard, PageContainer, PageHeader, SectionTitle, Surface } from "@/components/common/primitives";
+import { EmptyState, MetricCard, PageContainer, PageHeader, SectionTitle, Surface } from "@/components/common/primitives";
 import { ProductThumb } from "@/components/common/product-thumb";
 import { PaymentBreakdown } from "@/components/dashboard/dashboard-panels";
 import { SalesChart } from "@/components/dashboard/sales-chart";
 import { PeriodTable } from "@/components/reports/period-table";
+import { ReportTabSkeleton } from "@/components/reports/reports-skeletons";
 import { Button } from "@posly/ui/components/button";
 import { formatNumber } from "@posly/utils/format";
 import { useDashboard, useInsights } from "@/hooks/use-posly";
@@ -346,7 +347,7 @@ export function ReportsView() {
 				!advanced ? (
 					<AdvancedLocked />
 				) : !insights.data ? (
-					<ChartSkeleton />
+					<ReportTabSkeleton tab={tab} />
 				) : tab === "peak" ? (
 					<PeakHours data={insights.data} />
 				) : tab === "profit" ? (
@@ -355,7 +356,7 @@ export function ReportsView() {
 					<CustomerInsights data={insights.data} />
 				)
 			) : !data ? (
-				<ChartSkeleton />
+				<ReportTabSkeleton tab={tab} />
 			) : (
 				<>
 					{tab === "sales" ? (

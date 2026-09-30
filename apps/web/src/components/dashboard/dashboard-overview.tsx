@@ -1,6 +1,7 @@
 "use client";
 
-import { ChartSkeleton, MetricCard, MetricSkeleton, PageContainer, StatTrend } from "@/components/common/primitives";
+import { MetricCard, PageContainer, StatTrend } from "@/components/common/primitives";
+import { DashboardBodySkeleton, HeroFigureSkeleton } from "@/components/dashboard/dashboard-skeletons";
 import { PaymentBreakdown, StockAlerts, TopProducts } from "@/components/dashboard/dashboard-panels";
 import { SalesChart } from "@/components/dashboard/sales-chart";
 import {
@@ -128,7 +129,9 @@ export function DashboardOverview() {
 						{t("previousToday")} <span className="numeric">{roughBaht(m.previousRevenue)}</span>
 					</p>
 				</div>
-				) : null}
+				) : dashboard.isError ? null : (
+					<HeroFigureSkeleton />
+				)}
 			</motion.section>
 
 			{dashboard.isError && !data ? (
@@ -144,15 +147,7 @@ export function DashboardOverview() {
 					}
 				/>
 			) : !data || !m ? (
-				<>
-					<div className="grid grid-cols-2 gap-3 desktop:grid-cols-4 desktop:gap-4">
-						<MetricSkeleton />
-						<MetricSkeleton />
-						<MetricSkeleton />
-						<MetricSkeleton />
-					</div>
-					<ChartSkeleton />
-				</>
+				<DashboardBodySkeleton />
 			) : (
 				<>
 					<div className="grid grid-cols-2 gap-3 desktop:grid-cols-4 desktop:gap-4">

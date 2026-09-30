@@ -2,7 +2,8 @@
 
 import { type Column, ConfirmDialog, DataTable, FilterBar, Pager, SearchInput } from "@/components/common/controls";
 import { FeatureLocked } from "@/components/common/feature-locked";
-import { EmptyState, PageContainer, PageHeader, Surface, TableSkeleton } from "@/components/common/primitives";
+import { EmptyState, PageContainer, PageHeader, Surface } from "@/components/common/primitives";
+import { CustomerRowsSkeleton } from "@/components/people/people-skeletons";
 import { UserAvatar } from "@/components/layout/user-menu";
 import { Button } from "@posly/ui/components/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@posly/ui/components/dialog";
@@ -256,7 +257,7 @@ export function CustomersView() {
 			<Surface className="overflow-hidden p-0" data-tour="customers-list">
 				<FilterBar search={<SearchInput tone="toolbar" value={query} onChange={setQuery} placeholder={t("search")} />} />
 				{customers.isPending ? (
-					<TableSkeleton />
+					<CustomerRowsSkeleton />
 				) : rows.length === 0 ? (
 					<EmptyState
 						icon={UserRound}

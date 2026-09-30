@@ -3,6 +3,7 @@
 import { PasswordInput, PasswordStrength, passwordErrorKey } from "@/components/auth/password-input";
 import { PageContainer, PageHeader, SectionTitle, Surface } from "@/components/common/primitives";
 import { UserAvatar } from "@/components/layout/user-menu";
+import { PinRowSkeleton } from "@/components/profile/profile-skeletons";
 import { SetPinDialog, SwitchVisibilityToggle } from "@/components/pin/switch-user";
 import { useSession } from "@/components/providers/session-provider";
 import { useRoster } from "@/hooks/use-posly";
@@ -68,7 +69,8 @@ export function ProfileView() {
 function PinSection({ disabled }: { disabled: boolean }) {
 	const t = useTranslations("profile.pin");
 	const { business } = useActiveBusiness();
-	const me = useRoster().data?.find((p) => p.isYou);
+	const roster = useRoster();
+	const me = roster.data?.find((p) => p.isYou);
 	const hasPin = me?.hasPin ?? false;
 	const [editing, setEditing] = useState(false);
 
@@ -78,23 +80,28 @@ function PinSection({ disabled }: { disabled: boolean }) {
 				<SectionTitle className="mb-0">{t("title")}</SectionTitle>
 				<p className="text-muted-foreground text-sm">{t("hint", { shop: business.name })}</p>
 			</div>
-			<div className="flex items-center gap-4 rounded-xl bg-muted/50 p-4">
-				<span
-					className={cn(
-						"flex size-10 shrink-0 items-center justify-center rounded-full",
-						hasPin ? "bg-success/12 text-success" : "bg-muted text-muted-foreground"
-					)}
-				>
-					<KeyRound className="size-5" />
-				</span>
-				<div className="min-w-0 flex-1">
-					<p className="font-medium text-sm">{hasPin ? t("set") : t("notSet")}</p>
-					<p className="text-muted-foreground text-xs">{hasPin ? t("setHint") : t("notSetHint")}</p>
+			{/* Until the roster lands the row would say "not set" for everyone. */}
+			{roster.isPending ? (
+				<PinRowSkeleton />
+			) : (
+				<div className="flex items-center gap-4 rounded-xl bg-muted/50 p-4">
+					<span
+						className={cn(
+							"flex size-10 shrink-0 items-center justify-center rounded-full",
+							hasPin ? "bg-success/12 text-success" : "bg-muted text-muted-foreground"
+						)}
+					>
+						<KeyRound className="size-5" />
+					</span>
+					<div className="min-w-0 flex-1">
+						<p className="font-medium text-sm">{hasPin ? t("set") : t("notSet")}</p>
+						<p className="text-muted-foreground text-xs">{hasPin ? t("setHint") : t("notSetHint")}</p>
+					</div>
+					<Button variant="outline" disabled={disabled || !me} onClick={() => setEditing(true)} className="shrink-0">
+						{hasPin ? t("change") : t("create")}
+					</Button>
 				</div>
-				<Button variant="outline" disabled={disabled || !me} onClick={() => setEditing(true)} className="shrink-0">
-					{hasPin ? t("change") : t("create")}
-				</Button>
-			</div>
+			)}
 			{hasPin ? (
 				<div className="border-t pt-5">
 					<SwitchVisibilityToggle disabled={disabled} />

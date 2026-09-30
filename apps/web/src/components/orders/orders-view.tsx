@@ -3,7 +3,8 @@
 import { useOrderTag } from "@/components/pos/order-tag";
 import { type Column, DataTable, FilterBar, FilterMenu, Pager, SearchInput } from "@/components/common/controls";
 import { OrderStatusBadge, PaymentMethodLabel } from "@/components/common/order-badges";
-import { EmptyState, PageContainer, PageHeader, Surface, TableSkeleton } from "@/components/common/primitives";
+import { EmptyState, PageContainer, PageHeader, Surface } from "@/components/common/primitives";
+import { OrderRowsSkeleton } from "@/components/common/page-skeletons";
 import { Button } from "@posly/ui/components/button";
 import { Link, useRouter } from "@/i18n/navigation";
 import { formatClock } from "@posly/utils/format";
@@ -270,7 +271,7 @@ export function OrdersView() {
 					/>
 				</FilterBar>
 				{orders.isPending ? (
-					<TableSkeleton />
+					<OrderRowsSkeleton />
 				) : rows.length === 0 ? (
 					<EmptyState
 						icon={ReceiptText}

@@ -1,6 +1,7 @@
 "use client";
 
 import { FeatureLocked } from "@/components/common/feature-locked";
+import { TicketSkeleton } from "@/components/common/page-skeletons";
 import { SERVICE_ICON } from "@/components/pos/order-tag";
 import type { ServiceType } from "@posly/types/domain";
 import { Button } from "@posly/ui/components/button";
@@ -571,13 +572,20 @@ export function KitchenView() {
 						<>
 							<span className={cn("size-2.5 rounded-full", TONE[column])} />
 							{t(`columns.${column}`)}
-							<span className="numeric ml-auto rounded-full bg-card px-2.5 py-0.5 text-sm shadow-xs">
-								{tickets.length}
-							</span>
+							{board.isPending ? (
+								<Skeleton className="ml-auto h-6 w-8 rounded-full" />
+							) : (
+								<span className="numeric ml-auto rounded-full bg-card px-2.5 py-0.5 text-sm shadow-xs">
+									{tickets.length}
+								</span>
+							)}
 						</>
 					);
 					const body = board.isPending ? (
-						<Skeleton className="h-40 rounded-2xl" />
+						<>
+							<TicketSkeleton />
+							{column === "READY" ? null : <TicketSkeleton lines={2} />}
+						</>
 					) : tickets.length === 0 ? (
 						<p className="px-2 py-10 text-center text-muted-foreground text-sm">{t(`empty.${column}`)}</p>
 					) : (

@@ -3,6 +3,7 @@
 import { Segmented } from "@/components/common/controls";
 import type { DashboardDto, ReportCompare, ReportQuery, ReportRange } from "@/lib/api/posly";
 import { Link } from "@/i18n/navigation";
+import { PeriodLineSkeleton } from "@/components/reports/reports-skeletons";
 import { cn } from "@/lib/utils";
 import { Input } from "@posly/ui/components/input";
 import { formatThaiDate } from "@posly/utils/format";
@@ -186,7 +187,7 @@ export function PeriodSummary({
 						</span>
 					</p>
 				) : (
-					<span />
+					<PeriodLineSkeleton />
 				)}
 				{advanced ? (
 					<Segmented

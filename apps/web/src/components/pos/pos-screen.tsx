@@ -1,12 +1,13 @@
 "use client";
 
 import { SearchInput, Segmented } from "@/components/common/controls";
-import { EmptyState, ProductCardSkeleton } from "@/components/common/primitives";
+import { EmptyState } from "@/components/common/primitives";
 import { CartPanel } from "@/components/pos/cart-panel";
 import { useSubscription } from "@/components/providers/workspace-provider";
 import { type CompletedPayment, CheckoutDialog } from "@/components/pos/checkout-dialog";
 import { ModifierDialog } from "@/components/pos/modifier-dialog";
 import { ProductCard } from "@/components/pos/product-card";
+import { CategoryChipsSkeleton, ProductGridSkeleton } from "@/components/pos/pos-skeletons";
 import { Button } from "@posly/ui/components/button";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@posly/ui/components/sheet";
 import { useCategories, useCheckout, useProducts } from "@/hooks/use-posly";
@@ -261,28 +262,27 @@ export function PosScreen() {
 						/>
 					</div>
 					<div data-tour="pos-categories">
-						<Segmented
-							variant="chips"
-							size="lg"
-							value={category}
-							onChange={setCategory}
-							options={[
-								{ value: ALL, label: t("allCategories") },
-								...categories.map((c) => ({ value: c.id, label: c.name })),
-							]}
-						/>
+						{categoriesQuery.isPending ? (
+							<CategoryChipsSkeleton />
+						) : (
+							<Segmented
+								variant="chips"
+								size="lg"
+								value={category}
+								onChange={setCategory}
+								options={[
+									{ value: ALL, label: t("allCategories") },
+									...categories.map((c) => ({ value: c.id, label: c.name })),
+								]}
+							/>
+						)}
 					</div>
 				</div>
 
 				<div className="min-h-0 flex-1 overflow-y-auto px-4 pb-24 tablet:pb-6 desktop:px-6">
 					{/* Both: the menu is filtered by category visibility, so it is not ready without them. */}
 					{productsQuery.isPending || categoriesQuery.isPending ? (
-						<div className="grid grid-cols-2 gap-3 tablet:grid-cols-3 desktop:grid-cols-4">
-							{Array.from({ length: 8 }, (_, i) => (
-								// biome-ignore lint/suspicious/noArrayIndexKey: static placeholders
-								<ProductCardSkeleton key={i} />
-							))}
-						</div>
+						<ProductGridSkeleton />
 					) : products.length === 0 ? (
 						<EmptyState
 							icon={PackageSearch}

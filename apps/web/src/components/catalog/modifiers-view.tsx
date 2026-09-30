@@ -1,7 +1,8 @@
 "use client";
 
 import { ConfirmDialog, Segmented } from "@/components/common/controls";
-import { EmptyState, PageContainer, PageHeader, StatusBadge, Surface, TableSkeleton } from "@/components/common/primitives";
+import { ModifierGroupsSkeleton, RecipeLinesSkeleton } from "@/components/catalog/catalog-skeletons";
+import { EmptyState, PageContainer, PageHeader, StatusBadge, Surface } from "@/components/common/primitives";
 import { Button } from "@posly/ui/components/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@posly/ui/components/dialog";
 import {
@@ -12,7 +13,6 @@ import {
 } from "@posly/ui/components/dropdown-menu";
 import { Input } from "@posly/ui/components/input";
 import { Label } from "@posly/ui/components/label";
-import { Skeleton } from "@posly/ui/components/skeleton";
 import { Switch } from "@posly/ui/components/switch";
 import {
 	type DraftRecipeLine,
@@ -310,7 +310,7 @@ function OptionRecipeForm({
 	onClose: () => void;
 }) {
 	const recipe = useRecipe({ optionId });
-	if (recipe.isPending) return <TableSkeleton />;
+	if (recipe.isPending) return <RecipeLinesSkeleton />;
 	return <OptionRecipeDraft optionId={optionId} recipe={recipe.data} ingredients={ingredients} onClose={onClose} />;
 }
 
@@ -382,7 +382,7 @@ function OptionRecipeDialog({ group, onClose }: { group: ModifierGroupDto; onClo
 					options={group.options.map((o) => ({ value: o.id, label: o.name }))}
 				/>
 				{ingredients.isPending ? (
-					<TableSkeleton />
+					<RecipeLinesSkeleton />
 				) : (
 					<OptionRecipeForm key={optionId} optionId={optionId} ingredients={ingredients.data ?? []} onClose={onClose} />
 				)}
@@ -425,11 +425,7 @@ export function ModifiersView() {
 			/>
 
 			{groups.isPending ? (
-				<div className="grid gap-4 tablet:grid-cols-2">
-					{[0, 1, 2, 3].map((i) => (
-						<Skeleton key={i} className="h-40 rounded-2xl" />
-					))}
-				</div>
+				<ModifierGroupsSkeleton />
 			) : (groups.data ?? []).length === 0 ? (
 				<Surface data-tour="modifiers-list">
 					<EmptyState icon={SlidersHorizontal} title={t("empty")} description={t("emptyHint")} />

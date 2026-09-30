@@ -1,6 +1,7 @@
 "use client";
 
-import { EmptyState, PageContainer, PageHeader, StatusBadge, Surface, TableSkeleton } from "@/components/common/primitives";
+import { CategoryRowsSkeleton } from "@/components/catalog/catalog-skeletons";
+import { EmptyState, PageContainer, PageHeader, StatusBadge, Surface } from "@/components/common/primitives";
 import { Button } from "@posly/ui/components/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@posly/ui/components/popover";
 import { Switch } from "@posly/ui/components/switch";
@@ -119,7 +120,7 @@ export function CategoriesView() {
 			<PageHeader title={t("title")} description={t("description")} actions={<AddCategory />} />
 			<Surface className="p-2">
 				{categories.isPending ? (
-					<TableSkeleton rows={4} />
+					<CategoryRowsSkeleton kitchen={kitchen} />
 				) : items.length === 0 ? (
 					<EmptyState icon={Tags} title={t("empty")} description={t("emptyHint")} />
 				) : (

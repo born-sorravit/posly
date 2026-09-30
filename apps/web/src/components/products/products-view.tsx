@@ -10,7 +10,8 @@ import {
 } from "@/components/common/controls";
 import { usePagedRows } from "@/hooks/use-paged-rows";
 import { StockBadge } from "@/components/common/order-badges";
-import { EmptyState, PageContainer, PageHeader, StatusBadge, Surface, TableSkeleton } from "@/components/common/primitives";
+import { EmptyState, PageContainer, PageHeader, StatusBadge, Surface } from "@/components/common/primitives";
+import { ProductRowsSkeleton } from "@/components/products/products-skeletons";
 import { ProductThumb } from "@/components/common/product-thumb";
 import { Button } from "@posly/ui/components/button";
 import { Link, useRouter } from "@/i18n/navigation";
@@ -107,7 +108,14 @@ export function ProductsView() {
 		<PageContainer>
 			<PageHeader
 				title={t("title")}
-				description={t("description", { count: products.data?.length ?? 0 })}
+				description={
+					products.isPending ? (
+						// Not "0 products" while the list is still on its way.
+						<span className="inline-block h-4 w-48 animate-pulse rounded-md bg-muted align-middle" aria-hidden />
+					) : (
+						t("description", { count: products.data?.length ?? 0 })
+					)
+				}
 				actions={
 					canWrite ? (
 						<Button asChild size="lg" className="brand-gradient" data-tour="products-add">
@@ -154,7 +162,7 @@ export function ProductsView() {
 					/>
 				</FilterBar>
 				{products.isPending ? (
-					<TableSkeleton />
+					<ProductRowsSkeleton />
 				) : rows.length === 0 ? (
 					<EmptyState
 						icon={Package}

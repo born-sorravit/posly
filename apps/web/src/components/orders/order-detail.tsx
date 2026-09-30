@@ -9,7 +9,8 @@ import { Button } from "@posly/ui/components/button";
 import { Link } from "@/i18n/navigation";
 import { formatDateTime } from "@posly/utils/format";
 import { formatBaht } from "@posly/utils/money";
-import { EmptyState, TableSkeleton } from "@/components/common/primitives";
+import { EmptyState } from "@/components/common/primitives";
+import { OrderDetailSkeleton } from "@/components/orders/order-detail-skeleton";
 import { ReadOnlyNotice } from "@/components/common/permission-gate";
 import { usePrintReceipt } from "@/components/receipt/print-receipt";
 import { SendReceiptButton } from "@/components/receipt/send-receipt";
@@ -38,11 +39,7 @@ export function OrderDetailPage({ orderId }: { orderId: string }) {
 	const t = useTranslations("orders");
 	const order = useOrder(orderId);
 	if (order.isPending) {
-		return (
-			<PageContainer className="max-w-5xl">
-				<TableSkeleton />
-			</PageContainer>
-		);
+		return <OrderDetailSkeleton />;
 	}
 	if (!order.data) {
 		return (

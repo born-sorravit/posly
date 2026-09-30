@@ -1,7 +1,8 @@
 "use client";
 
 import { type Column, DataTable } from "@/components/common/controls";
-import { ListSkeleton, PageContainer, PageHeader, StatusBadge, Surface } from "@/components/common/primitives";
+import { PageContainer, PageHeader, StatusBadge, Surface } from "@/components/common/primitives";
+import { EmployeeRowsSkeleton } from "@/components/people/people-skeletons";
 import { UserAvatar } from "@/components/layout/user-menu";
 import { Button } from "@posly/ui/components/button";
 import {
@@ -415,7 +416,7 @@ export function EmployeesView() {
 			) : null}
 			<Surface className="p-0">
 				{members.isPending ? (
-					<ListSkeleton rows={4} />
+					<EmployeeRowsSkeleton />
 				) : (
 					<DataTable
 						columns={columns}

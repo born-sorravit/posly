@@ -17,7 +17,8 @@ import { Switch } from "@posly/ui/components/switch";
 import { Link, useRouter } from "@/i18n/navigation";
 import { ConfirmDialog } from "@/components/common/controls";
 import { ReadOnlyNotice } from "@/components/common/permission-gate";
-import { EmptyState, TableSkeleton } from "@/components/common/primitives";
+import { EmptyState } from "@/components/common/primitives";
+import { ProductFormSkeleton } from "@/components/products/products-skeletons";
 import {
 	blankRecipeLine,
 	type DraftRecipeLine,
@@ -144,11 +145,7 @@ export function ProductFormPage({ productId }: { productId?: string }) {
 		categories.isPending ||
 		(recipes && ((productId && recipe.isPending) || ingredients.isPending))
 	) {
-		return (
-			<PageContainer className="max-w-5xl">
-				<TableSkeleton />
-			</PageContainer>
-		);
+		return <ProductFormSkeleton edit={Boolean(productId)} recipes={recipes} actions={can("products:write")} />;
 	}
 	if (productId && !product.data) {
 		return (
