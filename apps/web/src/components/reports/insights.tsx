@@ -8,9 +8,10 @@ import { useRouter } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 import { formatNumber, formatThaiDate } from "@posly/utils/format";
 import { formatBaht } from "@posly/utils/money";
-import { Coins, Percent, PiggyBank, Repeat, UserPlus, Users, UserSearch, Wallet } from "lucide-react";
+import { BarChart3, Coins, Grid3x3, Percent, PiggyBank, Repeat, UserPlus, Users, UserSearch, Wallet } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useMemo, useState } from "react";
+import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 const DAYS = [1, 2, 3, 4, 5, 6, 7] as const;
 /** Monday-first, like the heatmap rows. 2024-01-01 was a Monday. */
@@ -18,27 +19,70 @@ const dayName = (dow: number, weekday: "short" | "long" = "short") =>
 	formatThaiDate(new Date(Date.UTC(2024, 0, dow, 5)), { weekday });
 const hourSpan = (hour: number) => `${String(hour).padStart(2, "0")}:00–${String((hour + 1) % 24).padStart(2, "0")}:00`;
 
-/** Five steps of one hue, empty cells in the muted surface — magnitude, not identity. */
-const STEPS = [18, 36, 54, 72, 92];
-const stepOf = (value: number, max: number) =>
-	value <= 0 ? -1 : Math.min(STEPS.length - 1, Math.floor((value / max) * STEPS.length));
-const stepColor = (step: number) =>
-	step < 0 ? "var(--muted)" : `color-mix(in oklab, var(--primary) ${STEPS[step]}%, var(--muted))`;
+/**
+ * Each measure keeps its colour everywhere on the page: money is the sales green, orders the
+ * brand purple — the bars, the grid ramp (`--heat-*` / `--heat-count-*`, both validated in
+ * globals.css) and the weekday bars all follow the toggle. Empty grid cells are muted.
+ */
+const RAMP = {
+	revenue: ["bg-heat-1", "bg-heat-2", "bg-heat-3", "bg-heat-4", "bg-heat-5"],
+	orders: ["bg-heat-count-1", "bg-heat-count-2", "bg-heat-count-3", "bg-heat-count-4", "bg-heat-count-5"],
+} as const;
+const COLOR = { revenue: "var(--success)", orders: "var(--chart-1)" } as const;
+const BAR = { revenue: "bg-success", orders: "bg-chart-1" } as const;
+const EMPTY = "bg-muted";
+/** Any sale lands on the first step; the busiest slot is always the last. */
+const heatOf = (metric: "orders" | "revenue", value: number, max: number) => {
+	const ramp = RAMP[metric];
+	return value <= 0 || max <= 0 ? EMPTY : ramp[Math.min(ramp.length - 1, Math.max(0, Math.ceil((value / max) * ramp.length) - 1))];
+};
 
 const percent = (part: number, whole: number) => (whole > 0 ? Math.round((part / whole) * 1000) / 10 : null);
 
 type Metric = "orders" | "revenue";
+type Active = { dow: number; hour: number; x: number; y: number };
+type View = "chart" | "grid";
+/** "all" is every day of the window together; 1–7 is one weekday (isodow). */
+type Day = "all" | `${(typeof DAYS)[number]}`;
+
+const VIEW_KEY = "posly:peak-view";
+
+/** "฿12K" on the axis; the exact figure is in the tooltip. */
+const axisBaht = (satang: number) => {
+	const baht = satang / 100;
+	if (baht >= 10_000) return `฿${Math.round(baht / 1000)}K`;
+	if (baht >= 1000) return `฿${(baht / 1000).toFixed(1).replace(/\.0$/, "")}K`;
+	return `฿${Math.round(baht)}`;
+};
 
 /**
  * When the shop sells: weekday × hour, each cell the average for one such day (the total over
  * how many Mondays, Tuesdays… the window holds), so a range with five Mondays and four
- * Sundays does not favour Monday. Rows are days on a wide screen; on a phone the grid turns so
- * the seven days fit across and the hours run down.
+ * Sundays does not favour Monday. Quiet by design — small cells, one hue, no figures in the
+ * grid; pointing at (or tapping) a cell opens a label with its numbers. Rows are days on a
+ * wide screen; on a phone the grid turns so the seven days fit across.
  */
 export function PeakHours({ data }: { data: InsightsDto }) {
 	const t = useTranslations("reports.insights");
 	const [metric, setMetric] = useState<Metric>("orders");
-	const [active, setActive] = useState<{ dow: number; hour: number } | null>(null);
+	const [active, setActive] = useState<Active | null>(null);
+	// The chosen view is a per-viewer convenience: remembered in this browser, fine to lose.
+	// Read on first render: this panel only mounts in the browser, once the insights arrive.
+	const [view, setView] = useState<View>(() => {
+		try {
+			return localStorage.getItem(VIEW_KEY) === "grid" ? "grid" : "chart";
+		} catch {
+			return "chart";
+		}
+	});
+	const [day, setDay] = useState<Day>("all");
+	const chooseView = (next: View) => {
+		setView(next);
+		setActive(null);
+		try {
+			localStorage.setItem(VIEW_KEY, next);
+		} catch {}
+	};
 
 	const { grid, hours, max, top, byDay } = useMemo(() => {
 		const { cells, weeks } = data.heatmap;
@@ -62,11 +106,33 @@ export function PeakHours({ data }: { data: InsightsDto }) {
 				dow,
 				orders: avg(dow, day.reduce((s, c) => s + c.orders, 0)),
 				revenue: avg(dow, day.reduce((s, c) => s + c.revenue, 0)),
-				count: weeks[dow - 1] ?? 0,
 			};
 		});
 		return { grid, hours, max, top, byDay };
 	}, [data, metric]);
+
+	/**
+	 * The bar chart's series: per hour, the average for the chosen weekday, or across every day
+	 * of the window ("ทุกวัน" — totals over the number of days, so it matches the grid's scale).
+	 */
+	const hourly = useMemo(() => {
+		const { cells, weeks } = data.heatmap;
+		const days = weeks.reduce((sum, n) => sum + n, 0) || 1;
+		return hours.map((hour) => {
+			const at = cells.filter((c) => c.hour === hour && (day === "all" || c.dow === Number(day)));
+			const divisor = day === "all" ? days : weeks[Number(day) - 1] || 1;
+			return {
+				hour,
+				label: String(hour).padStart(2, "0"),
+				orders: at.reduce((sum, c) => sum + c.orders, 0) / divisor,
+				revenue: at.reduce((sum, c) => sum + c.revenue, 0) / divisor,
+			};
+		});
+	}, [data, hours, day]);
+	const best = hourly.reduce<(typeof hourly)[number] | null>(
+		(top, h) => (h[metric] > 0 && (!top || h[metric] > top[metric]) ? h : top),
+		null
+	);
 
 	if (data.heatmap.cells.length === 0) {
 		return (
@@ -77,10 +143,32 @@ export function PeakHours({ data }: { data: InsightsDto }) {
 	}
 
 	const value = (v: { orders: number; revenue: number }) =>
-		metric === "orders" ? t("avgOrders", { count: formatNumber(Math.round(v.orders * 10) / 10) }) : formatBaht(Math.round(v.revenue));
+		metric === "orders"
+			? t("avgOrders", { count: formatNumber(Math.round(v.orders * 10) / 10) })
+			: formatBaht(Math.round(v.revenue));
+	/** The figure bold, its unit quiet, right-aligned — easier to scan down a column. */
+	const figure = (v: { orders: number; revenue: number }) => (
+		<span className="numeric shrink-0 text-right">
+			{metric === "orders" ? (
+				<>
+					<span className="font-semibold text-base">{formatNumber(Math.round(v.orders * 10) / 10)}</span>{" "}
+					<span className="text-muted-foreground text-xs">{t("ordersUnit")}</span>
+				</>
+			) : (
+				<span className="font-semibold text-base">{formatBaht(Math.round(v.revenue))}</span>
+			)}
+		</span>
+	);
 	const cellAt = (dow: number, hour: number) => grid.get(`${dow}-${hour}`) ?? { orders: 0, revenue: 0 };
-	const readout = active ?? top[0];
-	const dayMax = Math.max(1, ...byDay.map((d) => d[metric]));
+	const dayMax = Math.max(0, ...byDay.map((d) => d[metric]));
+
+	/** Anchor the label above the cell, kept inside the card so it never runs off a phone. */
+	const point = (dow: number, hour: number) => (e: { currentTarget: HTMLElement }) => {
+		const cell = e.currentTarget.getBoundingClientRect();
+		const box = e.currentTarget.closest("[data-grid]")!.getBoundingClientRect();
+		const x = Math.min(Math.max(cell.left + cell.width / 2 - box.left, 80), box.width - 80);
+		setActive({ dow, hour, x, y: cell.top - box.top });
+	};
 
 	const cell = (dow: number, hour: number) => {
 		const v = cellAt(dow, hour);
@@ -90,61 +178,168 @@ export function PeakHours({ data }: { data: InsightsDto }) {
 				key={`${dow}-${hour}`}
 				type="button"
 				aria-label={`${dayName(dow, "long")} ${hourSpan(hour)}: ${value(v)}`}
-				onMouseEnter={() => setActive({ dow, hour })}
-				onFocus={() => setActive({ dow, hour })}
-				onClick={() => setActive({ dow, hour })}
+				onMouseEnter={point(dow, hour)}
+				onFocus={point(dow, hour)}
+				onClick={point(dow, hour)}
 				className={cn(
-					"h-7 min-w-0 rounded-[4px] outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-ring",
-					selected && "ring-2 ring-foreground/70"
+					"h-6 min-w-0 rounded-[5px] outline-none transition-transform focus-visible:ring-2 focus-visible:ring-ring",
+					heatOf(metric, v[metric], max),
+					selected && "scale-110 ring-2 ring-foreground/70"
 				)}
-				style={{ backgroundColor: stepColor(stepOf(v[metric], max)) }}
 			/>
 		);
 	};
 
+	const label = active ? (
+		<div
+			className="-translate-x-1/2 -translate-y-full pointer-events-none absolute z-10 whitespace-nowrap rounded-lg bg-popover px-3 py-2 text-popover-foreground text-xs shadow-lg ring-1 ring-border"
+			style={{ left: active.x, top: active.y - 6 }}
+			role="status"
+		>
+			<p className="font-medium">
+				{dayName(active.dow, "long")} {hourSpan(active.hour)}
+			</p>
+			<p className="mt-0.5 text-muted-foreground">
+				{t("average")} <span className="numeric font-semibold text-foreground">{value(cellAt(active.dow, active.hour))}</span>
+			</p>
+		</div>
+	) : null;
+
 	return (
-		<div className="grid gap-4 desktop:grid-cols-[1fr_20rem]">
+		<div className="grid gap-4">
 			<Surface className="min-w-0">
 				<SectionTitle
 					action={
 						<Segmented
 							size="sm"
-							value={metric}
-							onChange={setMetric}
+							value={view}
+							onChange={chooseView}
 							options={[
-								{ value: "orders", label: t("metricOrders") },
-								{ value: "revenue", label: t("metricRevenue") },
+								{
+									value: "chart",
+									label: (
+										<span className="flex items-center gap-1.5">
+											<BarChart3 className="size-3.5" />
+											{t("viewChart")}
+										</span>
+									),
+								},
+								{
+									value: "grid",
+									label: (
+										<span className="flex items-center gap-1.5">
+											<Grid3x3 className="size-3.5" />
+											{t("viewGrid")}
+										</span>
+									),
+								},
 							]}
 						/>
 					}
 				>
 					{t("heatmapTitle")}
 				</SectionTitle>
-				<p className="-mt-2 mb-4 text-muted-foreground text-xs leading-relaxed">{t("heatmapHint")}</p>
 
-				{/* The reading line: what the cell under the pointer (or the busiest one) holds. */}
-				<p className="mb-3 min-h-5 text-sm" aria-live="polite">
-					{readout ? (
-						<>
-							<span className="font-medium">
-								{dayName(readout.dow, "long")} {hourSpan(readout.hour)}
-							</span>
-							<span className="text-muted-foreground"> · {t("average")} </span>
-							<span className="numeric font-semibold">{value(cellAt(readout.dow, readout.hour))}</span>
-						</>
-					) : null}
-				</p>
+				<div className="-mt-1 mb-5 flex flex-col gap-3 tablet:flex-row tablet:items-center tablet:justify-between">
+					<p className="text-muted-foreground text-xs leading-relaxed">
+						{view === "chart" ? t("chartHint") : t("heatmapHint")}
+					</p>
+					<Segmented
+						size="sm"
+						className="shrink-0 self-start"
+						value={metric}
+						onChange={setMetric}
+						options={[
+							{ value: "orders", label: t("metricOrders") },
+							{ value: "revenue", label: t("metricRevenue") },
+						]}
+					/>
+				</div>
 
+				{view === "chart" ? (
+					<>
+						<Segmented
+							variant="chips"
+							size="sm"
+							value={day}
+							onChange={setDay}
+							options={[
+								{ value: "all" as Day, label: t("allDays") },
+								...DAYS.map((dow) => ({ value: `${dow}` as Day, label: dayName(dow) })),
+							]}
+						/>
+						<p className="mt-4 mb-2 min-h-5 text-sm">
+							{best ? (
+								<>
+									<span className="text-muted-foreground">{t("bestHour")} </span>
+									<span className="font-semibold">{hourSpan(best.hour)}</span>
+									<span className="text-muted-foreground"> · {t("average")} </span>
+									<span className="numeric font-semibold">{value(best)}</span>
+								</>
+							) : (
+								<span className="text-muted-foreground">{t("noSalesDay")}</span>
+							)}
+						</p>
+						<div className="-ml-2 h-[260px]">
+							<ResponsiveContainer width="100%" height="100%">
+								<BarChart data={hourly} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+									<CartesianGrid vertical={false} stroke="var(--border)" />
+									<XAxis
+										dataKey="label"
+										tickLine={false}
+										axisLine={false}
+										interval="preserveStartEnd"
+										minTickGap={8}
+										tick={{ fill: "var(--muted-foreground)", fontSize: 12 }}
+									/>
+									<YAxis
+										tickLine={false}
+										axisLine={false}
+										width={metric === "revenue" ? 52 : 36}
+										allowDecimals={metric === "revenue"}
+										tickFormatter={(v: number) => (metric === "revenue" ? axisBaht(v) : formatNumber(v))}
+										tick={{ fill: "var(--muted-foreground)", fontSize: 12 }}
+									/>
+									<Tooltip
+										cursor={{ fill: "var(--muted)", opacity: 0.6 }}
+										content={(props) => {
+											const point = props.active ? (props.payload?.[0]?.payload as (typeof hourly)[number] | undefined) : undefined;
+											if (!point) return null;
+											return (
+												<div className="rounded-xl bg-popover px-3 py-2 text-popover-foreground text-xs shadow-lg ring-1 ring-border">
+													<p className="font-medium">
+														{day === "all" ? t("allDays") : dayName(Number(day), "long")} {hourSpan(point.hour)}
+													</p>
+													<p className="mt-0.5 text-muted-foreground">
+														{t("average")} <span className="numeric font-semibold text-foreground">{value(point)}</span>
+													</p>
+												</div>
+											);
+										}}
+									/>
+									<Bar dataKey={metric} radius={[4, 4, 0, 0]} maxBarSize={28} animationDuration={400}>
+										{hourly.map((h) => (
+											<Cell
+												key={h.hour}
+												fill={COLOR[metric]}
+												// The busiest hour at full strength; the rest recede so it stands out.
+												fillOpacity={best && h.hour === best.hour ? 1 : 0.4}
+											/>
+										))}
+									</Bar>
+								</BarChart>
+							</ResponsiveContainer>
+						</div>
+					</>
+				) : (
+					<>
 				{/* Wide: days down, hours across. */}
-				<div className="hidden tablet:block" onMouseLeave={() => setActive(null)}>
-					<div
-						className="grid gap-[2px]"
-						style={{ gridTemplateColumns: `2.5rem repeat(${hours.length}, minmax(0, 1fr))` }}
-					>
+				<div data-grid className="relative hidden tablet:block" onMouseLeave={() => setActive(null)}>
+					<div className="grid gap-1.5" style={{ gridTemplateColumns: `2.5rem repeat(${hours.length}, minmax(0, 1fr))` }}>
 						<span />
 						{hours.map((h) => (
-							<span key={h} className="numeric text-center text-[10px] text-muted-foreground">
-								{h % 2 === hours[0] % 2 ? String(h).padStart(2, "0") : ""}
+							<span key={h} className="numeric text-center text-[11px] text-muted-foreground">
+								{String(h).padStart(2, "0")}
 							</span>
 						))}
 						{DAYS.map((dow) => (
@@ -154,11 +349,12 @@ export function PeakHours({ data }: { data: InsightsDto }) {
 							</div>
 						))}
 					</div>
+					{label}
 				</div>
 
 				{/* Phone: the seven days across, the hours down. */}
-				<div className="tablet:hidden">
-					<div className="grid gap-[2px]" style={{ gridTemplateColumns: "3rem repeat(7, minmax(0, 1fr))" }}>
+				<div data-grid className="relative tablet:hidden">
+					<div className="grid gap-1.5" style={{ gridTemplateColumns: "2.75rem repeat(7, minmax(0, 1fr))" }}>
 						<span />
 						{DAYS.map((dow) => (
 							<span key={dow} className="text-center text-muted-foreground text-xs">
@@ -172,53 +368,58 @@ export function PeakHours({ data }: { data: InsightsDto }) {
 							</div>
 						))}
 					</div>
+					{label}
 				</div>
 
-				<div className="mt-4 flex items-center gap-2 text-muted-foreground text-xs">
+				<div className="mt-5 flex items-center gap-2 text-muted-foreground text-xs">
 					<span>{t("less")}</span>
-					<span className="flex gap-[2px]" aria-hidden>
-						{[-1, ...STEPS.keys()].map((s) => (
-							<span key={s} className="size-3.5 rounded-[3px]" style={{ backgroundColor: stepColor(s) }} />
+					<span className="flex gap-1" aria-hidden>
+						{[EMPTY, ...RAMP[metric]].map((bg) => (
+							<span key={bg} className={cn("size-3 rounded-[3px]", bg)} />
 						))}
 					</span>
 					<span>{t("more")}</span>
 				</div>
+					</>
+				)}
 			</Surface>
 
-			<div className="grid content-start gap-4">
+			<div className="grid items-start gap-4 desktop:grid-cols-2">
 				<Surface>
 					<SectionTitle>{t("topSlots")}</SectionTitle>
-					<ol className="grid gap-2.5">
+					<ol className="grid gap-1">
 						{top.map((slot, i) => (
-							<li key={`${slot.dow}-${slot.hour}`} className="flex items-center gap-3 text-sm">
-								<span className="numeric flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10 font-semibold text-primary text-xs">
+							<li key={`${slot.dow}-${slot.hour}`} className="flex items-center gap-4 rounded-xl px-1 py-2.5">
+								<span className="numeric flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted font-semibold text-muted-foreground text-sm">
 									{i + 1}
 								</span>
-								<span className="flex-1 font-medium">
-									{dayName(slot.dow, "long")} {hourSpan(slot.hour)}
+								<span className="min-w-0 flex-1">
+									<span className="block font-medium text-sm">{dayName(slot.dow, "long")}</span>
+									<span className="numeric block text-muted-foreground text-xs">{hourSpan(slot.hour)}</span>
 								</span>
-								<span className="numeric text-muted-foreground">{value(slot)}</span>
+								{figure(slot)}
 							</li>
 						))}
 					</ol>
 				</Surface>
 				<Surface>
 					<SectionTitle>{t("byWeekday")}</SectionTitle>
-					<ul className="grid gap-2.5">
+					<ul className="grid gap-3.5">
 						{byDay.map((d) => (
-							<li key={d.dow} className="grid grid-cols-[4.5rem_1fr_auto] items-center gap-3 text-sm">
-								<span>{dayName(d.dow, "long")}</span>
+							// Fixed columns so every bar starts and ends at the same place.
+							<li key={d.dow} className="grid grid-cols-[4.75rem_1fr_5.25rem] items-center gap-3 text-sm tablet:grid-cols-[5.5rem_1fr_6.5rem] tablet:gap-4">
+								<span className="text-muted-foreground">{dayName(d.dow, "long")}</span>
 								<span className="h-2 overflow-hidden rounded-full bg-muted">
 									<span
-										className="block h-full rounded-full bg-primary"
-										style={{ width: `${(d[metric] / dayMax) * 100}%` }}
+										className={cn("block h-full rounded-full", BAR[metric])}
+										style={{ width: `${dayMax ? (d[metric] / dayMax) * 100 : 0}%` }}
 									/>
 								</span>
-								<span className="numeric text-right font-medium">{value(d)}</span>
+								{figure(d)}
 							</li>
 						))}
 					</ul>
-					<p className="mt-3 text-muted-foreground text-xs">{t("perDayHint")}</p>
+					<p className="mt-5 text-muted-foreground text-xs leading-relaxed">{t("perDayHint")}</p>
 				</Surface>
 			</div>
 		</div>

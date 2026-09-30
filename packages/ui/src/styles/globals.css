@@ -25,6 +25,16 @@
   --color-chart-3: var(--chart-3);
   --color-chart-2: var(--chart-2);
   --color-chart-1: var(--chart-1);
+  --color-heat-1: var(--heat-1);
+  --color-heat-2: var(--heat-2);
+  --color-heat-3: var(--heat-3);
+  --color-heat-4: var(--heat-4);
+  --color-heat-5: var(--heat-5);
+  --color-heat-count-1: var(--heat-count-1);
+  --color-heat-count-2: var(--heat-count-2);
+  --color-heat-count-3: var(--heat-count-3);
+  --color-heat-count-4: var(--heat-count-4);
+  --color-heat-count-5: var(--heat-count-5);
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -129,6 +139,21 @@
   --chart-4: oklch(0.7 0.14 220);
   --chart-5: oklch(0.68 0.17 350);
 
+  /* Sequential ramp for magnitude grids (peak hours): the sales green, one hue, lightness
+     monotone, lightest step clears the card at 2:1 — dataviz validator, ordinal. */
+  --heat-1: #68c584;
+  --heat-2: #3cb264;
+  --heat-3: #0c9d49;
+  --heat-4: #008639;
+  --heat-5: #006b2f;
+  /* The same grid for counts (orders): the brand purple, validated the same way, so an
+     orders view never looks like a money view. */
+  --heat-count-1: #9da3ef;
+  --heat-count-2: #8086ec;
+  --heat-count-3: #6567e7;
+  --heat-count-4: #4d49d7;
+  --heat-count-5: #3934b1;
+
   /* Base radius; every rounded-* derives from it (lg 8px · xl 11px · 2xl 14px · 3xl 18px).
      Tight enough to read as a tool, not a toy. */
   --radius: 0.5rem;
@@ -183,6 +208,18 @@
   --chart-3: #ba7b1a;
   --chart-4: oklch(0.74 0.13 220);
   --chart-5: oklch(0.72 0.16 350);
+
+  /* On the dark card the ramp runs dim → bright (more is brighter), same hue; re-validated. */
+  --heat-1: #265937;
+  --heat-2: #2f7a47;
+  --heat-3: #399d57;
+  --heat-4: #3fc168;
+  --heat-5: #67e18f;
+  --heat-count-1: #434582;
+  --heat-count-2: #5a5cb7;
+  --heat-count-3: #7177ea;
+  --heat-count-4: #8e94ff;
+  --heat-count-5: #afb5ff;
 
   --sidebar: #080d1a;
   --sidebar-foreground: oklch(0.968 0.006 265);
