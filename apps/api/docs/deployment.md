@@ -7,6 +7,7 @@
 | Cache / queues | Railway Redis | `REDIS_URL`; shared by the cache and BullMQ |
 | Images | Railway Storage Bucket | Private; served through `GET /api/v1/media/…` |
 | Web | Vercel (region `sin1`) | `apps/web/vercel.json` |
+| Admin | Vercel (region `sin1`) | `apps/admin/vercel.json`; its own checklist: [`apps/admin/docs/deployment.md`](../../admin/docs/deployment.md) |
 
 ## Order
 

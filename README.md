@@ -8,7 +8,7 @@ Monorepo แบบ **pnpm workspace + Turborepo**
 posly/
 ├── apps/
 │   ├── web/        @posly/web    POS + หลังร้าน — Next.js 16 · Tailwind 4 · TanStack Query · Zustand · Motion · Recharts · next-intl   :3000
-│   ├── admin/      @posly/admin  Platform admin (ยังเป็น scaffold) — Next.js 16                                                        :3003
+│   ├── admin/      @posly/admin  Platform admin (ดูทุกร้าน, แพ็กเกจ, ผู้ใช้, ประกาศ) — Next.js 16 · TanStack Query · Recharts      :3003
 │   └── api/        @posly/api    Backend — NestJS 11 · PostgreSQL + TypeORM · BullMQ (Redis) · S3 bucket — บน Railway      :3001
 └── packages/
     ├── ui/         @posly/ui     shadcn/ui components (radix-nova) + `cn()` + theme CSS (`styles/globals.css`)
@@ -117,6 +117,7 @@ pnpm --filter @posly/api seed:demo -- --remove   # ลบร้านและ�
 | ส่วน | บริการ |
 | --- | --- |
 | Web (`apps/web`) | Vercel — Root Directory `apps/web` |
+| Admin (`apps/admin`) | Vercel — Root Directory `apps/admin` (โปรเจกต์แยกจาก web) |
 | API (`apps/api`) | Railway — `apps/api/railway.json` |
 | PostgreSQL | Railway PostgreSQL (private network) |
 | Queue (BullMQ) / Cache | Railway Redis |
@@ -125,6 +126,8 @@ pnpm --filter @posly/api seed:demo -- --remove   # ลบร้านและ�
 ## Deploy
 
 ดู [`apps/api/docs/deployment.md`](apps/api/docs/deployment.md) — Railway (`railway.json`) + Vercel (`vercel.json`)
+
+Admin: checklist ขึ้น production ครั้งแรกอยู่ที่ [`apps/admin/docs/deployment.md`](apps/admin/docs/deployment.md) (Google OAuth, migration, ตั้งผู้ดูแลคนแรก)
 
 ## สถานะ
 
