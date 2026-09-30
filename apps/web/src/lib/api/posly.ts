@@ -162,6 +162,11 @@ export interface StockAdjustmentDto {
 	change: number;
 	note: string | null;
 	actorName: string;
+	/** Satang paid per unit on a receipt; null when none was entered or without products:write. */
+	unitCost: Satang | null;
+	/** The product's cost before and after that receipt (equal when a recipe sets it). */
+	costBefore: Satang | null;
+	costAfter: Satang | null;
 }
 
 // A type alias, not an interface, so it satisfies the query-string index signature.
@@ -175,6 +180,8 @@ export type StockAdjustmentFilters = {
 export interface StockAdjustmentInput {
 	type: StockAdjustmentType;
 	quantity: number;
+	/** IN only: satang paid per unit; moves the cost to the weighted average. */
+	unitCost?: Satang;
 	note?: string;
 }
 
@@ -337,6 +344,8 @@ export interface RecipeDto {
 export interface IngredientStockInput {
 	type: StockAdjustmentType;
 	quantity: number;
+	/** IN only: satang paid for the whole delivery; moves the price to the weighted average. */
+	totalCost?: Satang;
 	note?: string;
 }
 

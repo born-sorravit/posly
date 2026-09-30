@@ -326,6 +326,17 @@ export class AdjustStockDto {
 	@Max(1_000_000)
 	quantity: number;
 
+	@ApiPropertyOptional({
+		example: 2400,
+		description:
+			"IN only: satang paid per unit. Moves the product's cost to the weighted average, unless its recipe sets the cost",
+	})
+	@IsOptional()
+	@IsInt()
+	@Min(0)
+	@Max(MAX_PRICE)
+	unitCost?: number;
+
 	@ApiPropertyOptional({ example: "รับจากซัพพลายเออร์" })
 	@IsOptional()
 	@Transform(trimmed)
@@ -363,4 +374,23 @@ export class StockAdjustmentResponse {
 	@ApiProperty({ description: "after - before" }) change: number;
 	@ApiProperty({ nullable: true }) note: string | null;
 	@ApiProperty() actorName: string;
+	@ApiProperty({
+		type: Number,
+		nullable: true,
+		description:
+			"Satang paid per unit on a receipt; null when none was entered or for members who cannot edit products",
+	})
+	unitCost: number | null;
+	@ApiProperty({
+		type: Number,
+		nullable: true,
+		description: "The product's cost before this receipt",
+	})
+	costBefore: number | null;
+	@ApiProperty({
+		type: Number,
+		nullable: true,
+		description: "Its cost after; equal to costBefore when a recipe sets the cost",
+	})
+	costAfter: number | null;
 }

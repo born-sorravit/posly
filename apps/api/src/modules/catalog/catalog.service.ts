@@ -37,6 +37,7 @@ import { Permission } from "@/shared/enums/permission.enum";
 import { OrderDirection } from "@/shared/dto/pagination.dto";
 import { PaginatedResponse, paginate } from "@/shared/utils/pagination.util";
 import { NotificationsService } from "@/modules/notifications/notifications.service";
+import { averageCost } from "@/shared/utils/average-cost.util";
 import {
 	BadRequestException,
 	ConflictException,
@@ -407,8 +408,27 @@ export class CatalogService {
 			if (after < 0) {
 				throw new ConflictException(`Only ${before} in stock`);
 			}
+			if (dto.unitCost !== undefined && dto.type !== StockAdjustmentType.IN) {
+				throw new BadRequestException(
+					"A purchase price goes with received stock only"
+				);
+			}
 
-			await manager.update(Product, { id: product.id }, { stock: after });
+			// Receiving at a price moves the cost to the weighted average of shelf and delivery.
+			// A recipe-costed product keeps its recipe's figure; the price paid is still recorded.
+			const costBefore = product.cost;
+			let costAfter = costBefore;
+			if (dto.unitCost !== undefined && !(await this.hasRecipe([product.id])).size) {
+				costAfter = Math.round(
+					averageCost(before, costBefore, dto.quantity, dto.unitCost)
+				);
+			}
+
+			await manager.update(
+				Product,
+				{ id: product.id },
+				{ stock: after, ...(costAfter !== costBefore ? { cost: costAfter } : {}) }
+			);
 			await this.notifications.stockChanged(
 				manager,
 				membership.businessId,
@@ -434,6 +454,9 @@ export class CatalogService {
 						before,
 						after,
 						note: dto.note || null,
+						...(dto.unitCost !== undefined
+							? { unitCost: dto.unitCost, costBefore, costAfter }
+							: {}),
 					},
 				})
 			);
@@ -481,6 +504,7 @@ export class CatalogService {
 						withDeleted: true,
 					});
 		const byId = new Map(products.map((p) => [p.id, p]));
+		const showCost = membership.permissions.includes(Permission.PRODUCTS_WRITE);
 
 		return page.map((log) => {
 			const payload = log.payload as {
@@ -489,6 +513,9 @@ export class CatalogService {
 				before: number;
 				after: number;
 				note: string | null;
+				unitCost?: number;
+				costBefore?: number | null;
+				costAfter?: number | null;
 			};
 			const product = byId.get(log.entityId);
 			return {
@@ -506,6 +533,10 @@ export class CatalogService {
 				change: payload.after - payload.before,
 				note: payload.note ?? null,
 				actorName: log.actorName,
+				// What was paid is the shop's margin, like the cost itself.
+				unitCost: showCost ? (payload.unitCost ?? null) : null,
+				costBefore: showCost ? (payload.costBefore ?? null) : null,
+				costAfter: showCost ? (payload.costAfter ?? null) : null,
 			};
 		});
 	}

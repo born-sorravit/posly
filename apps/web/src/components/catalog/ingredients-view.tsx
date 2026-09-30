@@ -2,6 +2,7 @@
 
 import { ConfirmDialog, type Column, DataTable, Segmented } from "@/components/common/controls";
 import { StockBadge } from "@/components/common/order-badges";
+import { previewAverageCost } from "@/components/catalog/stock-adjust-dialog";
 import { EmptyState, PageContainer, PageHeader, Surface, TableSkeleton } from "@/components/common/primitives";
 import { Button } from "@posly/ui/components/button";
 import {
@@ -247,6 +248,8 @@ function IngredientStockDialog({ ingredient, onClose }: { ingredient: Ingredient
 	const t = useTranslations("inventory");
 	const ti = useTranslations("ingredients");
 	const { adjust } = useIngredientMutations();
+	const canPrice = useActiveBusiness().can("products:write");
+	const [paidText, setPaidText] = useState("");
 	const [type, setType] = useState<StockAdjustmentType>("IN");
 	const [quantity, setQuantity] = useState("");
 	const [note, setNote] = useState("");
@@ -254,10 +257,13 @@ function IngredientStockDialog({ ingredient, onClose }: { ingredient: Ingredient
 	const amount = parse(quantity) ?? 0;
 	const after = Math.round((type === "IN" ? before + amount : type === "OUT" ? before - amount : amount) * 1000) / 1000;
 	const valid = quantity !== "" && (type === "COUNT" || amount > 0) && (type !== "OUT" || after >= 0);
+	const paid = canPrice && type === "IN" && paidText !== "" ? fromBaht(Number.parseFloat(paidText) || 0) : null;
+	const newUnitCost =
+		paid !== null && amount > 0 ? previewAverageCost(before, ingredient.purchasePrice ? ingredient.unitCost : null, amount, paid / amount) : null;
 
 	return (
 		<Dialog open onOpenChange={(open) => !open && onClose()}>
-			<DialogContent className="gap-6 p-6 sm:max-w-md">
+			<DialogContent className="max-h-[92svh] gap-6 overflow-y-auto p-6 sm:max-w-md">
 				<DialogHeader>
 					<DialogTitle>{t("adjustTitle")}</DialogTitle>
 					<DialogDescription>{ingredient.name}</DialogDescription>
@@ -268,7 +274,13 @@ function IngredientStockDialog({ ingredient, onClose }: { ingredient: Ingredient
 						e.preventDefault();
 						if (!valid || adjust.isPending) return;
 						adjust.mutate(
-							{ ingredientId: ingredient.id, type, quantity: Math.round(amount * 1000) / 1000, note: note.trim() || undefined },
+							{
+								ingredientId: ingredient.id,
+								type,
+								quantity: Math.round(amount * 1000) / 1000,
+								note: note.trim() || undefined,
+								...(paid !== null ? { totalCost: paid } : {}),
+							},
 							{
 								onSuccess: () => {
 									toast.success(ti("adjusted", { name: ingredient.name }));
@@ -311,6 +323,31 @@ function IngredientStockDialog({ ingredient, onClose }: { ingredient: Ingredient
 							{ti("beforeAfter", { before: formatNumber(before), after: formatNumber(after), unit: ingredient.unit })}
 						</p>
 					</div>
+					{canPrice && type === "IN" ? (
+						<div className="space-y-2">
+							<Label htmlFor="ing-paid">
+								{ti("paid")} <span className="font-normal text-muted-foreground">({ti("optional")})</span>
+							</Label>
+							<Input
+								id="ing-paid"
+								inputMode="decimal"
+								maxLength={10}
+								placeholder="0.00"
+								value={paidText}
+								onChange={(e) => setPaidText(e.target.value.replace(/[^\d.]/g, ""))}
+								className="numeric h-11 rounded-xl"
+							/>
+							<p className="text-muted-foreground text-xs">
+								{newUnitCost !== null
+									? ti("paidPreview", {
+											before: ingredient.unitCost !== null && ingredient.purchasePrice ? perUnit(ingredient.unitCost) : "—",
+											after: perUnit(newUnitCost),
+											unit: ingredient.unit,
+										})
+									: ti("paidHint")}
+							</p>
+						</div>
+					) : null}
 					<div className="space-y-2">
 						<Label htmlFor="ing-note">{t("note")}</Label>
 						<Input

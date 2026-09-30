@@ -20,6 +20,7 @@ import { CacheService } from "@/shared/cache/cache.service";
 import type { ResolvedMembership } from "@/shared/decorators/current-membership.decorator";
 import { AuditAction } from "@/shared/enums/audit-action.enum";
 import { Permission } from "@/shared/enums/permission.enum";
+import { averageCost } from "@/shared/utils/average-cost.util";
 import { roundQuantity } from "@/shared/utils/quantity.util";
 import {
 	BadRequestException,
@@ -191,8 +192,42 @@ export class InventoryService {
 			if (dto.type === StockAdjustmentType.OUT && after < 0) {
 				throw new ConflictException(`Only ${before} in stock`);
 			}
+			if (dto.totalCost !== undefined && dto.type !== StockAdjustmentType.IN) {
+				throw new BadRequestException(
+					"A purchase price goes with received stock only"
+				);
+			}
 
-			await manager.update(Ingredient, { id }, { stock: after });
+			// Receiving at a price moves the price per unit to the weighted average of what is
+			// left and what arrived, kept in the shop's own buying size (per 1,000 g stays so).
+			// A price of 0 was never entered, so it does not drag the average down.
+			const costBefore = ingredient.purchasePrice > 0 ? unitCost(ingredient) : null;
+			let costAfter = costBefore;
+			if (dto.totalCost !== undefined) {
+				costAfter = averageCost(
+					before,
+					costBefore,
+					dto.quantity,
+					dto.totalCost / dto.quantity
+				);
+			}
+			const repriced = costAfter !== costBefore && costAfter !== null;
+
+			await manager.update(
+				Ingredient,
+				{ id },
+				{
+					stock: after,
+					...(repriced
+						? {
+								purchasePrice: Math.round(
+									(costAfter as number) * ingredient.purchaseQty
+								),
+							}
+						: {}),
+				}
+			);
+			if (repriced) await this.recomputeUsing(manager, membership.businessId, [id]);
 			await this.notifyStock(
 				manager,
 				membership.businessId,
@@ -218,10 +253,25 @@ export class InventoryService {
 						before,
 						after,
 						note: dto.note || null,
+						...(dto.totalCost !== undefined
+							? {
+									totalCost: dto.totalCost,
+									// Per unit, to four decimals of a satang.
+									costBefore:
+										costBefore === null
+											? null
+											: Math.round(costBefore * 10_000) / 10_000,
+									costAfter:
+										costAfter === null
+											? null
+											: Math.round(costAfter * 10_000) / 10_000,
+								}
+							: {}),
 					},
 				})
 			);
 		});
+		if (dto.totalCost !== undefined) await this.costsChanged(membership.businessId);
 		const ingredient = await this.loadIngredient(
 			this.dataSource.manager,
 			membership,

@@ -113,6 +113,17 @@ export class AdjustIngredientStockDto {
 	@Max(MAX_QTY)
 	quantity: number;
 
+	@ApiPropertyOptional({
+		example: 52_000,
+		description:
+			"IN only: satang paid for the whole delivery. Moves the ingredient's price to the weighted average and re-costs its recipes",
+	})
+	@IsOptional()
+	@IsInt()
+	@Min(0)
+	@Max(MAX_PRICE)
+	totalCost?: number;
+
 	@ApiPropertyOptional({ example: "รับจากซัพพลายเออร์" })
 	@IsOptional()
 	@Transform(trimmed)
