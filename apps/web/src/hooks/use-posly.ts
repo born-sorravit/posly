@@ -17,6 +17,7 @@ import {
 	type PlanCode,
 	type NotificationListDto,
 	type ProductInput,
+	type ReportQuery,
 	type ReportRange,
 	type StockAdjustmentFilters,
 	type StockAdjustmentInput,
@@ -89,12 +90,12 @@ export function useOrder(orderId: string) {
 	});
 }
 
-export function useDashboard(range: ReportRange, enabled = true) {
+export function useDashboard(query: ReportRange | ReportQuery, enabled = true) {
 	const id = useBusinessId();
 	return useQuery({
 		enabled,
-		queryKey: queryKeys.dashboard(id, range),
-		queryFn: ({ signal }) => api.reports.dashboard(id, range, signal),
+		queryKey: queryKeys.dashboard(id, query),
+		queryFn: ({ signal }) => api.reports.dashboard(id, query, signal),
 		placeholderData: keepPreviousData,
 		refetchInterval: 60_000,
 	});
@@ -105,6 +106,17 @@ export function useMembers() {
 	return useQuery({
 		queryKey: queryKeys.members(id),
 		queryFn: ({ signal }) => api.members.list(id, signal),
+	});
+}
+
+/** The Advanced report over the same window as the dashboard (Pro plans and up). */
+export function useInsights(query: ReportQuery, enabled = true) {
+	const id = useBusinessId();
+	return useQuery({
+		enabled,
+		queryKey: queryKeys.insights(id, query),
+		queryFn: ({ signal }) => api.reports.insights(id, query, signal),
+		placeholderData: keepPreviousData,
 	});
 }
 

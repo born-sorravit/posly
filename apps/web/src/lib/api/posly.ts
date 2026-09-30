@@ -93,9 +93,16 @@ export interface OrderDto extends Order {
 }
 
 export interface DashboardDto {
+	/** The preset asked for, or "custom" for a from/to range. */
 	range: string;
+	compare: ReportCompare;
 	from: string;
 	to: string;
+	/** The period the changes compare against. */
+	previousFrom: string;
+	previousTo: string;
+	/** Shop-local days covered. */
+	days: number;
 	metrics: {
 		revenue: Satang;
 		revenueChange: number | null;
@@ -182,6 +189,64 @@ export interface InvitePreviewDto {
 }
 
 export type ReportRange = "today" | "yesterday" | "7d" | "30d";
+
+/** Against the equal-length period just before, or the same dates a year earlier. */
+export type ReportCompare = "previous" | "year";
+
+/**
+ * Which figures a report shows: a preset `range`, or a custom `from`–`to` (shop-local days,
+ * inclusive). Custom ranges and year-on-year are the Advanced report (ADVANCED_REPORT).
+ */
+export type ReportQuery = {
+	range?: ReportRange;
+	from?: string;
+	to?: string;
+	compare?: ReportCompare;
+};
+
+export interface InsightsCustomerRow {
+	id: string;
+	name: string;
+	phone: string | null;
+	orders: number;
+	revenue: Satang;
+	lastOrderAt: string;
+}
+
+export interface InsightsProfitRow {
+	sold: number;
+	revenue: Satang;
+	/** From the cost snapshot on each order line; before order-level discounts. */
+	cost: Satang;
+	profit: Satang;
+}
+
+export interface InsightsDto {
+	range: string;
+	from: string;
+	to: string;
+	days: number;
+	heatmap: {
+		/** isodow 1 = Monday … 7 = Sunday; hour 0–23 in the shop's time. Empty cells are absent. */
+		cells: { dow: number; hour: number; orders: number; revenue: Satang }[];
+		/** How many of each weekday (Mon…Sun) the window holds. */
+		weeks: number[];
+	};
+	products: (InsightsProfitRow & { productId: string | null; name: string; art: ProductArt; category: string | null })[];
+	/** `id`/`name` null: products with no category. */
+	categories: (InsightsProfitRow & { id: string | null; name: string | null; icon: string | null })[];
+	customers: {
+		orders: number;
+		revenue: Satang;
+		identifiedOrders: number;
+		identifiedRevenue: Satang;
+		customers: number;
+		newCustomers: number;
+		returningCustomers: number;
+		top: InsightsCustomerRow[];
+		lapsed: InsightsCustomerRow[];
+	};
+}
 
 export interface CheckoutInput {
 	clientOrderId: string;
@@ -461,8 +526,14 @@ export const api = {
 			backend.put<NotificationPreferenceDto[]>(`${b(id)}/notifications/preferences`, { muted }),
 	},
 	reports: {
-		dashboard: (id: string, range: ReportRange, signal?: AbortSignal) =>
-			backend.get<DashboardDto>(`${b(id)}/dashboard`, { range }, signal),
+		dashboard: (id: string, query: ReportRange | ReportQuery, signal?: AbortSignal) =>
+			backend.get<DashboardDto>(
+				`${b(id)}/dashboard`,
+				typeof query === "string" ? { range: query } : query,
+				signal
+			),
+		insights: (id: string, query: ReportQuery, signal?: AbortSignal) =>
+			backend.get<InsightsDto>(`${b(id)}/reports/insights`, query, signal),
 	},
 	members: {
 		list: (id: string, signal?: AbortSignal) =>

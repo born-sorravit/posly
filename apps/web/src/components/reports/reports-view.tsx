@@ -8,27 +8,64 @@ import { SalesChart } from "@/components/dashboard/sales-chart";
 import { PeriodTable } from "@/components/reports/period-table";
 import { Button } from "@posly/ui/components/button";
 import { formatNumber } from "@posly/utils/format";
-import { useDashboard } from "@/hooks/use-posly";
-import type { DashboardDto, ReportRange } from "@/lib/api/posly";
+import { useDashboard, useInsights } from "@/hooks/use-posly";
+import type { DashboardDto } from "@/lib/api/posly";
+import { CustomerInsights, PeakHours, ProfitInsights } from "@/components/reports/insights";
+import {
+	type Period,
+	type PeriodMode,
+	PeriodSummary,
+	displayRange,
+	initialPeriod,
+	toQuery,
+	windowLabel,
+} from "@/components/reports/period-picker";
 import { formatBaht } from "@posly/utils/money";
 import { downloadFile, toCsv } from "@/lib/export/csv";
-import { BarChart3, Coins, Download, PiggyBank, ReceiptText, ShoppingBag } from "lucide-react";
+import { BarChart3, Coins, Download, Lock, PiggyBank, ReceiptText, ShoppingBag } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { useFeature } from "@/hooks/use-workspace";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 
-type Tab = "sales" | "products" | "payments" | "employees";
+type Tab = "sales" | "products" | "peak" | "profit" | "customers" | "payments" | "employees";
+
+/** The tabs that read the Advanced report. */
+const INSIGHT_TABS = new Set<Tab>(["peak", "profit", "customers"]);
+
+function AdvancedLocked() {
+	const t = useTranslations("reports.period");
+	return (
+		<Surface>
+			<EmptyState
+				icon={Lock}
+				title={t("lockedInsightsTitle")}
+				description={t("lockedInsightsHint")}
+				action={
+					<Button asChild size="lg" className="brand-gradient">
+						<Link href="/settings/subscription">{t("upgrade")}</Link>
+					</Button>
+				}
+			/>
+		</Surface>
+	);
+}
 
 /**
  * Where the profit figure comes from, one line per step, so a negative number explains
  * itself: sales − cost of goods = gross profit − expenses = profit after expenses.
  * Without the Expenses feature there is nothing to subtract, and it says so.
+ *
+ * Beside the steps (below them on a phone), the same sale as one bar: how each ฿100 splits
+ * into cost, expenses and what is left. A loss has nothing left, so the bar is scaled to
+ * what went out and the shortfall is named instead.
  */
 function ProfitBreakdown({ metrics }: { metrics: DashboardDto["metrics"] }) {
 	const t = useTranslations("reports.breakdown");
 	const hasExpenses = useFeature("EXPENSES");
+	const expenses = hasExpenses ? metrics.expenses : 0;
+	const profit = hasExpenses ? metrics.estimatedProfit : metrics.grossProfit;
 	const row = (label: string, value: number, tone: "plain" | "minus" | "total" = "plain") => (
 		<div
 			className={cn(
@@ -42,21 +79,72 @@ function ProfitBreakdown({ metrics }: { metrics: DashboardDto["metrics"] }) {
 			</span>
 		</div>
 	);
+
+	const whole = Math.max(metrics.revenue, metrics.cost + expenses, 1);
+	const parts = [
+		{ key: "cost", label: t("cost"), value: metrics.cost, color: "var(--chart-3)" },
+		...(hasExpenses ? [{ key: "expenses", label: t("expenses"), value: expenses, color: "var(--chart-5)" }] : []),
+		{ key: "profit", label: hasExpenses ? t("net") : t("gross"), value: Math.max(0, profit), color: "var(--success)" },
+	].filter((p) => p.value > 0);
+	const margin = metrics.revenue > 0 ? Math.round((profit / metrics.revenue) * 1000) / 10 : null;
+	const share = (value: number) => (metrics.revenue > 0 ? `${Math.round((value / metrics.revenue) * 1000) / 10}%` : "–");
+
 	return (
-		<Surface className="space-y-3">
-			<SectionTitle className="mb-0">{t("title")}</SectionTitle>
-			<div className="max-w-xl text-sm">
-				{row(t("revenue"), metrics.revenue)}
-				{row(t("cost"), metrics.cost, "minus")}
-				{row(t("gross"), metrics.grossProfit, "total")}
-				{hasExpenses ? (
-					<>
-						{row(t("expenses"), metrics.expenses, "minus")}
-						{row(t("net"), metrics.estimatedProfit, "total")}
-					</>
-				) : null}
+		<Surface>
+			<SectionTitle>{t("title")}</SectionTitle>
+			<div className="grid gap-6 desktop:grid-cols-2 desktop:gap-10">
+				<div className="text-sm">
+					{row(t("revenue"), metrics.revenue)}
+					{row(t("cost"), metrics.cost, "minus")}
+					{row(t("gross"), metrics.grossProfit, "total")}
+					{hasExpenses ? (
+						<>
+							{row(t("expenses"), metrics.expenses, "minus")}
+							{row(t("net"), metrics.estimatedProfit, "total")}
+						</>
+					) : null}
+				</div>
+
+				<div className="flex flex-col gap-4 desktop:border-border desktop:border-l desktop:pl-10">
+					<div>
+						<p className="text-muted-foreground text-sm">{hasExpenses ? t("netMargin") : t("grossMargin")}</p>
+						<p className={cn("numeric mt-1 font-semibold text-3xl tracking-tight", profit < 0 && "text-danger")}>
+							{margin === null ? "–" : `${margin}%`}
+						</p>
+						<p className="mt-1 text-muted-foreground text-xs">
+							{metrics.revenue <= 0
+								? t("noSales")
+								: profit < 0
+									? t("loss", { amount: formatBaht(-profit) })
+									: t("perHundred", { amount: formatBaht(Math.round((profit / metrics.revenue) * 10_000)) })}
+						</p>
+					</div>
+
+					{parts.length ? (
+						<>
+							<div className="flex h-3 gap-[2px] overflow-hidden rounded-full" role="img" aria-label={t("splitLabel")}>
+								{parts.map((p) => (
+									<span
+										key={p.key}
+										className="h-full first:rounded-l-full last:rounded-r-full"
+										style={{ width: `${(p.value / whole) * 100}%`, backgroundColor: p.color }}
+									/>
+								))}
+							</div>
+							<ul className="grid gap-2 text-sm">
+								{parts.map((p) => (
+									<li key={p.key} className="flex items-center gap-2.5">
+										<span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: p.color }} aria-hidden />
+										<span className="flex-1 text-muted-foreground">{p.label}</span>
+										<span className="numeric font-medium">{share(p.value)}</span>
+									</li>
+								))}
+							</ul>
+						</>
+					) : null}
+				</div>
 			</div>
-			<p className="max-w-xl text-muted-foreground text-xs leading-relaxed">
+			<p className="mt-4 text-muted-foreground text-xs leading-relaxed">
 				{hasExpenses ? t("hint") : t("hintNoExpenses")}{" "}
 				{hasExpenses ? (
 					<Link href="/expenses" className="font-medium text-primary hover:underline">
@@ -122,8 +210,16 @@ function ProductList({ title, rows }: { title: string; rows: DashboardDto["topPr
 export function ReportsView() {
 	const t = useTranslations("reports");
 	const [tab, setTab] = useState<Tab>("sales");
-	const [range, setRange] = useState<ReportRange>("7d");
-	const { data } = useDashboard(range);
+	const [period, setPeriod] = useState<Period>(initialPeriod);
+	const advanced = useFeature("ADVANCED_REPORT");
+	const query = toQuery(period, advanced);
+	const { data } = useDashboard(query);
+	const insights = useInsights(query, advanced && INSIGHT_TABS.has(tab));
+	/** What the chart and the table are drawn as; the requested range until the data arrives. */
+	const range = data ? displayRange(data) : period.preset;
+	const choosePreset = (preset: Period["preset"]) => setPeriod((p) => ({ ...p, mode: preset, preset }));
+	const chooseMode = (mode: PeriodMode) =>
+		mode === "custom" ? setPeriod((p) => ({ ...p, mode })) : choosePreset(mode);
 	const tBreakdown = useTranslations("reports.breakdown");
 	const tMethod = useTranslations("paymentMethod");
 
@@ -136,7 +232,7 @@ export function ReportsView() {
 		const m = data.metrics;
 		const baht = (satang: number) => satang / 100;
 		const rows: (string | number | null)[][] = [
-			[t("title"), t(range === "today" ? "today" : range === "7d" ? "last7" : "last30")],
+			[t("title"), windowLabel(data.from, data.days)],
 			[],
 			[t("revenue"), baht(m.revenue)],
 			[t("orders"), m.orders],
@@ -146,8 +242,8 @@ export function ReportsView() {
 			[tBreakdown("expenses"), baht(m.expenses)],
 			[tBreakdown("net"), baht(m.estimatedProfit)],
 			[],
-			[range === "today" ? t("time") : t("date"), t("orders"), t("revenue")],
-			...data.series.map((b) => [range === "today" ? b.label : b.date, b.orders, baht(b.revenue)]),
+			[data.days === 1 ? t("time") : t("date"), t("orders"), t("revenue")],
+			...data.series.map((b) => [data.days === 1 ? b.label : b.date, b.orders, baht(b.revenue)]),
 			[],
 			[t("topSelling"), t("csvSold"), t("revenue")],
 			...data.topProducts.map((p) => [p.name, p.sold, baht(p.revenue)]),
@@ -159,7 +255,8 @@ export function ReportsView() {
 			...data.employees.map((e) => [e.name, e.orders, baht(e.revenue), baht(e.refunds), baht(e.discounts)]),
 		];
 		const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok" }).format(new Date());
-		downloadFile(`posly-report-${range}-${day}.csv`, toCsv(rows));
+		const name = data.range === "custom" ? `${query.from}_${query.to}` : `${data.range}-${day}`;
+		downloadFile(`posly-report-${name}.csv`, toCsv(rows));
 	};
 
 	type Perf = DashboardDto["employees"][number];
@@ -180,12 +277,13 @@ export function ReportsView() {
 					<>
 						<span data-tour="reports-range">
 							<Segmented
-								value={range}
-								onChange={setRange}
+								value={period.mode}
+								onChange={chooseMode}
 								options={[
 									{ value: "today", label: t("today") },
 									{ value: "7d", label: t("last7") },
 									{ value: "30d", label: t("last30") },
+									{ value: "custom", label: t("custom") },
 								]}
 							/>
 						</span>
@@ -197,6 +295,8 @@ export function ReportsView() {
 				}
 			/>
 
+			<PeriodSummary period={period} onChange={setPeriod} data={data} advanced={advanced} />
+
 			<div data-tour="reports-tabs">
 				<Segmented
 					variant="chips"
@@ -206,13 +306,28 @@ export function ReportsView() {
 					options={[
 						{ value: "sales", label: t("tabs.sales") },
 						{ value: "products", label: t("tabs.products") },
+						{ value: "peak", label: t("tabs.peak") },
+						{ value: "profit", label: t("tabs.profit") },
+						{ value: "customers", label: t("tabs.customers") },
 						{ value: "payments", label: t("tabs.payments") },
 						{ value: "employees", label: t("tabs.employees") },
 					]}
 				/>
 			</div>
 
-			{!data ? (
+			{INSIGHT_TABS.has(tab) ? (
+				!advanced ? (
+					<AdvancedLocked />
+				) : !insights.data ? (
+					<ChartSkeleton />
+				) : tab === "peak" ? (
+					<PeakHours data={insights.data} />
+				) : tab === "profit" ? (
+					<ProfitInsights data={insights.data} />
+				) : (
+					<CustomerInsights data={insights.data} />
+				)
+			) : !data ? (
 				<ChartSkeleton />
 			) : (
 				<>
@@ -227,7 +342,14 @@ export function ReportsView() {
 							<div data-tour="reports-profit">
 								<ProfitBreakdown metrics={data.metrics} />
 							</div>
-							<SalesChart height={300} series={data.series} range={range} onRangeChange={setRange} />
+							<SalesChart
+								height={300}
+								series={data.series}
+								range={range}
+								onRangeChange={
+									data.range === "custom" ? undefined : (r) => choosePreset(r === "yesterday" ? "today" : r)
+								}
+							/>
 							<PeriodTable series={data.series} range={range} />
 						</>
 					) : null}

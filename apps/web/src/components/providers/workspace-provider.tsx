@@ -15,7 +15,12 @@ export const queryKeys = {
 	product: (id: string, productId: string) => ["business", id, "products", productId] as const,
 	orders: (id: string, filters: object) => ["business", id, "orders", filters] as const,
 	order: (id: string, orderId: string) => ["business", id, "order", orderId] as const,
-	dashboard: (id: string, range: string) => ["business", id, "dashboard", range] as const,
+	dashboard: (id: string, query: string | Record<string, string | undefined>) =>
+		["business", id, "dashboard", query] as const,
+	// Under "dashboard" so everything that invalidates the dashboard (a sale, an expense) also
+	// refreshes the Advanced report.
+	insights: (id: string, query: Record<string, string | undefined>) =>
+		["business", id, "dashboard", "insights", query] as const,
 	members: (id: string) => ["business", id, "members"] as const,
 	stockAdjustments: (id: string, filters: object) => ["business", id, "stock-adjustments", filters] as const,
 	expenses: (id: string, filters: object) => ["business", id, "expenses", filters] as const,

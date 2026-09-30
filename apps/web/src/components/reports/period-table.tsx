@@ -35,6 +35,8 @@ const weekStart = (iso: string) => {
 
 interface Labels {
 	thisWeek: string;
+	/** Only a week ending today is "so far"; a custom range can end mid-week in the past. */
+	today: string;
 	days: (n: number) => string;
 }
 
@@ -68,7 +70,7 @@ const toRows = (series: Bucket[], grain: Grain, range: ReportRange, labels: Labe
 	return values.map((w, i) => {
 		const days = Math.round((dateOf(w.last).getTime() - dateOf(w.first).getTime()) / 86_400_000) + 1;
 		// The newest week is still running; the oldest may start mid-week at the edge of the range.
-		const partial = days < 7 ? (i === 0 ? labels.thisWeek : labels.days(days)) : null;
+		const partial = days < 7 ? (i === 0 && w.last === labels.today ? labels.thisWeek : labels.days(days)) : null;
 		return {
 			key: w.key,
 			label: w.first === w.last ? dayLabel(w.first) : `${short(w.first)} – ${short(w.last)}`,
@@ -94,6 +96,7 @@ export function PeriodTable({ series, range }: { series: Bucket[]; range: Report
 		() =>
 			toRows(series, grain, range, {
 				thisWeek: t("thisWeekSoFar"),
+				today: new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok" }).format(new Date()),
 				days: (n) => t("partialDays", { count: n }),
 			}),
 		[series, grain, range, t]

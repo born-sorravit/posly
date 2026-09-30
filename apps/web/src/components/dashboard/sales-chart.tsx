@@ -130,7 +130,8 @@ export function SalesChart({
 	height?: number;
 	series: Point[];
 	range: SalesRange;
-	onRangeChange: (range: SalesRange) => void;
+	/** Absent when the page picks the period itself (a custom range): no preset switcher then. */
+	onRangeChange?: (range: SalesRange) => void;
 }) {
 	const t = useTranslations("dashboard");
 	const data = trimHours(series, range);
@@ -143,6 +144,7 @@ export function SalesChart({
 		<Surface className={className}>
 			<SectionTitle
 				action={
+					onRangeChange ? (
 					<Segmented
 						size="sm"
 						value={range === "yesterday" ? "today" : range}
@@ -153,6 +155,7 @@ export function SalesChart({
 							{ value: "30d", label: t("range.30d") },
 						]}
 					/>
+					) : undefined
 				}
 			>
 				{t("salesOverview")}
