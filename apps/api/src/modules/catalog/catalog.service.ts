@@ -11,6 +11,7 @@ import { ProductRepository } from "@/models/catalog/product.repository";
 import {
 	toModifierGroupResponse,
 	toProductResponse,
+	withoutModifierCost,
 } from "@/modules/catalog/catalog.mapper";
 import {
 	AdjustStockDto,
@@ -36,6 +37,7 @@ import { Permission } from "@/shared/enums/permission.enum";
 import { OrderDirection } from "@/shared/dto/pagination.dto";
 import { PaginatedResponse, paginate } from "@/shared/utils/pagination.util";
 import { NotificationsService } from "@/modules/notifications/notifications.service";
+import { averageCost } from "@/shared/utils/average-cost.util";
 import {
 	BadRequestException,
 	ConflictException,
@@ -61,6 +63,19 @@ export class CatalogService {
 		private readonly notifications: NotificationsService,
 		private readonly cacheService: CacheService
 	) {}
+
+	/** Which of these products (or options) are costed by a recipe. */
+	private async hasRecipe(
+		ids: string[],
+		column: "product_id" | "modifier_option_id" = "product_id"
+	): Promise<Set<string>> {
+		if (!ids.length) return new Set();
+		const rows = (await this.dataSource.query(
+			`SELECT DISTINCT ${column} AS id FROM recipe_line WHERE deleted_at IS NULL AND ${column} = ANY($1)`,
+			[ids]
+		)) as { id: string }[];
+		return new Set(rows.map((r) => r.id));
+	}
 
 	/** The dashboard lists low stock and product names: a product change retires it. */
 	private productsChanged(membership: ResolvedMembership) {
@@ -180,10 +195,25 @@ export class CatalogService {
 				)) as { id: string; n: number }[]
 			).map((r) => [r.id, r.n])
 		);
-		return groups.map((g) => ({
-			...toModifierGroupResponse(g),
-			productCount: counts.get(g.id) ?? 0,
-		}));
+		const showCost = membership.permissions.includes(Permission.PRODUCTS_WRITE);
+		const recipeCosted = showCost
+			? await this.hasRecipe(
+					groups.flatMap((g) => g.options.map((o) => o.id)),
+					"modifier_option_id"
+				)
+			: new Set<string>();
+		return groups.map((g) => {
+			const base = toModifierGroupResponse(g);
+			const response = {
+				...base,
+				options: base.options.map((o) => ({
+					...o,
+					costFromRecipe: recipeCosted.has(o.id),
+				})),
+				productCount: counts.get(g.id) ?? 0,
+			};
+			return showCost ? response : withoutModifierCost(response);
+		});
 	}
 
 	/**
@@ -223,10 +253,16 @@ export class CatalogService {
 					required: dto.required,
 				}
 			);
+			const recipeCosted = await this.hasRecipe(
+				dto.options.flatMap((o) => (o.id ? [o.id] : [])),
+				"modifier_option_id"
+			);
 			for (const [index, o] of dto.options.entries()) {
 				const values = {
 					name: o.name,
 					priceDelta: o.priceDelta,
+					// An option with a recipe keeps the cost its recipe gives it.
+					...(o.id && recipeCosted.has(o.id) ? {} : { costDelta: o.costDelta ?? 0 }),
 					isDefault:
 						dto.selection === ModifierSelection.SINGLE && (o.isDefault ?? false),
 					displayOrder: index,
@@ -296,6 +332,7 @@ export class CatalogService {
 					Object.assign(new ModifierOption(), {
 						name: o.name,
 						priceDelta: o.priceDelta,
+						costDelta: o.costDelta ?? 0,
 						isDefault: o.isDefault ?? false,
 						displayOrder: index,
 					})
@@ -371,8 +408,27 @@ export class CatalogService {
 			if (after < 0) {
 				throw new ConflictException(`Only ${before} in stock`);
 			}
+			if (dto.unitCost !== undefined && dto.type !== StockAdjustmentType.IN) {
+				throw new BadRequestException(
+					"A purchase price goes with received stock only"
+				);
+			}
 
-			await manager.update(Product, { id: product.id }, { stock: after });
+			// Receiving at a price moves the cost to the weighted average of shelf and delivery.
+			// A recipe-costed product keeps its recipe's figure; the price paid is still recorded.
+			const costBefore = product.cost;
+			let costAfter = costBefore;
+			if (dto.unitCost !== undefined && !(await this.hasRecipe([product.id])).size) {
+				costAfter = Math.round(
+					averageCost(before, costBefore, dto.quantity, dto.unitCost)
+				);
+			}
+
+			await manager.update(
+				Product,
+				{ id: product.id },
+				{ stock: after, ...(costAfter !== costBefore ? { cost: costAfter } : {}) }
+			);
 			await this.notifications.stockChanged(
 				manager,
 				membership.businessId,
@@ -398,6 +454,9 @@ export class CatalogService {
 						before,
 						after,
 						note: dto.note || null,
+						...(dto.unitCost !== undefined
+							? { unitCost: dto.unitCost, costBefore, costAfter }
+							: {}),
 					},
 				})
 			);
@@ -445,6 +504,7 @@ export class CatalogService {
 						withDeleted: true,
 					});
 		const byId = new Map(products.map((p) => [p.id, p]));
+		const showCost = membership.permissions.includes(Permission.PRODUCTS_WRITE);
 
 		return page.map((log) => {
 			const payload = log.payload as {
@@ -453,6 +513,9 @@ export class CatalogService {
 				before: number;
 				after: number;
 				note: string | null;
+				unitCost?: number;
+				costBefore?: number | null;
+				costAfter?: number | null;
 			};
 			const product = byId.get(log.entityId);
 			return {
@@ -470,6 +533,10 @@ export class CatalogService {
 				change: payload.after - payload.before,
 				note: payload.note ?? null,
 				actorName: log.actorName,
+				// What was paid is the shop's margin, like the cost itself.
+				unitCost: showCost ? (payload.unitCost ?? null) : null,
+				costBefore: showCost ? (payload.costBefore ?? null) : null,
+				costAfter: showCost ? (payload.costAfter ?? null) : null,
 			};
 		});
 	}
@@ -528,6 +595,14 @@ export class CatalogService {
 			product.modifierGroups = groups;
 		}
 
+		// A product costed by its recipe keeps that cost; the form's figure is only a display.
+		if (
+			fields.cost !== undefined &&
+			product.id &&
+			(await this.hasRecipe([product.id])).size
+		) {
+			delete fields.cost;
+		}
 		Object.assign(product, fields);
 
 		if (
@@ -602,6 +677,10 @@ export class CatalogService {
 		);
 		return membership.permissions.includes(Permission.PRODUCTS_WRITE)
 			? response
-			: { ...response, cost: null };
+			: {
+					...response,
+					cost: null,
+					modifierGroups: response.modifierGroups.map(withoutModifierCost),
+				};
 	}
 }

@@ -48,6 +48,7 @@ export class SampleCatalogService {
 							manager.create(ModifierOption, {
 								name: o.name,
 								priceDelta: o.priceDelta,
+								costDelta: o.costDelta ?? 0,
 								isDefault: o.isDefault ?? false,
 								displayOrder: i,
 							})

@@ -90,6 +90,13 @@ export class Order extends BaseEntity {
 	})
 	totalCost: Satang;
 
+	/**
+	 * Ingredient amounts this sale took from stock, by ingredient id — what a refund puts
+	 * back, even if the recipe has changed since. Null when nothing was taken.
+	 */
+	@Column({ name: "ingredient_usage", type: "jsonb", nullable: true })
+	ingredientUsage: Record<string, number> | null;
+
 	@Column({ name: "vat_basis_points", type: "int", default: 0 })
 	vatBasisPoints: number;
 

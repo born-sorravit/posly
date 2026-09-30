@@ -1,6 +1,6 @@
 "use client";
 
-import { api, type BusinessDetailDto, type BusinessSummaryDto } from "@/lib/api/posly";
+import { api, type BusinessDetailDto, type BusinessSummaryDto, type RecipeOwner } from "@/lib/api/posly";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import type { Branch, Business, FeatureKey } from "@posly/types/domain";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -27,6 +27,9 @@ export const queryKeys = {
 	expenseSummary: (id: string, filters: object) => ["business", id, "expenses", "summary", filters] as const,
 	customers: (id: string, query: object) => ["business", id, "customers", query] as const,
 	modifierGroups: (id: string) => ["business", id, "modifier-groups"] as const,
+	ingredients: (id: string) => ["business", id, "ingredients"] as const,
+	recipe: (id: string, owner: RecipeOwner) =>
+		["business", id, "recipe", "productId" in owner ? owner.productId : owner.optionId] as const,
 	notifications: (id: string) => ["business", id, "notifications"] as const,
 	notificationPreferences: (id: string) => ["business", id, "notification-preferences"] as const,
 };

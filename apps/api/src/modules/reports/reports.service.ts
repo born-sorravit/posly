@@ -5,6 +5,7 @@ import { CacheService } from "@/shared/cache/cache.service";
 import type { ResolvedMembership } from "@/shared/decorators/current-membership.decorator";
 import type { ReportQueryDto } from "@/modules/reports/dto/report.dto";
 import { EntitlementsService } from "@/modules/subscriptions/entitlements.service";
+import { ExpenseCategory } from "@/shared/enums/expense-category.enum";
 import { OrderStatus } from "@/shared/enums/order.enum";
 import { Feature } from "@/shared/enums/subscription.enum";
 import {
@@ -140,7 +141,7 @@ export class ReportsService {
 		// morning looks like a collapse in sales. `window.previousTo` already stops there.
 		const partial = window.partial;
 		const now = new Date();
-		const [current, previous, expenses, previousExpenses] = await Promise.all([
+		const [current, previous, expenseSums, previousExpenseSums] = await Promise.all([
 			this.totals(business.id, window.from, partial ? now : window.to, scope),
 			this.totals(business.id, window.previousFrom, window.previousTo, scope),
 			this.expenses(business.id, tz, window.from, window.to),
@@ -158,20 +159,31 @@ export class ReportsService {
 					: window.previousTo
 			),
 		]);
-		const profit = current.revenue - current.cost - expenses;
-		const previousProfit = previous.revenue - previous.cost - previousExpenses;
+		const expenses = expenseSums.total;
+		const previousExpenses = previousExpenseSums.total;
+		const gross = current.sales - current.cost;
+		const previousGross = previous.sales - previous.cost;
+		const profit = gross - expenses;
+		const previousProfit = previousGross - previousExpenses;
 
 		const hourly = window.days === 1;
 		const series = await this.series(business.id, tz, window, hourly, scope);
 
-		const [topProducts, lowSelling, paymentBreakdown, employees, lowStock] =
-			await Promise.all([
-				this.products(business.id, window, scope, "DESC"),
-				this.products(business.id, window, scope, "ASC"),
-				this.payments(business.id, window, scope),
-				this.employees(business.id, window, scope),
-				this.lowStock(business.id),
-			]);
+		const [
+			topProducts,
+			lowSelling,
+			paymentBreakdown,
+			employees,
+			lowStock,
+			productsWithoutCost,
+		] = await Promise.all([
+			this.products(business.id, window, scope, "DESC"),
+			this.products(business.id, window, scope, "ASC"),
+			this.payments(business.id, window, scope),
+			this.employees(business.id, window, scope),
+			this.lowStock(business.id),
+			this.productsWithoutCost(business.id),
+		]);
 
 		const average = (t: { revenue: number; orders: number }) =>
 			t.orders === 0 ? 0 : Math.round(t.revenue / t.orders);
@@ -194,14 +206,14 @@ export class ReportsService {
 				// Gross profit: sales minus the cost snapshot taken at each sale. The dashboard
 				// shows this — it is what a day or an hour actually earned.
 				cost: current.cost,
-				grossProfit: current.revenue - current.cost,
-				grossProfitChange: change(
-					current.revenue - current.cost,
-					previous.revenue - previous.cost
-				),
+				grossProfit: gross,
+				grossProfitChange: change(gross, previousGross),
 				// Minus the expenses recorded for the same days (plan §19). Meaningful over a
 				// month; over a single day one rent payment swamps it, so only reports show it.
 				expenses,
+				// Ingredient bills recorded as expenses while products carry a cost count the
+				// same ingredients twice; the report warns rather than guessing which to drop.
+				ingredientExpenses: expenseSums.ingredients,
 				estimatedProfit: profit,
 				profitChange: change(profit, previousProfit),
 				// The comparison period's own figures (for "today", yesterday up to this time), so
@@ -209,7 +221,7 @@ export class ReportsService {
 				previousRevenue: previous.revenue,
 				previousOrders: previous.orders,
 				previousAverageOrder: average(previous),
-				previousGrossProfit: previous.revenue - previous.cost,
+				previousGrossProfit: previousGross,
 				previousEstimatedProfit: previousProfit,
 			},
 			series,
@@ -218,6 +230,7 @@ export class ReportsService {
 			paymentBreakdown,
 			employees,
 			lowStock,
+			productsWithoutCost,
 		};
 	}
 
@@ -306,15 +319,19 @@ export class ReportsService {
 	) {
 		const [row] = (await this.dataSource.query(
 			`SELECT COALESCE(SUM(o.total), 0)::bigint AS revenue,
+				COALESCE(SUM(CASE WHEN o.prices_include_vat THEN o.total ELSE o.total - o.vat END), 0)::bigint AS sales,
 				COUNT(*)::int AS orders,
 				COALESCE(SUM(o.total_cost), 0)::bigint AS cost
 			FROM "order" o
 			WHERE o.business_id = $1 AND o.status = $2 AND o.created_at >= $3 AND o.created_at < $4
 				AND o.deleted_at IS NULL ${this.scopeSql(scope, 5)}`,
 			this.params([businessId, OrderStatus.PAID, from, to], scope)
-		)) as [{ revenue: string; orders: number; cost: string }];
+		)) as [{ revenue: string; sales: string; orders: number; cost: string }];
 		return {
 			revenue: Number(row.revenue),
+			// What profit is measured against: the total less any VAT added on top. Inclusive
+			// VAT stays in, as it does in every line's total, so per-product profit adds up.
+			sales: Number(row.sales),
 			orders: row.orders,
 			cost: Number(row.cost),
 		};
@@ -329,15 +346,17 @@ export class ReportsService {
 		tz: string,
 		from: Date,
 		to: Date
-	): Promise<number> {
+	): Promise<{ total: number; ingredients: number }> {
 		const [row] = (await this.dataSource.query(
-			`SELECT COALESCE(SUM(amount), 0)::bigint AS sum FROM expense
+			`SELECT COALESCE(SUM(amount), 0)::bigint AS sum,
+				COALESCE(SUM(amount) FILTER (WHERE category = '${ExpenseCategory.INGREDIENTS}'), 0)::bigint AS ingredients
+			 FROM expense
 			 WHERE business_id = $1 AND deleted_at IS NULL
 			   AND spent_on >= ($2::timestamptz AT TIME ZONE $4)::date
 			   AND spent_on < ($3::timestamptz AT TIME ZONE $4)::date`,
 			[businessId, from, to, tz]
-		)) as [{ sum: string }];
-		return Number(row.sum);
+		)) as [{ sum: string; ingredients: string }];
+		return { total: Number(row.sum), ingredients: Number(row.ingredients) };
 	}
 
 	/** Every bucket, including the empty ones, so the chart has no gaps. */
@@ -529,8 +548,9 @@ export class ReportsService {
 
 	/**
 	 * Per product: what it sold, what that cost at the time (the cost snapshot on each line),
-	 * and the difference. Order-level discounts are not spread over lines, so these margins
-	 * are before discounts — the page says so.
+	 * and the difference. Revenue is after each line's share of the order discount (orders
+	 * before that share was recorded count it as 0). `missingCost`: some sales had no cost —
+	 * or, for lines sold before that was recorded, the whole cost is 0.
 	 */
 	private async productProfit(
 		businessId: string,
@@ -540,7 +560,8 @@ export class ReportsService {
 		const rows = (await this.dataSource.query(
 			`SELECT i.product_id AS "productId", i.name, MAX(i.art) AS art,
 				MAX(c.name) AS category, SUM(i.quantity)::int AS sold,
-				SUM(i.line_total)::bigint AS revenue, SUM(i.unit_cost * i.quantity)::bigint AS cost
+				SUM(i.line_total - i.discount)::bigint AS revenue, SUM(i.unit_cost * i.quantity)::bigint AS cost,
+				(BOOL_OR(i.cost_missing) OR SUM(i.unit_cost * i.quantity) = 0) AS "missingCost"
 			FROM order_item i
 			JOIN "order" o ON o.id = i.order_id
 			LEFT JOIN product p ON p.id = i.product_id
@@ -559,6 +580,7 @@ export class ReportsService {
 			sold: number;
 			revenue: string;
 			cost: string;
+			missingCost: boolean;
 		}[];
 		return rows.map((r) => {
 			const revenue = Number(r.revenue);
@@ -575,7 +597,8 @@ export class ReportsService {
 	) {
 		const rows = (await this.dataSource.query(
 			`SELECT c.id, c.name, MAX(c.icon) AS icon, SUM(i.quantity)::int AS sold,
-				SUM(i.line_total)::bigint AS revenue, SUM(i.unit_cost * i.quantity)::bigint AS cost
+				SUM(i.line_total - i.discount)::bigint AS revenue, SUM(i.unit_cost * i.quantity)::bigint AS cost,
+				(BOOL_OR(i.cost_missing) OR SUM(i.unit_cost * i.quantity) = 0) AS "missingCost"
 			FROM order_item i
 			JOIN "order" o ON o.id = i.order_id
 			LEFT JOIN product p ON p.id = i.product_id
@@ -592,6 +615,7 @@ export class ReportsService {
 			sold: number;
 			revenue: string;
 			cost: string;
+			missingCost: boolean;
 		}[];
 		return rows.map((r) => {
 			const revenue = Number(r.revenue);
@@ -690,6 +714,17 @@ export class ReportsService {
 			top: top.map(toRow),
 			lapsed: lapsed.map(toRow),
 		};
+	}
+
+	/** Active products with no cost entered: their sales count as free, so profit reads high. */
+	private async productsWithoutCost(businessId: string): Promise<number> {
+		return this.productRepository
+			.createQueryBuilder("p")
+			.where(
+				"p.business_id = :businessId AND p.is_active = true AND p.cost IS NULL",
+				{ businessId }
+			)
+			.getCount();
 	}
 
 	private async lowStock(businessId: string) {

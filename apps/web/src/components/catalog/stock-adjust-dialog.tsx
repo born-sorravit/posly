@@ -21,6 +21,8 @@ import {
 } from "@posly/ui/components/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@posly/ui/components/popover";
 import { useAdjustStock } from "@/hooks/use-posly";
+import { useActiveBusiness } from "@/hooks/use-workspace";
+import { formatBaht, fromBaht } from "@posly/utils/money";
 import { formatNumber } from "@posly/utils/format";
 import type { StockAdjustmentType } from "@/lib/api/posly";
 import { stockStatus } from "@/lib/stock";
@@ -32,6 +34,10 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 const MAX = 1_000_000;
+
+/** The server's weighted average (`averageCost`), for the preview under the price field. */
+export const previewAverageCost = (onHand: number, current: number | null, received: number, paid: number) =>
+	received <= 0 ? current : onHand <= 0 || current === null ? paid : (onHand * current + received * paid) / (onHand + received);
 
 const nextStock = (type: StockAdjustmentType, before: number, quantity: number) =>
 	type === "IN" ? before + quantity : type === "OUT" ? before - quantity : quantity;
@@ -140,6 +146,9 @@ function StockAdjustForm({
 }) {
 	const t = useTranslations("inventory");
 	const adjust = useAdjustStock();
+	// What was paid is the shop's margin: only members who edit products are asked for it.
+	const canPrice = useActiveBusiness().can("products:write");
+	const [price, setPrice] = useState("");
 	const [productId, setProductId] = useState(initialProductId ?? products[0]?.id ?? "");
 	const [type, setType] = useState<StockAdjustmentType>(initialType);
 	const [text, setText] = useState(() => {
@@ -173,10 +182,14 @@ function StockAdjustForm({
 	const quantityLabel = type === "IN" ? t("quantityIn") : type === "OUT" ? t("quantityOut") : t("quantityCount");
 	const hint = type === "IN" ? t("hintIn") : type === "OUT" ? t("hintOut") : t("hintCount");
 
+	const paid = canPrice && type === "IN" && price !== "" ? fromBaht(Number.parseFloat(price) || 0) : null;
+	const newCost =
+		paid !== null && product && quantity ? Math.round(previewAverageCost(before, product.cost, quantity, paid) ?? paid) : null;
+
 	const save = () => {
 		if (!product || quantity === null || after === null) return;
 		adjust.mutate(
-			{ productId: product.id, type, quantity, note: note.trim() || undefined },
+			{ productId: product.id, type, quantity, note: note.trim() || undefined, ...(paid !== null ? { unitCost: paid } : {}) },
 			{
 				onSuccess: (saved) => {
 					toast.success(t("saved", { name: saved.name, count: formatNumber(saved.stock ?? 0), unit: saved.unit }));
@@ -309,6 +322,31 @@ function StockAdjustForm({
 				<p className="-mt-4 text-muted-foreground text-xs">{t("unchanged")}</p>
 			) : null}
 
+			{canPrice && type === "IN" ? (
+				<div className="space-y-3">
+					<label htmlFor="stock-price" className="block font-medium text-sm">
+						{t("unitPrice")} <span className="font-normal text-muted-foreground">({t("notePlaceholder")})</span>
+					</label>
+					<input
+						id="stock-price"
+						inputMode="decimal"
+						maxLength={10}
+						placeholder="0.00"
+						value={price}
+						onChange={(event) => setPrice(event.target.value.replace(/[^\d.]/g, ""))}
+						className="numeric h-10 w-full rounded-lg border bg-card px-3 text-sm outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
+					/>
+					<p className="text-muted-foreground text-xs">
+						{newCost !== null
+							? t("costPreview", {
+									before: product?.cost != null ? formatBaht(product.cost) : "—",
+									after: formatBaht(newCost),
+								})
+							: t("unitPriceHint")}
+					</p>
+				</div>
+			) : null}
+
 			<div className="space-y-3">
 				<label htmlFor="stock-note" className="block font-medium text-sm">
 					{t("note")} <span className="font-normal text-muted-foreground">({t("notePlaceholder")})</span>
@@ -369,7 +407,7 @@ export function StockAdjustDialog({
 	const t = useTranslations("inventory");
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="gap-6 p-6 sm:max-w-lg">
+			<DialogContent className="max-h-[92svh] gap-6 overflow-y-auto p-6 sm:max-w-lg">
 				<DialogHeader>
 					<DialogTitle>{productId ? t("adjustTitle") : t("stockInTitle")}</DialogTitle>
 					<DialogDescription className="sr-only">{t("hintIn")}</DialogDescription>

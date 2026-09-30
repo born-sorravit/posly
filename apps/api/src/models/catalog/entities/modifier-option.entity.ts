@@ -29,6 +29,15 @@ export class ModifierOption extends BaseEntity {
 	})
 	priceDelta: Satang;
 
+	/** Added to the product's cost when chosen — the extra shot's beans. Satang. */
+	@Column({
+		name: "cost_delta",
+		type: "bigint",
+		default: 0,
+		transformer: moneyColumnTransformer,
+	})
+	costDelta: Satang;
+
 	/** Pre-selected in a SINGLE group. */
 	@Column({ name: "is_default", type: "boolean", default: false })
 	isDefault: boolean;

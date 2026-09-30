@@ -48,12 +48,25 @@ export class OrderItem extends BaseEntity {
 	})
 	unitCost: Satang;
 
+	/** The product had no cost when sold: `unitCost` is unknown, not free. */
+	@Column({ name: "cost_missing", type: "boolean", default: false })
+	costMissing: boolean;
+
 	@Column({
 		name: "line_total",
 		type: "bigint",
 		transformer: moneyColumnTransformer,
 	})
 	lineTotal: Satang;
+
+	/** This line's share of the order discount; `lineTotal − discount` is what it earned. */
+	@Column({
+		name: "discount",
+		type: "bigint",
+		default: 0,
+		transformer: moneyColumnTransformer,
+	})
+	discount: Satang;
 
 	@Column({ type: "varchar", length: 200, nullable: true })
 	note: string | null;

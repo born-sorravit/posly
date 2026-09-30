@@ -5,6 +5,7 @@ import { AuthModule } from "@/modules/auth/auth.module";
 import { BranchesModule } from "@/modules/branches/branches.module";
 import { BusinessesModule } from "@/modules/businesses/businesses.module";
 import { CatalogModule } from "@/modules/catalog/catalog.module";
+import { InventoryModule } from "@/modules/inventory/inventory.module";
 import { MembersModule } from "@/modules/members/members.module";
 import { OrdersModule } from "@/modules/orders/orders.module";
 import { ReportsModule } from "@/modules/reports/reports.module";
@@ -62,6 +63,7 @@ import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 		BranchesModule,
 		MembersModule,
 		CatalogModule,
+		InventoryModule,
 		OrdersModule,
 		ReportsModule,
 		ExpensesModule,

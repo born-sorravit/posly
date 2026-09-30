@@ -30,6 +30,7 @@ const hrefOf = (n: NotificationDto): string => {
 	switch (n.kind) {
 		case "LOW_STOCK":
 		case "OUT_OF_STOCK":
+			if (n.data.ingredient) return "/inventory/ingredients";
 			return n.entityId ? `/products/${n.entityId}` : "/products";
 		case "REFUND":
 		case "CANCELLED":

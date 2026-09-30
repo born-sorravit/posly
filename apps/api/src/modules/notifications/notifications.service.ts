@@ -89,9 +89,11 @@ export class NotificationsService {
 		businessId: string,
 		product: StockProduct,
 		before: number,
-		after: number
+		after: number,
+		/** Merged into the payload, e.g. `{ ingredient: true }` so the reader links to it. */
+		extra: Record<string, unknown> = {}
 	): Promise<void> {
-		const data = { name: product.name, unit: product.unit, stock: after };
+		const data = { name: product.name, unit: product.unit, stock: after, ...extra };
 		if (after <= 0 && before > 0) {
 			await this.emit(manager, businessId, NotificationKind.OUT_OF_STOCK, data, {
 				entityId: product.id,

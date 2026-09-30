@@ -8,18 +8,23 @@ import { Expense } from "@/models/expenses/entities/expense.entity";
 import { ModifierGroup } from "@/models/catalog/entities/modifier-group.entity";
 import { ModifierOption } from "@/models/catalog/entities/modifier-option.entity";
 import { Product } from "@/models/catalog/entities/product.entity";
+import { Ingredient } from "@/models/inventory/entities/ingredient.entity";
+import { RecipeLine } from "@/models/inventory/entities/recipe-line.entity";
 import { Order } from "@/models/orders/entities/order.entity";
 import { OrderItem } from "@/models/orders/entities/order-item.entity";
 import { OrderItemModifier } from "@/models/orders/entities/order-item-modifier.entity";
 import { Payment } from "@/models/orders/entities/payment.entity";
 import { Subscription } from "@/models/subscriptions/entities/subscription.entity";
 import { User } from "@/models/users/entities/user.entity";
-import { computeOrderTotals } from "@/modules/orders/pricing";
+import { StockAdjustmentType } from "@/modules/catalog/dto/catalog.dto";
+import { recipeCost, unitCost } from "@/modules/inventory/recipe-cost";
+import { allocateDiscount, computeOrderTotals } from "@/modules/orders/pricing";
 import {
 	DEMO_ACCOUNTS,
 	DEMO_EMAIL_DOMAIN,
 	DEMO_PASSWORD,
 	DEMO_SHOPS,
+	type DemoRecipe,
 	type DemoShop,
 } from "@/shared/database/seeds/demo.data";
 import { dataSourceOptions } from "@/shared/database/typeorm.config";
@@ -257,6 +262,81 @@ async function createShop(
 		})
 	);
 
+	// ------------------------------------------------------------------ ingredients
+	const owner = members.find((mem) => mem.role === MemberRole.OWNER) ?? members[0];
+	const ingredients = new Map<string, Ingredient>();
+	for (const i of shop.ingredients ?? []) {
+		ingredients.set(
+			i.key,
+			await m.save(
+				m.create(Ingredient, {
+					businessId: business.id,
+					name: i.name,
+					unit: i.unit,
+					purchasePrice: i.purchasePrice,
+					purchaseQty: i.purchaseQty,
+					trackStock: i.stock !== undefined,
+					stock: i.stock ?? null,
+					lowStockAt: i.lowStockAt ?? null,
+				})
+			)
+		);
+	}
+	// The last delivery of each tracked ingredient, so its stock history is not empty.
+	await m.save(
+		[...ingredients.values()]
+			.filter((i) => i.trackStock)
+			.map((i) => {
+				const quantity = Math.max(i.purchaseQty, i.stock as number);
+				const perUnit = unitCost(i);
+				return m.create(AuditLog, {
+					businessId: business.id,
+					memberId: owner.id,
+					actorName: owner.displayName,
+					action: AuditAction.STOCK_ADJUSTED,
+					entity: "ingredient",
+					entityId: i.id,
+					payload: {
+						type: StockAdjustmentType.IN,
+						quantity,
+						before: (i.stock as number) - quantity,
+						after: i.stock,
+						note: "รับของจากร้านส่ง",
+						totalCost: Math.round(quantity * perUnit),
+						costBefore: Math.round(perUnit * 10_000) / 10_000,
+						costAfter: Math.round(perUnit * 10_000) / 10_000,
+					},
+					createdAt: new Date(Date.now() - 3 * 86_400_000),
+				});
+			})
+	);
+	const recipeLines = (recipe: DemoRecipe) =>
+		recipe.map(([key, quantity], displayOrder) => {
+			const ingredient = ingredients.get(key);
+			if (!ingredient) throw new Error(`${shop.name}: no ingredient "${key}"`);
+			return { ingredient, quantity, displayOrder };
+		});
+	const saveRecipe = async (
+		target: { productId: string } | { modifierOptionId: string },
+		recipe: DemoRecipe
+	) => {
+		await m.save(
+			recipeLines(recipe).map((line) =>
+				m.create(RecipeLine, {
+					businessId: business.id,
+					productId: null,
+					modifierOptionId: null,
+					...target,
+					ingredientId: line.ingredient.id,
+					quantity: line.quantity,
+					displayOrder: line.displayOrder,
+				})
+			)
+		);
+	};
+	const productRecipes = shop.recipes?.products ?? {};
+	const optionRecipes = shop.recipes?.options ?? {};
+
 	const groups = new Map<string, ModifierGroup>();
 	for (const [i, g] of shop.catalog.groups.entries()) {
 		groups.set(
@@ -272,6 +352,9 @@ async function createShop(
 						m.create(ModifierOption, {
 							name: o.name,
 							priceDelta: o.priceDelta,
+							costDelta: optionRecipes[`${g.key}:${o.name}`]
+								? recipeCost(recipeLines(optionRecipes[`${g.key}:${o.name}`]))
+								: (o.costDelta ?? 0),
 							isDefault: o.isDefault ?? false,
 							displayOrder: j,
 						})
@@ -279,6 +362,10 @@ async function createShop(
 				})
 			)
 		);
+		for (const option of groups.get(g.key)?.options ?? []) {
+			const recipe = optionRecipes[`${g.key}:${option.name}`];
+			if (recipe) await saveRecipe({ modifierOptionId: option.id }, recipe);
+		}
 	}
 
 	const menu: Menu[] = [];
@@ -295,13 +382,14 @@ async function createShop(
 			const productGroups = (p.groups ?? [])
 				.map((key) => groups.get(key))
 				.filter((g): g is ModifierGroup => Boolean(g));
+			const recipe = productRecipes[p.name];
 			const product = await m.save(
 				m.create(Product, {
 					businessId: business.id,
 					categoryId: category.id,
 					name: p.name,
 					price: p.price,
-					cost: p.cost,
+					cost: recipe ? recipeCost(recipeLines(recipe)) : p.cost,
 					art: p.art,
 					unit: p.unit,
 					trackStock: p.stock !== undefined,
@@ -312,6 +400,7 @@ async function createShop(
 					modifierGroups: productGroups,
 				})
 			);
+			if (recipe) await saveRecipe({ productId: product.id }, recipe);
 			menu.push({ product, groups: productGroups });
 		}
 	}
@@ -405,7 +494,9 @@ async function createShop(
 							?.name ?? "",
 					quantity: random() < 0.15 ? 2 : 1,
 					unitPrice,
-					unitCost: entry.product.cost ?? 0,
+					unitCost:
+						(entry.product.cost ?? 0) + chosen.reduce((s, o) => s + o.costDelta, 0),
+					costMissing: entry.product.cost === null,
 				};
 			});
 
@@ -415,6 +506,10 @@ async function createShop(
 				discount,
 				shop.vatBasisPoints,
 				shop.pricesIncludeVat
+			);
+			const lineDiscounts = allocateDiscount(
+				lines.map((l) => l.unitPrice * l.quantity),
+				totals.discount
 			);
 			const method = pickWeighted(random, mix, ([, w]) => w)[0];
 			const received =
@@ -481,7 +576,9 @@ async function createShop(
 							quantity: line.quantity,
 							unitPrice: line.unitPrice,
 							unitCost: line.unitCost,
+							costMissing: line.costMissing,
 							lineTotal: line.unitPrice * line.quantity,
+							discount: lineDiscounts[i],
 							note: null,
 							// Keeps the line order stable, like a real cart.
 							createdAt: new Date(at.getTime() + i),
@@ -494,6 +591,7 @@ async function createShop(
 								groupName: line.groupName(option.id),
 								optionName: option.name,
 								priceDelta: option.priceDelta,
+								costDelta: option.costDelta,
 								createdAt: at,
 								updatedAt: at,
 							});
@@ -592,7 +690,6 @@ async function createShop(
 	const grossProfit = orders
 		.filter((o) => o.status === OrderStatus.PAID)
 		.reduce((sum, o) => sum + (o.total as number) - (o.totalCost as number), 0);
-	const owner = members.find((mem) => mem.role === MemberRole.OWNER) ?? members[0];
 	const round10 = (satang: number) => Math.round(satang / 1000) * 1000;
 	const dayAgo = (days: number) =>
 		getLocalDateString(new Date(Date.now() - days * 86_400_000));

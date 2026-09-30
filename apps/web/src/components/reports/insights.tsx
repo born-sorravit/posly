@@ -429,9 +429,9 @@ export function PeakHours({ data }: { data: InsightsDto }) {
 type ProfitSort = "revenue" | "profit" | "margin";
 
 /**
- * Profit by category and by product, from the cost recorded on each sold line. Order-level
- * discounts are not spread over lines, so every figure here is before them — said on screen,
- * and the gap to the Sales tab's gross profit is exactly those discounts.
+ * Profit by category and by product, from the cost recorded on each sold line. Revenue is after
+ * each line's share of the order discount, so the totals match the Sales tab's gross profit
+ * (orders from before shares were recorded still count their discount as 0).
  */
 export function ProfitInsights({ data }: { data: InsightsDto }) {
 	const t = useTranslations("reports.insights");
@@ -488,7 +488,7 @@ export function ProfitInsights({ data }: { data: InsightsDto }) {
 						<span className="block truncate font-medium">{p.name}</span>
 						<span className="block truncate text-muted-foreground text-xs">{p.category ?? t("uncategorized")}</span>
 					</span>
-					{p.cost === 0 ? (
+					{p.missingCost ? (
 						<StatusBadge tone="warning" className="shrink-0">
 							{noCost}
 						</StatusBadge>
@@ -510,7 +510,7 @@ export function ProfitInsights({ data }: { data: InsightsDto }) {
 				<p className="truncate font-medium">{p.name}</p>
 				<p className="text-muted-foreground text-xs">
 					{tr("sold", { count: p.sold })} · {formatBaht(p.revenue)}
-					{p.cost === 0 ? <span className="text-amber-700 dark:text-warning"> · {noCost}</span> : null}
+					{p.missingCost ? <span className="text-amber-700 dark:text-warning"> · {noCost}</span> : null}
 				</p>
 			</div>
 			<div className="text-right">

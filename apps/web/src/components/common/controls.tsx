@@ -19,6 +19,7 @@ import {
 } from "@posly/ui/components/dropdown-menu";
 import { formatNumber } from "@posly/utils/format";
 import type { Tone } from "@posly/types/domain";
+import { Link, usePathname } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 import {
 	ChevronDown,
@@ -33,6 +34,43 @@ import {
 import { motion } from "motion/react";
 import { useTranslations } from "next-intl";
 import { Fragment, forwardRef, type ReactNode, useId } from "react";
+
+/**
+ * Sub-pages of one page ("สินค้า / วัตถุดิบ" under stock): real links with an underline on
+ * the current one. `Segmented` is for switching a value on the page, not for going elsewhere.
+ */
+export function PageTabs({
+	tabs,
+	className,
+}: {
+	tabs: { href: string; label: ReactNode; icon?: LucideIcon }[];
+	className?: string;
+}) {
+	const pathname = usePathname();
+	return (
+		<nav className={cn("no-scrollbar flex gap-6 overflow-x-auto border-border border-b", className)}>
+			{tabs.map(({ href, label, icon: Icon }) => {
+				const active = pathname === href;
+				return (
+					<Link
+						key={href}
+						href={href}
+						aria-current={active ? "page" : undefined}
+						className={cn(
+							"-mb-px flex h-11 shrink-0 items-center gap-2 border-b-2 px-0.5 font-medium text-sm transition-colors",
+							active
+								? "border-primary text-foreground"
+								: "border-transparent text-muted-foreground hover:text-foreground"
+						)}
+					>
+						{Icon ? <Icon className={cn("size-4", active && "text-primary")} /> : null}
+						{label}
+					</Link>
+				);
+			})}
+		</nav>
+	);
+}
 
 /**
  * A single-choice pill row: date ranges, order filters, category chips. The selected pill

@@ -18,9 +18,27 @@ import { Link, useRouter } from "@/i18n/navigation";
 import { ConfirmDialog } from "@/components/common/controls";
 import { ReadOnlyNotice } from "@/components/common/permission-gate";
 import { EmptyState, TableSkeleton } from "@/components/common/primitives";
-import { useCategories, useDeleteProduct, useModifierGroups, useProduct, useSaveProduct } from "@/hooks/use-posly";
-import { useActiveBusiness } from "@/hooks/use-workspace";
-import type { ProductDto } from "@/lib/api/posly";
+import {
+	blankRecipeLine,
+	type DraftRecipeLine,
+	draftRecipeCost,
+	filledRecipeLines,
+	RecipeEditor,
+	toDraftLines,
+} from "@/components/catalog/recipe-editor";
+import { Segmented } from "@/components/common/controls";
+import {
+	useCategories,
+	useDeleteProduct,
+	useIngredients,
+	useModifierGroups,
+	useProduct,
+	useRecipe,
+	useSaveProduct,
+	useSetRecipe,
+} from "@/hooks/use-posly";
+import { useActiveBusiness, useFeature } from "@/hooks/use-workspace";
+import type { ProductDto, RecipeDto } from "@/lib/api/posly";
 import { isAllowedImage, MAX_UPLOAD_BYTES, uploadImage } from "@/lib/api/uploads";
 import { formatBaht, fromBaht } from "@posly/utils/money";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -114,7 +132,18 @@ export function ProductFormPage({ productId }: { productId?: string }) {
 	const t = useTranslations("productForm");
 	const product = useProduct(productId);
 	const categories = useCategories();
-	if ((productId && product.isPending) || categories.isPending) {
+	// Recipes need the Inventory feature and the right to see costs; without either the
+	// form is exactly what it was, a typed cost.
+	const inventory = useFeature("INVENTORY");
+	const { can } = useActiveBusiness();
+	const recipes = inventory && can("products:write");
+	const recipe = useRecipe(productId ? { productId } : null, recipes);
+	const ingredients = useIngredients(recipes);
+	if (
+		(productId && product.isPending) ||
+		categories.isPending ||
+		(recipes && ((productId && recipe.isPending) || ingredients.isPending))
+	) {
 		return (
 			<PageContainer className="max-w-5xl">
 				<TableSkeleton />
@@ -128,10 +157,17 @@ export function ProductFormPage({ productId }: { productId?: string }) {
 			</PageContainer>
 		);
 	}
-	return <ProductForm key={product.data?.id ?? "new"} product={product.data} />;
+	return (
+		<ProductForm
+			key={product.data?.id ?? "new"}
+			product={product.data}
+			recipes={recipes}
+			recipe={recipe.data}
+		/>
+	);
 }
 
-function ProductForm({ product }: { product?: ProductDto }) {
+function ProductForm({ product, recipes, recipe }: { product?: ProductDto; recipes: boolean; recipe?: RecipeDto }) {
 	const t = useTranslations("productForm");
 	const router = useRouter();
 	const { business, can } = useActiveBusiness();
@@ -148,6 +184,15 @@ function ProductForm({ product }: { product?: ProductDto }) {
 	// Before the shop's list loads, show what the product already has so nothing flickers.
 	const allGroups = modifierGroups.data ?? product?.modifierGroups ?? [];
 	const [groupIds, setGroupIds] = useState<string[]>(() => product?.modifierGroups.map((g) => g.id) ?? []);
+	const ingredients = useIngredients(recipes).data ?? [];
+	const setRecipe = useSetRecipe();
+	const hadRecipe = (recipe?.lines.length ?? 0) > 0;
+	const [costMode, setCostMode] = useState<"manual" | "recipe">(hadRecipe ? "recipe" : "manual");
+	const [recipeLines, setRecipeLines] = useState<DraftRecipeLine[]>(() =>
+		hadRecipe ? toDraftLines(recipe) : [blankRecipeLine()]
+	);
+	const fromRecipe = recipes && costMode === "recipe";
+	const recipeCost = draftRecipeCost(recipeLines, ingredients);
 
 	useEffect(() => () => {
 		if (preview?.startsWith("blob:")) URL.revokeObjectURL(preview);
@@ -181,7 +226,7 @@ function ProductForm({ product }: { product?: ProductDto }) {
 	});
 	const unitPresets = t.raw("unitPresets") as string[];
 	const price = Number(priceInput) || 0;
-	const cost = Number(costInput) || 0;
+	const cost = fromRecipe ? recipeCost / 100 : Number(costInput) || 0;
 	const margin = price > 0 && cost > 0 ? Math.round(((price - cost) / price) * 100) : null;
 
 	const onFile = async (file: File | undefined) => {
@@ -202,13 +247,19 @@ function ProductForm({ product }: { product?: ProductDto }) {
 	};
 
 	const onSubmit = async (values: FormValues) => {
+		const lines = filledRecipeLines(recipeLines);
+		if (fromRecipe && lines.length === 0) return toast.error(t("recipeEmpty"));
 		// Every amount leaves as satang, converted once here.
 		try {
-			await save.mutateAsync({
+			// Back to a typed cost: drop the recipe first, or the server keeps its computed cost.
+			if (recipes && product && hadRecipe && !fromRecipe) {
+				await setRecipe.mutateAsync({ owner: { productId: product.id }, lines: [] });
+			}
+			const saved = await save.mutateAsync({
 				name: values.name,
 				categoryId: values.categoryId || null,
 				price: fromBaht(values.price),
-				cost: values.cost === "" ? null : fromBaht(values.cost),
+				cost: fromRecipe ? recipeCost : values.cost === "" ? null : fromBaht(values.cost),
 				sku: values.sku.trim() || null,
 				barcode: values.barcode.trim() || null,
 				trackStock: values.trackStock,
@@ -218,6 +269,16 @@ function ProductForm({ product }: { product?: ProductDto }) {
 				modifierGroupIds: groupIds,
 				...(imagePath !== undefined ? { imagePath } : {}),
 			});
+			if (fromRecipe) {
+				try {
+					await setRecipe.mutateAsync({ owner: { productId: saved.id }, lines });
+				} catch (error) {
+					// The product exists now: retrying from a "new" form would create a second one.
+					toast.error(error instanceof Error ? error.message : t("saveFailed"));
+					if (!product) router.replace(`/products/${saved.id}`);
+					return;
+				}
+			}
 			toast.success(t("saved"));
 			router.push("/products");
 		} catch (error) {
@@ -334,9 +395,19 @@ function ProductForm({ product }: { product?: ProductDto }) {
 								<Field
 									label={t("cost")}
 									htmlFor="cost"
-									hint={margin !== null ? t("margin", { margin }) : t("costHint")}
+									hint={
+										margin !== null
+											? `${fromRecipe ? `${t("costFromRecipe")} · ` : ""}${t("margin", { margin })}`
+											: fromRecipe
+												? t("costFromRecipe")
+												: t("costHint")
+									}
 								>
-									<Input id="cost" maxLength={10} inputMode="decimal" className="numeric h-11 rounded-xl" placeholder="0.00" {...register("cost")} />
+									{fromRecipe ? (
+										<Input id="cost" readOnly value={(recipeCost / 100).toFixed(2)} className="numeric h-11 rounded-xl bg-muted/50" />
+									) : (
+										<Input id="cost" maxLength={10} inputMode="decimal" className="numeric h-11 rounded-xl" placeholder="0.00" {...register("cost")} />
+									)}
 								</Field>
 								<Field label={t("sku")} htmlFor="sku">
 									<Input id="sku" maxLength={40} className="h-11 rounded-xl" {...register("sku")} />
@@ -346,6 +417,29 @@ function ProductForm({ product }: { product?: ProductDto }) {
 								</Field>
 							</div>
 						</Surface>
+
+						{recipes && !readOnly ? (
+							<Surface className="space-y-4">
+								<div className="flex flex-col gap-3 tablet:flex-row tablet:items-start tablet:justify-between">
+									<div>
+										<p className="font-semibold">{t("recipeTitle")}</p>
+										<p className="text-muted-foreground text-sm">{t("recipeHint")}</p>
+									</div>
+									<Segmented
+										className="shrink-0"
+										value={costMode}
+										onChange={setCostMode}
+										options={[
+											{ value: "manual", label: t("costManual") },
+											{ value: "recipe", label: t("costRecipe") },
+										]}
+									/>
+								</div>
+								{fromRecipe ? (
+									<RecipeEditor ingredients={ingredients} lines={recipeLines} onChange={setRecipeLines} />
+								) : null}
+							</Surface>
+						) : null}
 
 						<Surface className="space-y-4">
 							<div className="flex items-center justify-between gap-4">

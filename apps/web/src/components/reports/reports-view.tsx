@@ -22,7 +22,7 @@ import {
 } from "@/components/reports/period-picker";
 import { formatBaht } from "@posly/utils/money";
 import { downloadFile, toCsv } from "@/lib/export/csv";
-import { BarChart3, Coins, Download, Lock, PiggyBank, ReceiptText, ShoppingBag } from "lucide-react";
+import { AlertTriangle, BarChart3, Coins, Download, Lock, PiggyBank, ReceiptText, ShoppingBag } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { useFeature } from "@/hooks/use-workspace";
@@ -61,9 +61,13 @@ function AdvancedLocked() {
  * into cost, expenses and what is left. A loss has nothing left, so the bar is scaled to
  * what went out and the shortfall is named instead.
  */
-function ProfitBreakdown({ metrics }: { metrics: DashboardDto["metrics"] }) {
+function ProfitBreakdown({ metrics, productsWithoutCost }: { metrics: DashboardDto["metrics"]; productsWithoutCost: number }) {
 	const t = useTranslations("reports.breakdown");
 	const hasExpenses = useFeature("EXPENSES");
+	// VAT added on top of prices is the tax office's, so profit is measured without it.
+	const vatAdded = Math.max(0, metrics.revenue - metrics.cost - metrics.grossProfit);
+	const sales = metrics.revenue - vatAdded;
+	const doubleCounted = hasExpenses && metrics.ingredientExpenses > 0 && metrics.cost > 0;
 	const expenses = hasExpenses ? metrics.expenses : 0;
 	const profit = hasExpenses ? metrics.estimatedProfit : metrics.grossProfit;
 	const row = (label: string, value: number, tone: "plain" | "minus" | "total" = "plain") => (
@@ -80,14 +84,14 @@ function ProfitBreakdown({ metrics }: { metrics: DashboardDto["metrics"] }) {
 		</div>
 	);
 
-	const whole = Math.max(metrics.revenue, metrics.cost + expenses, 1);
+	const whole = Math.max(sales, metrics.cost + expenses, 1);
 	const parts = [
 		{ key: "cost", label: t("cost"), value: metrics.cost, color: "var(--chart-3)" },
 		...(hasExpenses ? [{ key: "expenses", label: t("expenses"), value: expenses, color: "var(--chart-5)" }] : []),
 		{ key: "profit", label: hasExpenses ? t("net") : t("gross"), value: Math.max(0, profit), color: "var(--success)" },
 	].filter((p) => p.value > 0);
-	const margin = metrics.revenue > 0 ? Math.round((profit / metrics.revenue) * 1000) / 10 : null;
-	const share = (value: number) => (metrics.revenue > 0 ? `${Math.round((value / metrics.revenue) * 1000) / 10}%` : "–");
+	const margin = sales > 0 ? Math.round((profit / sales) * 1000) / 10 : null;
+	const share = (value: number) => (sales > 0 ? `${Math.round((value / sales) * 1000) / 10}%` : "–");
 
 	return (
 		<Surface>
@@ -95,6 +99,7 @@ function ProfitBreakdown({ metrics }: { metrics: DashboardDto["metrics"] }) {
 			<div className="grid gap-6 desktop:grid-cols-2 desktop:gap-10">
 				<div className="text-sm">
 					{row(t("revenue"), metrics.revenue)}
+					{vatAdded > 0 ? row(t("vatAdded"), vatAdded, "minus") : null}
 					{row(t("cost"), metrics.cost, "minus")}
 					{row(t("gross"), metrics.grossProfit, "total")}
 					{hasExpenses ? (
@@ -112,11 +117,11 @@ function ProfitBreakdown({ metrics }: { metrics: DashboardDto["metrics"] }) {
 							{margin === null ? "–" : `${margin}%`}
 						</p>
 						<p className="mt-1 text-muted-foreground text-xs">
-							{metrics.revenue <= 0
+							{sales <= 0
 								? t("noSales")
 								: profit < 0
 									? t("loss", { amount: formatBaht(-profit) })
-									: t("perHundred", { amount: formatBaht(Math.round((profit / metrics.revenue) * 10_000)) })}
+									: t("perHundred", { amount: formatBaht(Math.round((profit / sales) * 10_000)) })}
 						</p>
 					</div>
 
@@ -144,6 +149,27 @@ function ProfitBreakdown({ metrics }: { metrics: DashboardDto["metrics"] }) {
 					) : null}
 				</div>
 			</div>
+			{productsWithoutCost > 0 || doubleCounted ? (
+				<div className="mt-4 grid gap-2">
+					{productsWithoutCost > 0 ? (
+						<p className="flex items-start gap-2 rounded-xl bg-warning/10 px-3.5 py-2.5 text-foreground text-xs leading-relaxed">
+							<AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
+							<span>
+								{t("missingCost", { count: productsWithoutCost })}{" "}
+								<Link href="/products" className="font-medium text-primary hover:underline">
+									{t("addCost")}
+								</Link>
+							</span>
+						</p>
+					) : null}
+					{doubleCounted ? (
+						<p className="flex items-start gap-2 rounded-xl bg-warning/10 px-3.5 py-2.5 text-foreground text-xs leading-relaxed">
+							<AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
+							<span>{t("doubleCount", { amount: formatBaht(metrics.ingredientExpenses) })}</span>
+						</p>
+					) : null}
+				</div>
+			) : null}
 			<p className="mt-4 text-muted-foreground text-xs leading-relaxed">
 				{hasExpenses ? t("hint") : t("hintNoExpenses")}{" "}
 				{hasExpenses ? (
@@ -237,6 +263,7 @@ export function ReportsView() {
 			[t("revenue"), baht(m.revenue)],
 			[t("orders"), m.orders],
 			[t("average"), baht(m.averageOrder)],
+			...(m.revenue - m.cost - m.grossProfit > 0 ? [[tBreakdown("vatAdded"), baht(m.revenue - m.cost - m.grossProfit)]] : []),
 			[tBreakdown("cost"), baht(m.cost)],
 			[tBreakdown("gross"), baht(m.grossProfit)],
 			[tBreakdown("expenses"), baht(m.expenses)],
@@ -340,7 +367,7 @@ export function ReportsView() {
 								<MetricCard icon={PiggyBank} tone="warning" label={t("profit")} value={formatBaht(data.metrics.estimatedProfit)} change={data.metrics.profitChange} />
 							</div>
 							<div data-tour="reports-profit">
-								<ProfitBreakdown metrics={data.metrics} />
+								<ProfitBreakdown metrics={data.metrics} productsWithoutCost={data.productsWithoutCost} />
 							</div>
 							<SalesChart
 								height={300}

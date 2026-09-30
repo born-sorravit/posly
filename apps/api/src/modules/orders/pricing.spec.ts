@@ -1,4 +1,4 @@
-import { computeOrderTotals } from "@/modules/orders/pricing";
+import { allocateDiscount, computeOrderTotals } from "@/modules/orders/pricing";
 
 const lines = [
 	{ unitPrice: 6000, unitCost: 1800, quantity: 1 },
@@ -26,5 +26,22 @@ describe("computeOrderTotals", () => {
 	it("clamps a discount to the subtotal and ignores a negative one", () => {
 		expect(computeOrderTotals(lines, 999_999, 0, true).total).toBe(0);
 		expect(computeOrderTotals(lines, -500, 0, true).discount).toBe(0);
+	});
+});
+
+describe("allocateDiscount", () => {
+	it("spreads the discount by line amount", () => {
+		expect(allocateDiscount([6000, 14_000, 6500], 2650)).toEqual([600, 1400, 650]);
+	});
+
+	it("rounds to whole satang that add up to the discount exactly", () => {
+		const shares = allocateDiscount([100, 100, 100], 100);
+		expect(shares.reduce((a, b) => a + b, 0)).toBe(100);
+		expect(shares).toEqual([34, 33, 33]);
+	});
+
+	it("gives nothing when there is no discount or nothing to discount", () => {
+		expect(allocateDiscount([6000, 7000], 0)).toEqual([0, 0]);
+		expect(allocateDiscount([0, 0], 500)).toEqual([0, 0]);
 	});
 });

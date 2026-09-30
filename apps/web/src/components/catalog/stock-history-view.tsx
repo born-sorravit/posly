@@ -8,6 +8,7 @@ import { useProducts, useStockAdjustments } from "@/hooks/use-posly";
 import { Link } from "@/i18n/navigation";
 import type { StockAdjustmentDto, StockAdjustmentType } from "@/lib/api/posly";
 import { formatClock, formatNumber, formatThaiDate } from "@posly/utils/format";
+import { formatBaht } from "@posly/utils/money";
 import { cn } from "@/lib/utils";
 import { ArrowLeft, ArrowRight, History, Package, Shapes } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -64,7 +65,18 @@ export function StockHistoryView() {
 			cell: (r) => (
 				<span className="flex items-center gap-3">
 					<ProductThumb art={r.art} name={r.productName} className="size-9" rounded="rounded-lg" />
-					<span className={cn("font-medium", r.productDeleted && "text-muted-foreground")}>{r.productName}</span>
+					<span className="min-w-0">
+						<span className={cn("block font-medium", r.productDeleted && "text-muted-foreground")}>{r.productName}</span>
+						{/* A receipt at a price: what was paid, and where it moved the cost. */}
+						{r.unitCost !== null ? (
+							<span className="numeric block text-muted-foreground text-xs">
+								{t("paidPerUnit", { price: formatBaht(r.unitCost), unit: r.productUnit })}
+								{r.costAfter !== null && r.costAfter !== r.costBefore
+									? ` · ${t("costMoved", { before: r.costBefore !== null ? formatBaht(r.costBefore) : "—", after: formatBaht(r.costAfter) })}`
+									: ""}
+							</span>
+						) : null}
+					</span>
 					{r.productDeleted ? <StatusBadge tone="neutral">{t("deleted")}</StatusBadge> : null}
 				</span>
 			),
