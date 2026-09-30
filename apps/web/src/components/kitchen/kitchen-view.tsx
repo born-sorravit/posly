@@ -4,6 +4,14 @@ import { FeatureLocked } from "@/components/common/feature-locked";
 import { SERVICE_ICON } from "@/components/pos/order-tag";
 import type { ServiceType } from "@posly/types/domain";
 import { Button } from "@posly/ui/components/button";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuRadioGroup,
+	DropdownMenuRadioItem,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from "@posly/ui/components/dropdown-menu";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@posly/ui/components/sheet";
 import { Skeleton } from "@posly/ui/components/skeleton";
 import { useKitchenBoard, useKitchenMutations } from "@/hooks/use-posly";
@@ -14,7 +22,7 @@ import { TABLET_UP, useMediaQuery } from "@/hooks/use-media-query";
 import type { KitchenStatus, KitchenTicketDto } from "@/lib/api/posly";
 import { formatClock } from "@posly/utils/format";
 import { cn } from "@/lib/utils";
-import { ArrowRight, Bell, BellOff, Check, ChefHat, ChevronDown, History, Loader2, RotateCcw, Undo2, WifiOff } from "lucide-react";
+import { ArrowRight, Bell, BellOff, Check, ChefHat, ChevronDown, History, Loader2, RotateCcw, Undo2, Volume2, WifiOff } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useTranslations } from "next-intl";
 import { type ReactNode, useEffect, useRef, useState, useSyncExternalStore } from "react";
@@ -41,38 +49,69 @@ const subscribeSound = (notify: () => void) => {
 	soundListeners.add(notify);
 	return () => soundListeners.delete(notify);
 };
-let soundFallback = false;
-const readSound = () => {
+const TONES = ["chime", "bell", "alert", "beep"] as const;
+type Tone = (typeof TONES)[number];
+type SoundSetting = Tone | "off";
+
+let soundFallback: SoundSetting = "off";
+/** Stored per device. "on" is what the old on/off switch wrote; it meant the chime. */
+const readSound = (): SoundSetting => {
 	try {
-		return localStorage.getItem(SOUND_KEY) === "on";
+		const raw = localStorage.getItem(SOUND_KEY);
+		if (raw === "on") return "chime";
+		return (TONES as readonly string[]).includes(raw ?? "") ? (raw as Tone) : "off";
 	} catch {
 		return soundFallback;
 	}
 };
-const writeSound = (on: boolean) => {
+const writeSound = (setting: SoundSetting) => {
 	try {
-		localStorage.setItem(SOUND_KEY, on ? "on" : "off");
+		localStorage.setItem(SOUND_KEY, setting);
 	} catch {
 		// Private mode: the setting lasts for this visit only.
-		soundFallback = on;
+		soundFallback = setting;
 	}
 	for (const notify of soundListeners) notify();
 };
 
-/** A short two-note chime, made on the spot — no audio file to load or cache. */
-const chime = (context: AudioContext) => {
-	const now = context.currentTime;
-	for (const [i, freq] of [880, 1320].entries()) {
-		const osc = context.createOscillator();
-		const gain = context.createGain();
-		osc.frequency.value = freq;
-		osc.type = "sine";
-		gain.gain.setValueAtTime(0.0001, now + i * 0.16);
-		gain.gain.exponentialRampToValueAtTime(0.25, now + i * 0.16 + 0.02);
-		gain.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.16 + 0.35);
-		osc.connect(gain).connect(context.destination);
-		osc.start(now + i * 0.16);
-		osc.stop(now + i * 0.16 + 0.4);
+/** One note: a wave at a pitch, rising fast and dying away. */
+const note = (
+	context: AudioContext,
+	{ freq, at, length, type = "sine", peak = 0.25 }: { freq: number; at: number; length: number; type?: OscillatorType; peak?: number }
+) => {
+	const start = context.currentTime + at;
+	const osc = context.createOscillator();
+	const gain = context.createGain();
+	osc.type = type;
+	osc.frequency.value = freq;
+	gain.gain.setValueAtTime(0.0001, start);
+	gain.gain.exponentialRampToValueAtTime(peak, start + 0.015);
+	gain.gain.exponentialRampToValueAtTime(0.0001, start + length);
+	osc.connect(gain).connect(context.destination);
+	osc.start(start);
+	osc.stop(start + length + 0.05);
+};
+
+/**
+ * The new-order sounds, made on the spot — no audio file to load or cache. From soft to
+ * loud: a counter with music on wants the chime, a kitchen with a fryer going wants the alert.
+ */
+const play = (context: AudioContext, tone: Tone) => {
+	switch (tone) {
+		case "chime": // two rising notes
+			note(context, { freq: 880, at: 0, length: 0.35 });
+			note(context, { freq: 1320, at: 0.16, length: 0.35 });
+			break;
+		case "bell": // a service bell: one bright strike with a long ring and an overtone
+			note(context, { freq: 1568, at: 0, length: 1.4, peak: 0.3 });
+			note(context, { freq: 3136, at: 0, length: 0.8, peak: 0.08 });
+			break;
+		case "alert": // three hard beeps, repeated: cuts through a noisy kitchen
+			for (let i = 0; i < 6; i++) note(context, { freq: i % 3 === 2 ? 1175 : 988, at: i * 0.14 + (i >= 3 ? 0.25 : 0), length: 0.1, type: "square", peak: 0.12 });
+			break;
+		case "beep": // one short, quiet pip
+			note(context, { freq: 740, at: 0, length: 0.18, type: "triangle", peak: 0.22 });
+			break;
 	}
 };
 
@@ -416,7 +455,7 @@ export function KitchenView() {
 	const live = useRealtime((s) => s.connected);
 	const now = useNow(15_000);
 	// Per device, read after hydration: the server has no idea what this tablet chose.
-	const sound = useSyncExternalStore(subscribeSound, readSound, () => false);
+	const sound = useSyncExternalStore(subscribeSound, readSound, () => "off" as SoundSetting);
 	const audio = useRef<AudioContext | null>(null);
 	const wide = useMediaQuery(TABLET_UP);
 	// Only the columns someone folded or unfolded by hand; the rest follow "has tickets".
@@ -428,21 +467,20 @@ export function KitchenView() {
 		const open = board.data?.open;
 		if (!open) return;
 		const ids = new Set(open.filter((ticket) => ticket.status === "NEW").map((ticket) => ticket.id));
-		if (seen.current && sound && audio.current && [...ids].some((id) => !seen.current?.has(id))) {
-			chime(audio.current);
+		if (seen.current && sound !== "off" && audio.current && [...ids].some((id) => !seen.current?.has(id))) {
+			play(audio.current, sound);
 		}
 		seen.current = new Set([...(seen.current ?? []), ...ids]);
 	}, [board.data, sound]);
 
-	const toggleSound = () => {
-		const next = !sound;
-		// Browsers only let a page make sound after a tap; this tap is that permission.
-		if (next) {
+	const chooseSound = (setting: SoundSetting) => {
+		// Browsers only let a page make sound after a tap; choosing is that tap, and a preview.
+		if (setting !== "off") {
 			audio.current ??= new AudioContext();
 			void audio.current.resume();
-			chime(audio.current);
+			play(audio.current, setting);
 		}
-		writeSound(next);
+		writeSound(setting);
 	};
 
 	if (!enabled) return <FeatureLocked title={t("lockedTitle")} hint={t("lockedHint")} action={t("upgrade")} />;
@@ -472,17 +510,54 @@ export function KitchenView() {
 				)}
 				<span className="text-muted-foreground text-sm">· {t("tapToTick")}</span>
 				<div className="ml-auto flex gap-2">
-					<Button
-						variant="outline"
-						size="lg"
-						onClick={toggleSound}
-						aria-pressed={sound}
-						title={t("sound")}
-						data-tour="kitchen-sound"
-					>
-						{sound ? <Bell /> : <BellOff />}
-						{sound ? t("soundOn") : t("soundOff")}
-					</Button>
+					<DropdownMenu>
+						<DropdownMenuTrigger asChild>
+							{/* On or off at a glance; which tone is a detail for the menu. */}
+							<Button variant="outline" size="lg" data-tour="kitchen-sound" className="gap-2">
+								{sound === "off" ? <BellOff className="text-muted-foreground" /> : <Bell />}
+								{sound === "off" ? t("soundOff") : t("soundOn")}
+								<ChevronDown className="size-4 text-muted-foreground" />
+							</Button>
+						</DropdownMenuTrigger>
+						<DropdownMenuContent align="end" className="w-72 p-1.5">
+							<div className="px-2.5 pt-1.5 pb-2">
+								<p className="font-medium text-sm">{t("sound")}</p>
+								<p className="text-muted-foreground text-xs">{t("soundHint")}</p>
+							</div>
+							<DropdownMenuSeparator />
+							<DropdownMenuRadioGroup value={sound} onValueChange={(v) => chooseSound(v as SoundSetting)}>
+								{TONES.map((tone) => (
+									// Keeps the menu open, so tones can be tried one after another.
+									<DropdownMenuRadioItem
+										key={tone}
+										value={tone}
+										onSelect={(e) => e.preventDefault()}
+										className="gap-3 rounded-lg py-2 pr-9 pl-2"
+									>
+										<span
+											className={cn(
+												"flex size-8 items-center justify-center rounded-lg",
+												sound === tone ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+											)}
+										>
+											<Volume2 className="size-4" />
+										</span>
+										<span className="flex min-w-0 flex-col">
+											<span className="font-medium">{t(`tones.${tone}`)}</span>
+											<span className="text-muted-foreground text-xs">{t(`toneHints.${tone}`)}</span>
+										</span>
+									</DropdownMenuRadioItem>
+								))}
+								<DropdownMenuSeparator />
+								<DropdownMenuRadioItem value="off" className="gap-3 rounded-lg py-2 pr-9 pl-2">
+									<span className="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+										<BellOff className="size-4" />
+									</span>
+									<span className="font-medium">{t("soundOff")}</span>
+								</DropdownMenuRadioItem>
+							</DropdownMenuRadioGroup>
+						</DropdownMenuContent>
+					</DropdownMenu>
 					<RecentSheet tickets={board.data?.recent ?? []} />
 				</div>
 			</div>
