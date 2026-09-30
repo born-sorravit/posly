@@ -5,7 +5,7 @@ import type { AuthenticatedUser } from "@/shared/decorators/current-user.decorat
 import { MemberRole } from "@/shared/enums/member-role.enum";
 import { MemberStatus } from "@/shared/enums/member-status.enum";
 import { OrderStatus } from "@/shared/enums/order.enum";
-import { SubscriptionStatus } from "@/shared/enums/subscription.enum";
+import { PlanCode, SubscriptionStatus } from "@/shared/enums/subscription.enum";
 import { DEMO_EMAIL_DOMAIN } from "@/shared/utils/demo.util";
 import {
 	PaginatedResponse,
@@ -18,6 +18,8 @@ import { DataSource, type EntityManager } from "typeorm";
 import {
 	AdminActionRow,
 	AdminActionsQueryDto,
+	AdminAttentionResponse,
+	AdminAttentionRow,
 	AdminActivityQueryDto,
 	AdminAuditRow,
 	AdminBusinessDetail,
@@ -69,6 +71,19 @@ const iso = (value: unknown): string | null =>
 	value == null ? null : new Date(value as string).toISOString();
 
 const mb = (bytes: number) => Math.round((bytes / 1024 / 1024) * 10) / 10;
+
+const toAttentionRow = (row: Record<string, unknown>): AdminAttentionRow => ({
+	businessId: row.businessId as string,
+	businessName: row.businessName as string,
+	ownerEmail: (row.ownerEmail as string) ?? null,
+	plan: (row.plan as string) ?? null,
+	endDate: iso(row.endDate),
+	lastOrderAt: iso(row.lastOrderAt),
+	ordersThisMonth: row.ordersThisMonth == null ? null : num(row.ordersThisMonth),
+	orderLimit: row.orderLimit == null ? null : num(row.orderLimit),
+	createdAt: iso(row.createdAt) as string,
+	cancelAtPeriodEnd: Boolean(row.cancelAtPeriodEnd),
+});
 
 /**
  * Read-only, platform-wide queries for the admin monitor.
@@ -228,6 +243,78 @@ export class AdminService {
 				gmv: num(row.gmv),
 			})),
 		};
+	}
+
+	/**
+	 * Shops an operator should look at, one list per reason. Each list is capped: it is a
+	 * worklist, not a report, and the lists page links on to the shop.
+	 */
+	async attention(includeDemo: boolean): Promise<AdminAttentionResponse> {
+		const cte = `WITH ${shopsCte(includeDemo)},
+			base AS (
+				SELECT b.id AS "businessId", b.name AS "businessName", b.created_at AS "createdAt",
+					b.onboarded_at AS "onboardedAt", b.timezone,
+					(SELECT u.email FROM business_member m JOIN "user" u ON u.id = m.user_id
+						WHERE m.business_id = b.id AND m.role = '${MemberRole.OWNER}' AND m.deleted_at IS NULL
+						ORDER BY m.created_at LIMIT 1) AS "ownerEmail",
+					s.plan_code AS plan, s.status, s.end_date AS "endDate",
+					s.cancel_at_period_end AS "cancelAtPeriodEnd",
+					(SELECT MAX(o.created_at) FROM "order" o
+						WHERE o.business_id = b.id AND o.deleted_at IS NULL) AS "lastOrderAt"
+				FROM business b
+				JOIN shops ON shops.id = b.id
+				LEFT JOIN subscription s ON s.business_id = b.id AND s.deleted_at IS NULL)`;
+		const list = async (where: string, order: string, extra = "") =>
+			(
+				await this.dataSource.query(
+					`${cte}
+					SELECT base.*, NULL::int AS "ordersThisMonth", NULL::int AS "orderLimit" ${extra}
+					FROM base WHERE ${where} ORDER BY ${order} LIMIT 50`
+				)
+			).map(toAttentionRow);
+
+		const [pastDue, expiring, dormant, notOnboarded] = await Promise.all([
+			list(`status = '${SubscriptionStatus.PAST_DUE}'`, `"endDate" NULLS LAST`),
+			list(
+				`status IN ('${SubscriptionStatus.ACTIVE}', '${SubscriptionStatus.TRIALING}')
+				AND plan <> '${PlanCode.FREE}'
+				AND ("cancelAtPeriodEnd" OR ("endDate" IS NOT NULL AND "endDate" < now() + interval '7 days'))`,
+				`"endDate" NULLS LAST`
+			),
+			list(
+				`"lastOrderAt" IS NOT NULL AND "lastOrderAt" < now() - interval '7 days'`,
+				`"lastOrderAt" DESC`
+			),
+			list(
+				`"onboardedAt" IS NULL AND "createdAt" < now() - interval '3 days'`,
+				`"createdAt" DESC`
+			),
+		]);
+
+		// The plan in force, as entitlements decide it: a lapsed paid plan counts as Free.
+		const nearQuota = (
+			await this.dataSource.query(
+				`${cte},
+				usage AS (
+					SELECT base.*,
+						(SELECT COUNT(*) FROM "order" o
+							WHERE o.business_id = base."businessId" AND o.deleted_at IS NULL
+							AND o.created_at >= (date_trunc('month', now() AT TIME ZONE base.timezone) AT TIME ZONE base.timezone)
+						)::int AS "ordersThisMonth",
+						p.order_limit AS "orderLimit"
+					FROM base
+					JOIN subscription_plan p ON p.code = CASE
+						WHEN base.status IN ('${SubscriptionStatus.ACTIVE}', '${SubscriptionStatus.TRIALING}')
+							AND (base."endDate" IS NULL OR base."endDate" > now())
+						THEN base.plan ELSE '${PlanCode.FREE}' END)
+				SELECT * FROM usage
+				WHERE "orderLimit" IS NOT NULL AND "ordersThisMonth" >= "orderLimit" * 0.8
+				ORDER BY "ordersThisMonth"::float / NULLIF("orderLimit", 0) DESC
+				LIMIT 50`
+			)
+		).map(toAttentionRow);
+
+		return { pastDue, expiring, nearQuota, dormant, notOnboarded };
 	}
 
 	async businesses(

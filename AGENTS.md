@@ -8,3 +8,10 @@ Read `docs/README.md` inside that installed package first, then read the relevan
 
 This block is written and re-added by `turbo` before repository-scoped commands when an AI agent is detected. In the Turborepo source repository, its template is defined in `crates/turborepo-cli/src/cli/agent_guidance.rs`. Removing the managed block while updates are enabled means a later qualifying invocation will add it again. Set `"agentGuidance": false` in the root `turbo.json` or `turbo.jsonc` to opt out; this does not remove an existing block. Keep the block committed with your work to avoid an uncommitted change on the next agent invocation.
 <!-- END:turborepo-agent-rules -->
+
+# UI work
+
+Before changing any screen in `apps/web` or `apps/admin`, read `packages/ui/DESIGN.md`: the
+tokens, the shared brand utilities, the component vocabulary both apps use, and the phone /
+tablet / desktop rules. Build from the existing components there before adding new ones, and
+update DESIGN.md in the same change when a rule changes.

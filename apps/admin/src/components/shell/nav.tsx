@@ -1,7 +1,8 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { Activity, CreditCard, LayoutGrid, type LucideIcon, Server, Store, Users } from "lucide-react";
+import { useAttention } from "@/lib/use-attention";
+import { Activity, BellRing, CreditCard, LayoutGrid, type LucideIcon, Server, Store, Users } from "lucide-react";
 import { motion } from "motion/react";
 import Image from "next/image";
 import Link from "next/link";
@@ -12,6 +13,7 @@ const SECTIONS: { title?: string; items: { href: string; label: string; icon: Lu
 	{
 		items: [
 			{ href: "/", label: "ภาพรวม", icon: LayoutGrid },
+			{ href: "/attention", label: "ต้องดูแล", icon: BellRing },
 			{ href: "/businesses", label: "ร้านค้า", icon: Store },
 			{ href: "/users", label: "ผู้ใช้", icon: Users },
 			{ href: "/subscriptions", label: "Subscriptions", icon: CreditCard },
@@ -49,6 +51,8 @@ export function Brand({ onNavigate }: { onNavigate?: () => void }) {
 
 export function SidebarNav({ onNavigate, layoutId = "sidebar-active" }: { onNavigate?: () => void; layoutId?: string }) {
 	const pathname = usePathname();
+	// Shops waiting on someone: the one number worth showing in the menu.
+	const { total: attention } = useAttention();
 	return (
 		<nav className="grid gap-5">
 			{SECTIONS.map((section, index) => (
@@ -81,6 +85,11 @@ export function SidebarNav({ onNavigate, layoutId = "sidebar-active" }: { onNavi
 								) : null}
 								<Icon className={cn("relative size-[18px] shrink-0", active ? "text-primary" : "group-hover:text-foreground")} />
 								<span className="relative truncate">{label}</span>
+								{href === "/attention" && attention > 0 ? (
+									<span className="numeric relative ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1.5 font-semibold text-[11px] text-white">
+										{attention > 99 ? "99+" : attention}
+									</span>
+								) : null}
 							</Link>
 						);
 					})}

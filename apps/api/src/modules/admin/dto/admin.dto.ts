@@ -377,3 +377,31 @@ export interface AdminActionRow {
 	payload: Record<string, unknown>;
 	createdAt: string;
 }
+
+/** One shop that needs a look, with the figure that put it on the list. */
+export interface AdminAttentionRow {
+	businessId: string;
+	businessName: string;
+	ownerEmail: string | null;
+	plan: string | null;
+	/** What the list is about: an end date, days quiet, orders used against the limit… */
+	endDate: string | null;
+	lastOrderAt: string | null;
+	ordersThisMonth: number | null;
+	orderLimit: number | null;
+	createdAt: string;
+	cancelAtPeriodEnd: boolean;
+}
+
+export interface AdminAttentionResponse {
+	/** Billing failed; Stripe is retrying. */
+	pastDue: AdminAttentionRow[];
+	/** A paid plan ending within 7 days, or set to cancel at period end. */
+	expiring: AdminAttentionRow[];
+	/** 80% or more of this month's order limit used. */
+	nearQuota: AdminAttentionRow[];
+	/** Sold before, nothing in the last 7 days. */
+	dormant: AdminAttentionRow[];
+	/** Signed up over 3 days ago and never finished setting up. */
+	notOnboarded: AdminAttentionRow[];
+}

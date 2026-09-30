@@ -20,6 +20,7 @@ import { AdminService } from "@/modules/admin/admin.service";
 import {
 	AdminActionRow,
 	AdminActionsQueryDto,
+	AdminAttentionResponse,
 	AdminActivityQueryDto,
 	AdminAuditRow,
 	AdminBusinessDetail,
@@ -70,6 +71,14 @@ export class AdminController {
 	@ApiOperation({ summary: "Platform KPIs and daily series" })
 	overview(@Query() query: AdminOverviewQueryDto): Promise<AdminOverviewResponse> {
 		return this.adminService.overview(query);
+	}
+
+	@Get("attention")
+	@ApiOperation({
+		summary: "Shops to look at: past due, expiring, near quota, quiet, not set up",
+	})
+	attention(@Query() query: AdminOverviewQueryDto): Promise<AdminAttentionResponse> {
+		return this.adminService.attention(query.includeDemo);
 	}
 
 	@Get("businesses")

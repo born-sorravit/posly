@@ -1,5 +1,7 @@
 import { api, bootApp, ownerWithShop } from "./helpers";
 import type { INestApplication } from "@nestjs/common";
+import { EntitlementsService } from "@/modules/subscriptions/entitlements.service";
+import { randomUUID } from "node:crypto";
 import { DataSource } from "typeorm";
 
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
@@ -229,5 +231,97 @@ describe("platform admin", () => {
 			.set(auth(admin.token))
 			.expect(200);
 		expect(log.body.meta.total).toBeGreaterThanOrEqual(2);
+	});
+
+	it("lists the shops that need a look, each under its reason", async () => {
+		const db = app.get(DataSource);
+		const [late, ending, quiet, fresh, busy] = await Promise.all(
+			Array.from({ length: 5 }, () => ownerWithShop(app))
+		);
+		await db.query(
+			`UPDATE subscription SET status = 'PAST_DUE' WHERE business_id = $1`,
+			[late.businessId]
+		);
+		await db.query(
+			`UPDATE subscription SET end_date = now() + interval '3 days' WHERE business_id = $1`,
+			[ending.businessId]
+		);
+		await db.query(
+			`UPDATE business SET onboarded_at = NULL, created_at = now() - interval '5 days' WHERE id = $1`,
+			[fresh.businessId]
+		);
+
+		// One sale, then back-dated past the quiet window.
+		const sale = await api(app)
+			.post(`/api/v1/businesses/${quiet.businessId}/orders`)
+			.set(auth(quiet.token))
+			.send({
+				clientOrderId: randomUUID(),
+				items: [
+					{
+						productId: quiet.products.find((p) => p.name === "Croissant")!.id,
+						quantity: 1,
+					},
+				],
+				payment: { method: "CASH", received: 10_000 },
+			})
+			.expect(200);
+		await db.query(
+			`UPDATE "order" SET created_at = now() - interval '10 days' WHERE id = $1`,
+			[sale.body.data.id]
+		);
+
+		// A Free shop at its whole month's limit, with the limit lowered for this test.
+		await db.query(
+			`UPDATE subscription SET plan_code = 'FREE' WHERE business_id = $1`,
+			[busy.businessId]
+		);
+		const [{ order_limit: limitBefore }] = await db.query(
+			`SELECT order_limit FROM subscription_plan WHERE code = 'FREE'`
+		);
+		await db.query(
+			`UPDATE subscription_plan SET order_limit = 1 WHERE code = 'FREE'`
+		);
+		try {
+			await api(app)
+				.post(`/api/v1/businesses/${busy.businessId}/orders`)
+				.set(auth(busy.token))
+				.send({
+					clientOrderId: randomUUID(),
+					items: [
+						{
+							productId: busy.products.find((p) => p.name === "Croissant")!.id,
+							quantity: 1,
+						},
+					],
+					payment: { method: "CASH", received: 10_000 },
+				})
+				.expect(200);
+
+			const res = await api(app)
+				.get("/api/v1/admin/attention")
+				.set(auth(admin.token))
+				.expect(200);
+			const ids = (key: string) =>
+				(res.body.data[key] as { businessId: string }[]).map((r) => r.businessId);
+			expect(ids("pastDue")).toContain(late.businessId);
+			expect(ids("expiring")).toContain(ending.businessId);
+			expect(ids("dormant")).toContain(quiet.businessId);
+			expect(ids("notOnboarded")).toContain(fresh.businessId);
+			expect(ids("nearQuota")).toContain(busy.businessId);
+			const busyRow = res.body.data.nearQuota.find(
+				(r: { businessId: string }) => r.businessId === busy.businessId
+			);
+			expect(busyRow).toMatchObject({ ordersThisMonth: 1, orderLimit: 1 });
+			// A healthy shop is on no list.
+			for (const key of Object.keys(res.body.data))
+				expect(ids(key)).not.toContain(owner.businessId);
+		} finally {
+			await db.query(
+				`UPDATE subscription_plan SET order_limit = $1 WHERE code = 'FREE'`,
+				[limitBefore]
+			);
+			app.get(EntitlementsService).invalidatePlans();
+		}
 	});
 });
