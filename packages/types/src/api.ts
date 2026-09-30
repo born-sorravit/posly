@@ -34,4 +34,6 @@ export interface AuthUser {
 	locale: string;
 	/** A shared demo account: some actions are refused and the data resets nightly. */
 	isDemo?: boolean;
+	/** May open the platform admin monitor (apps/admin). */
+	isPlatformAdmin?: boolean;
 }

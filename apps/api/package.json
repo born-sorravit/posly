@@ -25,7 +25,8 @@
 		"migration:revert": "node ./node_modules/typeorm/cli.js migration:revert -d ./dist/shared/database/typeorm.config.js",
 		"seed:demo": "TS_NODE_TRANSPILE_ONLY=1 node -r ts-node/register -r tsconfig-paths/register ./src/shared/database/seeds/demo.seed.ts",
 		"migration:run:src": "TS_NODE_TRANSPILE_ONLY=1 node -r ts-node/register -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:run -d ./src/shared/database/typeorm.config.ts",
-		"subscription:set": "TS_NODE_TRANSPILE_ONLY=1 node -r ts-node/register -r tsconfig-paths/register ./src/scripts/set-plan.ts"
+		"subscription:set": "TS_NODE_TRANSPILE_ONLY=1 node -r ts-node/register -r tsconfig-paths/register ./src/scripts/set-plan.ts",
+		"admin:set": "TS_NODE_TRANSPILE_ONLY=1 node -r ts-node/register -r tsconfig-paths/register ./src/scripts/set-admin.ts"
 	},
 	"dependencies": {
 		"@aws-sdk/client-s3": "^3.1141.0",

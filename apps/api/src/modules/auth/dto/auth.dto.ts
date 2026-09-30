@@ -127,6 +127,8 @@ export class AuthUserResponse {
 	@ApiProperty() locale: string;
 	@ApiProperty({ description: "A shared demo account; some actions are refused." })
 	isDemo: boolean;
+	@ApiProperty({ description: "May open the platform admin monitor." })
+	isPlatformAdmin: boolean;
 }
 
 export class AuthSessionResponse {

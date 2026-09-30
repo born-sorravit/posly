@@ -1,5 +1,6 @@
 import configuration, { getEnvFilePath } from "@/config/configuration";
 import { ModelModule } from "@/models/model.module";
+import { AdminModule } from "@/modules/admin/admin.module";
 import { AuthModule } from "@/modules/auth/auth.module";
 import { BranchesModule } from "@/modules/branches/branches.module";
 import { BusinessesModule } from "@/modules/businesses/businesses.module";
@@ -24,6 +25,7 @@ import { BusinessAccessGuard } from "@/shared/guards/business-access.guard";
 import { FeatureGuard } from "@/shared/guards/feature.guard";
 import { DemoGuard } from "@/shared/guards/demo.guard";
 import { JwtAuthGuard } from "@/shared/guards/jwt-auth.guard";
+import { PlatformAdminGuard } from "@/shared/guards/platform-admin.guard";
 import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { APP_GUARD } from "@nestjs/core";
@@ -68,6 +70,7 @@ import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 		KitchenModule,
 		RealtimeModule,
 		CustomersModule,
+		AdminModule,
 	],
 	controllers: [HealthController],
 	providers: [
@@ -75,6 +78,8 @@ import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 		// business you may act in and with what permissions.
 		{ provide: APP_GUARD, useClass: ThrottlerGuard },
 		{ provide: APP_GUARD, useClass: JwtAuthGuard },
+		// Posly's own operators; only routes marked @PlatformAdmin() are affected.
+		{ provide: APP_GUARD, useClass: PlatformAdminGuard },
 		// Keeps the shared demo accounts from changing what the nightly reset cannot undo.
 		{ provide: APP_GUARD, useClass: DemoGuard },
 		{ provide: APP_GUARD, useClass: BusinessAccessGuard },

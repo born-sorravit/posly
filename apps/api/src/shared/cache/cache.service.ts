@@ -73,6 +73,26 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
 		return value;
 	}
 
+	/** For the admin system page: which backend is in use and whether it answers. */
+	async ping(): Promise<{
+		provider: "redis" | "memory";
+		up: boolean;
+		latencyMs: number | null;
+	}> {
+		if (!this.redis) return { provider: "memory", up: true, latencyMs: null };
+		const started = performance.now();
+		try {
+			await this.redis.ping();
+			return {
+				provider: "redis",
+				up: true,
+				latencyMs: Math.round(performance.now() - started),
+			};
+		} catch {
+			return { provider: "redis", up: false, latencyMs: null };
+		}
+	}
+
 	async forget(key: string): Promise<void> {
 		const namespaced = `${this.config.prefix}:${key}`;
 		this.memory.delete(namespaced);

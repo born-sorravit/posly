@@ -5,8 +5,9 @@ import { Column, Entity, Index } from "typeorm";
 /**
  * A person, independent of any shop.
  *
- * Deliberately carries no role and no business: what someone may do is a property of their
- * membership in a particular business (`BusinessMember`), and one user can belong to many.
+ * Deliberately carries no shop role and no business: what someone may do in a shop is a
+ * property of their membership in it (`BusinessMember`), and one user can belong to many.
+ * The one exception is `isPlatformAdmin`, which is about Posly itself, not any shop.
  */
 @Entity("user")
 export class User extends BaseEntity {
@@ -42,4 +43,8 @@ export class User extends BaseEntity {
 
 	@Column({ type: "varchar", length: 5, default: "th" })
 	locale: string;
+
+	/** Can read the platform-wide admin monitor (apps/admin). Set with `pnpm admin:set`. */
+	@Column({ name: "is_platform_admin", type: "boolean", default: false })
+	isPlatformAdmin: boolean;
 }

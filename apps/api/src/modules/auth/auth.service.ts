@@ -546,6 +546,7 @@ export class AuthService {
 			isVerified: user.isVerified,
 			locale: user.locale,
 			isDemo: isDemoEmail(user.email),
+			isPlatformAdmin: user.isPlatformAdmin ?? false,
 		};
 	}
 
