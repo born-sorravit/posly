@@ -15,6 +15,7 @@ import { NotificationsModule } from "@/modules/notifications/notifications.modul
 import { BillingModule } from "@/modules/billing/billing.module";
 import { KitchenModule } from "@/modules/kitchen/kitchen.module";
 import { TablesModule } from "@/modules/tables/tables.module";
+import { DemoModule } from "@/modules/demo/demo.module";
 import { RealtimeModule } from "@/modules/realtime/realtime.module";
 import { HealthController } from "@/modules/health/health.controller";
 import { QueueModule } from "@/modules/queue/queue.module";
@@ -72,6 +73,7 @@ import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 		BillingModule,
 		KitchenModule,
 		TablesModule,
+		DemoModule,
 		RealtimeModule,
 		CustomersModule,
 		AdminModule,

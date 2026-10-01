@@ -169,6 +169,12 @@ export interface BillingConfig {
  */
 export interface DemoConfig {
 	enabled: boolean;
+	/**
+	 * Keeps the shared demo shops looking alive: rebuilt every night at 04:00 Bangkok time and
+	 * topped up with sales through the day. Off by default — it deletes and recreates every
+	 * demo account, so only the environment that hosts the public demo should turn it on.
+	 */
+	autoReset: boolean;
 }
 
 export interface Configuration {
@@ -256,5 +262,6 @@ export default (): Configuration => ({
 	},
 	demo: {
 		enabled: toBool(process.env.DEMO_ENABLED, false),
+		autoReset: toBool(process.env.DEMO_AUTO_RESET, false),
 	},
 });
