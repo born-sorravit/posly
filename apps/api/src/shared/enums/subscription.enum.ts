@@ -27,4 +27,8 @@ export enum Feature {
 	LINE_NOTIFICATION = "LINE_NOTIFICATION",
 	KITCHEN_DISPLAY = "KITCHEN_DISPLAY",
 	ADVANCED_PERMISSION = "ADVANCED_PERMISSION",
+	/** Tables and their tabs: open a table, add rounds, check out once. */
+	TABLES = "TABLES",
+	/** Guests order from the QR on their table (needs TABLES). */
+	QR_ORDERING = "QR_ORDERING",
 }

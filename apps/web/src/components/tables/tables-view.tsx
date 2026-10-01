@@ -9,7 +9,8 @@ import { TableQrDialog } from "@/components/tables/table-qr";
 import { TableGridSkeleton } from "@/components/tables/tables-skeletons";
 import { useTab, useTabMutations, useTableBoard } from "@/hooks/use-posly";
 import { useNow } from "@/hooks/use-now";
-import { useActiveBusiness } from "@/hooks/use-workspace";
+import { useActiveBusiness, useFeature } from "@/hooks/use-workspace";
+import { FeatureLocked } from "@/components/common/feature-locked";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import type { BoardTableDto, TabDto, TableRequestDto } from "@/lib/api/posly";
 import { cn } from "@/lib/utils";
@@ -80,7 +81,7 @@ function TableCard({ table, now, onSelect }: { table: BoardTableDto; now: Date; 
 						{table.name}
 					</span>
 					{table.seats ? (
-						<span className="mt-0.5 flex items-center gap-1 text-muted-foreground text-xs">
+						<span className="mt-0.5 flex items-center gap-1 whitespace-nowrap text-muted-foreground text-xs">
 							<Users className="size-3.5" />
 							{t("seats", { count: table.seats })}
 						</span>
@@ -133,7 +134,7 @@ function TableCard({ table, now, onSelect }: { table: BoardTableDto; now: Date; 
 				)}
 			</span>
 			<span className="numeric mt-auto font-bold text-xl tracking-tight">{formatBaht(tab.total)}</span>
-			<span className="flex items-center gap-3 text-muted-foreground text-xs">
+			<span className="flex flex-wrap items-center gap-x-3 gap-y-0.5 whitespace-nowrap text-muted-foreground text-xs">
 				<span className="flex items-center gap-1">
 					<ReceiptText className="size-3.5" />
 					{t("items", { count: tab.itemCount })}
@@ -207,7 +208,7 @@ function OpenTableDialog({ table, onOpenChange, onOpened }: { table: BoardTableD
 											: "bg-muted/70 text-foreground hover:bg-muted"
 									)}
 								>
-									{isMore ? (seats && seats <= MAX_CHIPS ? t("moreThan", { count: seats }) : t("many")) : n}
+									{isMore ? t("orMore", { count: more }) : n}
 								</button>
 							);
 						})}
@@ -341,6 +342,8 @@ function TabSheet({ sessionId, onClose }: { sessionId: string | null; onClose: (
 	const tab = useTab(sessionId);
 	const board = useTableBoard();
 	const { close, cancel } = useTabMutations();
+	const hasTables = useFeature("TABLES");
+	const hasQr = useFeature("QR_ORDERING");
 	const [discount, setDiscount] = useState<Discount | null>(null);
 	const [paying, setPaying] = useState(false);
 	const [cancelling, setCancelling] = useState(false);
@@ -493,7 +496,7 @@ function TabSheet({ sessionId, onClose }: { sessionId: string | null; onClose: (
 										</Button>
 									</DropdownMenuTrigger>
 									<DropdownMenuContent align="start" side="top">
-										{table ? (
+										{table && hasQr ? (
 											<DropdownMenuItem onClick={() => setShowQr(true)}>
 												<QrCode />
 												{t("showQr")}
@@ -506,10 +509,13 @@ function TabSheet({ sessionId, onClose }: { sessionId: string | null; onClose: (
 										</DropdownMenuItem>
 									</DropdownMenuContent>
 								</DropdownMenu>
-								<Button variant="outline" className="h-12 flex-1 rounded-xl" onClick={addItems}>
-									<Plus />
-									{t("add")}
-								</Button>
+								{/* A shop past its plan can still settle the tab, not add to it. */}
+								{hasTables ? (
+									<Button variant="outline" className="h-12 flex-1 rounded-xl" onClick={addItems}>
+										<Plus />
+										{t("add")}
+									</Button>
+								) : null}
 								<Button
 									className="brand-gradient h-12 flex-1 rounded-xl font-semibold"
 									disabled={!data.orderId || pending.length > 0}
@@ -591,6 +597,7 @@ function TabSheet({ sessionId, onClose }: { sessionId: string | null; onClose: (
 export function TablesView() {
 	const t = useTranslations("tables");
 	const { can } = useActiveBusiness();
+	const hasTables = useFeature("TABLES");
 	const board = useTableBoard();
 	const now = useNow(30_000);
 	const router = useRouter();
@@ -602,7 +609,11 @@ export function TablesView() {
 	const setSession = (id: string | null) =>
 		router.replace(id ? { pathname, query: { tab: id } } : pathname, { scroll: false });
 
-	const tables = useMemo(() => board.data ?? [], [board.data]);
+	// Without the plan, only tabs still open are shown, so they can be settled.
+	const tables = useMemo(
+		() => (board.data ?? []).filter((table) => hasTables || table.tab),
+		[board.data, hasTables]
+	);
 	const zones = useMemo(() => {
 		const byZone = new Map<string, BoardTableDto[]>();
 		for (const table of tables) {
@@ -621,13 +632,16 @@ export function TablesView() {
 		(filter === "occupied" && Boolean(table.tab)) ||
 		(filter === "waiting" && (table.tab?.pendingRequests ?? 0) > 0);
 
+	if (!hasTables && !board.isPending && tables.length === 0)
+		return <FeatureLocked title={t("lockedTitle")} hint={t("lockedHint")} action={t("upgrade")} />;
+
 	return (
 		<PageContainer>
 			<PageHeader
 				title={t("title")}
 				description={t("description")}
 				actions={
-					can("settings:manage") ? (
+					can("settings:manage") && hasTables ? (
 						<Button asChild variant="outline">
 							<Link href="/settings/tables">
 								<Settings2 />
@@ -638,6 +652,18 @@ export function TablesView() {
 				}
 			/>
 
+			{!hasTables ? (
+				<div className="flex flex-col gap-3 rounded-2xl bg-warning/12 p-4 tablet:flex-row tablet:items-center">
+					<TriangleAlert className="size-5 shrink-0" />
+					<div className="min-w-0 flex-1">
+						<p className="font-semibold text-sm">{t("lockedTitle")}</p>
+						<p className="text-muted-foreground text-sm">{t("lockedOpenTabs")}</p>
+					</div>
+					<Button asChild variant="outline">
+						<Link href="/settings/subscription">{t("upgrade")}</Link>
+					</Button>
+				</div>
+			) : null}
 			{board.isPending ? (
 				<TableGridSkeleton />
 			) : tables.length === 0 ? (

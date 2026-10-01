@@ -15,6 +15,7 @@ import { OrderResponse } from "@/modules/orders/dto/order.dto";
 import { OrdersService } from "@/modules/orders/orders.service";
 import { allocateDiscount, computeOrderTotals } from "@/modules/orders/pricing";
 import { RealtimeService } from "@/modules/realtime/realtime.service";
+import { EntitlementsService } from "@/modules/subscriptions/entitlements.service";
 import {
 	AddRoundDto,
 	BoardTableResponse,
@@ -72,7 +73,8 @@ export class TablesService {
 		private readonly dataSource: DataSource,
 		private readonly orders: OrdersService,
 		private readonly realtime: RealtimeService,
-		private readonly cacheService: CacheService
+		private readonly cacheService: CacheService,
+		private readonly entitlements: EntitlementsService
 	) {}
 
 	// ------------------------------------------------------------ setup
@@ -93,6 +95,10 @@ export class TablesService {
 		dto: CreateTableDto
 	): Promise<TableResponse> {
 		const branch = await this.resolveBranch(membership, dto.branchId);
+		await this.entitlements.assertTableSlot(
+			this.dataSource.manager,
+			membership.businessId
+		);
 		const repo = this.dataSource.getRepository(DiningTable);
 		const table = repo.create({
 			businessId: membership.businessId,

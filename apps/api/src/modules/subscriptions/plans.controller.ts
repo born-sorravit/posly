@@ -16,6 +16,7 @@ export class PlanResponse {
 	@ApiProperty({ nullable: true, description: "Staff, not counting the owner" })
 	memberLimit: number | null;
 	@ApiProperty({ nullable: true }) branchLimit: number | null;
+	@ApiProperty({ nullable: true }) tableLimit: number | null;
 	@ApiProperty({ type: [String] }) features: string[];
 	@ApiProperty({ type: [PlanHighlightResponse] })
 	highlights: PlanHighlightResponse[];
@@ -41,6 +42,7 @@ export class PlansController {
 				orderLimit: p.orderLimit,
 				memberLimit: p.memberLimit,
 				branchLimit: p.branchLimit,
+				tableLimit: p.tableLimit,
 				features: (p.features ?? []).filter((f) => f.enabled).map((f) => f.feature),
 				highlights: p.highlights,
 			}));

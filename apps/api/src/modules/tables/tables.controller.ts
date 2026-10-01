@@ -18,7 +18,9 @@ import { TablesService } from "@/modules/tables/tables.service";
 import { CurrentMembership } from "@/shared/decorators/current-membership.decorator";
 import type { ResolvedMembership } from "@/shared/decorators/current-membership.decorator";
 import { Public } from "@/shared/decorators/public.decorator";
+import { RequireFeature } from "@/shared/decorators/require-feature.decorator";
 import { RequirePermission } from "@/shared/decorators/require-permission.decorator";
+import { Feature } from "@/shared/enums/subscription.enum";
 import { Permission } from "@/shared/enums/permission.enum";
 import {
 	Body,
@@ -39,7 +41,11 @@ import {
 } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
 
-/** Setting tables up is shop settings; working the floor is the till's job. */
+/**
+ * Setting tables up is shop settings; working the floor is the till's job. The plan gates
+ * only what starts new work (a table, a tab, a round): a shop that downgrades with a tab
+ * still open can always see it, take its payment, cancel it or turn a round down.
+ */
 @ApiTags("tables")
 @ApiBearerAuth()
 @Controller("businesses/:businessId")
@@ -62,6 +68,7 @@ export class TablesController {
 	}
 
 	@Post("tables")
+	@RequireFeature(Feature.TABLES)
 	@RequirePermission(Permission.SETTINGS_MANAGE)
 	@ApiOkResponse({ type: TableResponse })
 	create(
@@ -72,6 +79,7 @@ export class TablesController {
 	}
 
 	@Patch("tables/:tableId")
+	@RequireFeature(Feature.TABLES)
 	@RequirePermission(Permission.SETTINGS_MANAGE)
 	@ApiOkResponse({ type: TableResponse })
 	update(
@@ -94,6 +102,7 @@ export class TablesController {
 	}
 
 	@Post("tables/:tableId/rotate-qr")
+	@RequireFeature(Feature.TABLES)
 	@HttpCode(200)
 	@RequirePermission(Permission.SETTINGS_MANAGE)
 	@ApiOperation({
@@ -108,6 +117,7 @@ export class TablesController {
 	}
 
 	@Post("tables/:tableId/open")
+	@RequireFeature(Feature.TABLES)
 	@RequirePermission(Permission.POS_USE)
 	@ApiOperation({ summary: "Open a tab on the table; its QR starts taking orders" })
 	@ApiOkResponse({ type: TabResponse })
@@ -130,6 +140,7 @@ export class TablesController {
 	}
 
 	@Post("table-sessions/:sessionId/items")
+	@RequireFeature(Feature.TABLES)
 	@HttpCode(200)
 	@RequirePermission(Permission.POS_USE)
 	@ApiOperation({ summary: "Add a round from the till, straight to the tab" })
@@ -172,6 +183,7 @@ export class TablesController {
 	}
 
 	@Post("table-requests/:requestId/accept")
+	@RequireFeature(Feature.TABLES)
 	@HttpCode(200)
 	@RequirePermission(Permission.POS_USE)
 	@ApiOperation({

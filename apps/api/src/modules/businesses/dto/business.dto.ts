@@ -142,12 +142,14 @@ export class PlanLimitsResponse {
 	@ApiProperty({ nullable: true, description: "Staff, not counting the owner" })
 	members: number | null;
 	@ApiProperty({ nullable: true }) branches: number | null;
+	@ApiProperty({ nullable: true }) tables: number | null;
 }
 
 export class PlanUsageResponse {
 	@ApiProperty() ordersThisMonth: number;
 	@ApiProperty() members: number;
 	@ApiProperty() branches: number;
+	@ApiProperty() tables: number;
 }
 
 /** What this shop may do right now — the UI asks this, it never decides from a plan code. */

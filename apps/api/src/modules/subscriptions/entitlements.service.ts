@@ -14,12 +14,14 @@ export interface Limits {
 	orders: number | null;
 	members: number | null;
 	branches: number | null;
+	tables: number | null;
 }
 
 export interface Usage {
 	ordersThisMonth: number;
 	members: number;
 	branches: number;
+	tables: number;
 }
 
 export interface Entitlements {
@@ -117,6 +119,7 @@ export class EntitlementsService {
 				orders: plan.orderLimit,
 				members: plan.memberLimit,
 				branches: plan.branchLimit,
+				tables: plan.tableLimit,
 			},
 		};
 	}
@@ -209,12 +212,13 @@ export class EntitlementsService {
 
 	async usage(businessId: string, timezone: string): Promise<Usage> {
 		const manager = this.dataSource.manager;
-		const [ordersThisMonth, members, branches] = await Promise.all([
+		const [ordersThisMonth, members, branches, tables] = await Promise.all([
 			this.ordersThisMonth(manager, businessId, timezone),
 			this.membersInUse(manager, businessId),
 			this.branchesInUse(manager, businessId),
+			this.tablesInUse(manager, businessId),
 		]);
-		return { ordersThisMonth, members, branches };
+		return { ordersThisMonth, members, branches, tables };
 	}
 
 	/**
@@ -237,6 +241,26 @@ export class EntitlementsService {
 		}
 		// What the caller's order will make it, for the "nearly at your limit" warning.
 		return { used: used + 1, limit: limits.orders };
+	}
+
+	async tablesInUse(manager: EntityManager, businessId: string): Promise<number> {
+		const [row] = (await manager.query(
+			`SELECT COUNT(*)::int AS n FROM dining_table WHERE business_id = $1 AND deleted_at IS NULL`,
+			[businessId]
+		)) as { n: number }[];
+		return row.n;
+	}
+
+	/**
+	 * Refuses a table past the plan's count. A shop over it after a downgrade keeps its
+	 * tables; it only cannot add more.
+	 */
+	async assertTableSlot(manager: EntityManager, businessId: string): Promise<void> {
+		const { limits } = await this.forBusiness(businessId, manager);
+		if (limits.tables === null) return;
+		if ((await this.tablesInUse(manager, businessId)) >= limits.tables) {
+			throw new ForbiddenException(`Plan allows up to ${limits.tables} tables`);
+		}
 	}
 
 	/** Refuses a new or re-enabled staff member past the plan's seat count. */

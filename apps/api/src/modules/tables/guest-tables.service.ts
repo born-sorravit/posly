@@ -9,6 +9,8 @@ import { toModifierGroupResponse } from "@/modules/catalog/catalog.mapper";
 import { OrdersService } from "@/modules/orders/orders.service";
 import { NotificationsService } from "@/modules/notifications/notifications.service";
 import { RealtimeService } from "@/modules/realtime/realtime.service";
+import { EntitlementsService } from "@/modules/subscriptions/entitlements.service";
+import { Feature } from "@/shared/enums/subscription.enum";
 import { StorageService } from "@/modules/storage/storage.service";
 import {
 	GuestMenuResponse,
@@ -22,7 +24,12 @@ import {
 } from "@/modules/tables/tables.service";
 import { NotificationKind } from "@/shared/enums/notification.enum";
 import { TableRequestStatus, TableSessionStatus } from "@/shared/enums/table.enum";
-import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
+import {
+	ConflictException,
+	ForbiddenException,
+	Injectable,
+	NotFoundException,
+} from "@nestjs/common";
 import { DataSource, EntityManager, In } from "typeorm";
 
 /** Rounds a table may have waiting at once: enough for a big party, not for a prank. */
@@ -41,11 +48,16 @@ export class GuestTablesService {
 		private readonly tables: TablesService,
 		private readonly realtime: RealtimeService,
 		private readonly notifications: NotificationsService,
+		private readonly entitlements: EntitlementsService,
 		private readonly storage: StorageService
 	) {}
 
 	async menu(token: string): Promise<GuestMenuResponse> {
 		const table = await this.loadTable(this.dataSource.manager, token);
+		const qrOrdering = await this.entitlements.hasFeature(
+			table.businessId,
+			Feature.QR_ORDERING
+		);
 		const [business, session, categories, products] = await Promise.all([
 			this.dataSource
 				.getRepository(Business)
@@ -66,8 +78,10 @@ export class GuestTablesService {
 			shopName: business.name,
 			logoUrl: business.logoPath ? this.storage.publicUrl(business.logoPath) : null,
 			tableName: table.name,
+			// The shop's plan takes orders from the QR at all; printed QR cards outlive a downgrade.
+			qrOrdering,
 			// Open for ordering: a tab is running, or the shop lets the first order open one.
-			open: Boolean(session) || business.tableSelfOpen,
+			open: qrOrdering && (Boolean(session) || business.tableSelfOpen),
 			categories: categories.map((c) => ({ id: c.id, name: c.name, icon: c.icon })),
 			products: products
 				.filter((p) => !p.categoryId || shown.has(p.categoryId))
@@ -102,6 +116,10 @@ export class GuestTablesService {
 		const lines = dto.items.map(toRequestLine);
 		await this.dataSource.transaction(async (manager) => {
 			const table = await this.loadTable(manager, token);
+			if (
+				!(await this.entitlements.hasFeature(table.businessId, Feature.QR_ORDERING))
+			)
+				throw new ForbiddenException("This shop does not take orders from the QR");
 			const session =
 				(await this.openSession(manager, table, true)) ??
 				(await this.openForGuest(manager, table));

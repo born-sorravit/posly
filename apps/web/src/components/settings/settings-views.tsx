@@ -757,6 +757,9 @@ export function SubscriptionSettings() {
 					/>
 					<UsageMeter label={t("usageMembers")} used={subscription.usage.members} limit={subscription.limits.members} />
 					<UsageMeter label={t("usageBranches")} used={subscription.usage.branches} limit={subscription.limits.branches} />
+					{subscription.features.includes("TABLES") ? (
+						<UsageMeter label={t("usageTables")} used={subscription.usage.tables} limit={subscription.limits.tables} />
+					) : null}
 				</div>
 			</Surface>
 

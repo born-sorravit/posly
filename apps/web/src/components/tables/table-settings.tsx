@@ -4,7 +4,10 @@ import { ConfirmDialog } from "@/components/common/controls";
 import { EmptyState, SectionTitle, Surface } from "@/components/common/primitives";
 import { TableQrDialog, usePrintQr } from "@/components/tables/table-qr";
 import { useTableMutations, useTables, useUpdateBusiness } from "@/hooks/use-posly";
-import { useActiveBusiness } from "@/hooks/use-workspace";
+import { useActiveBusiness, useFeature } from "@/hooks/use-workspace";
+import { useSubscription } from "@/components/providers/workspace-provider";
+import { Link } from "@/i18n/navigation";
+import { cn } from "@/lib/utils";
 import type { TableDto } from "@/lib/api/posly";
 import { Button } from "@posly/ui/components/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@posly/ui/components/dialog";
@@ -20,7 +23,7 @@ import { Label } from "@posly/ui/components/label";
 import { Skeleton } from "@posly/ui/components/skeleton";
 import { Switch } from "@posly/ui/components/switch";
 import { StatusBadge } from "@/components/common/primitives";
-import { Loader2, MoreHorizontal, Pencil, Plus, Printer, QrCode, RefreshCw, Trash2, UtensilsCrossed } from "lucide-react";
+import { Loader2, Lock, MoreHorizontal, Pencil, Plus, Printer, QrCode, RefreshCw, Trash2, UtensilsCrossed } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -151,6 +154,29 @@ export function TableSettings() {
 	const { business, can } = useActiveBusiness();
 	const updateBusiness = useUpdateBusiness();
 	const [selfOpen, setSelfOpen] = useState(business.tableSelfOpen);
+	const tTables = useTranslations("tables");
+	const hasTables = useFeature("TABLES");
+	// Starter has tables without guests ordering: no QR to print or open tables with.
+	const hasQr = useFeature("QR_ORDERING");
+	const { limits } = useSubscription();
+	const atLimit = limits.tables !== null && list.length >= limits.tables;
+
+	if (!hasTables) {
+		return (
+			<Surface>
+				<EmptyState
+					icon={Lock}
+					title={tTables("lockedTitle")}
+					description={tTables("lockedHint")}
+					action={
+						<Button asChild size="lg" className="brand-gradient">
+							<Link href="/settings/subscription">{tTables("upgrade")}</Link>
+						</Button>
+					}
+				/>
+			</Surface>
+		);
+	}
 
 	return (
 		<>
@@ -159,11 +185,13 @@ export function TableSettings() {
 					action={
 						list.length > 0 ? (
 							<div className="flex gap-2">
-								<Button variant="outline" onClick={() => print(list.filter((x) => x.isActive))}>
-									<Printer />
-									<span className="hidden tablet:inline">{t("printAll")}</span>
-								</Button>
-								<Button className="brand-gradient" onClick={() => setDialog({ editing: null })}>
+								{hasQr ? (
+									<Button variant="outline" onClick={() => print(list.filter((x) => x.isActive))}>
+										<Printer />
+										<span className="hidden tablet:inline">{t("printAll")}</span>
+									</Button>
+								) : null}
+								<Button className="brand-gradient" disabled={atLimit} onClick={() => setDialog({ editing: null })}>
 									<Plus />
 									{t("add")}
 								</Button>
@@ -173,8 +201,39 @@ export function TableSettings() {
 				>
 					{t("title")}
 				</SectionTitle>
-				<p className="-mt-2 mb-4 text-muted-foreground text-sm">{t("description")}</p>
-				<label className="mb-4 flex items-center justify-between gap-4 rounded-xl bg-muted/50 px-4 py-3">
+				<p className="-mt-2 mb-4 text-muted-foreground text-sm">
+					{hasQr ? t("description") : t("descriptionNoQr")}
+					{limits.tables !== null ? (
+						<span className="numeric ml-1 font-medium text-foreground">
+							· {t("usage", { used: list.length, limit: limits.tables })}
+						</span>
+					) : null}
+				</p>
+				{atLimit ? (
+					<p className="mb-4 flex items-center justify-between gap-3 rounded-xl bg-warning/12 px-4 py-3 text-sm">
+						{t("limitReached")}
+						<Button asChild variant="outline" size="sm">
+							<Link href="/settings/subscription">{t("qrUpsellAction")}</Link>
+						</Button>
+					</p>
+				) : null}
+				{!hasQr ? (
+					<p className="mb-4 flex items-center justify-between gap-3 rounded-xl bg-muted/50 px-4 py-3 text-sm">
+						<span className="flex items-center gap-2">
+							<QrCode className="size-4 text-primary" />
+							{t("qrUpsell")}
+						</span>
+						<Button asChild variant="outline" size="sm">
+							<Link href="/settings/subscription">{t("qrUpsellAction")}</Link>
+						</Button>
+					</p>
+				) : null}
+				<label
+					className={cn(
+						"mb-4 flex items-center justify-between gap-4 rounded-xl bg-muted/50 px-4 py-3",
+						!hasQr && "hidden"
+					)}
+				>
 					<span>
 						<span className="block font-medium text-sm">{t("selfOpen")}</span>
 						<span className="block text-muted-foreground text-xs">{t("selfOpenHint")}</span>
@@ -238,9 +297,11 @@ export function TableSettings() {
 									title={t("activeHint")}
 									onCheckedChange={(isActive) => update.mutate({ tableId: table.id, isActive }, { onError })}
 								/>
-								<Button variant="ghost" size="icon" aria-label={t("qr")} onClick={() => setShowing(table)}>
-									<QrCode />
-								</Button>
+								{hasQr ? (
+									<Button variant="ghost" size="icon" aria-label={t("qr")} onClick={() => setShowing(table)}>
+										<QrCode />
+									</Button>
+								) : null}
 								<DropdownMenu>
 									<DropdownMenuTrigger asChild>
 										<Button variant="ghost" size="icon" aria-label={t("actions")}>
@@ -252,10 +313,12 @@ export function TableSettings() {
 											<Pencil />
 											{t("edit")}
 										</DropdownMenuItem>
-										<DropdownMenuItem onClick={() => setConfirm({ kind: "rotate", table })}>
-											<RefreshCw />
-											{t("rotate")}
-										</DropdownMenuItem>
+										{hasQr ? (
+											<DropdownMenuItem onClick={() => setConfirm({ kind: "rotate", table })}>
+												<RefreshCw />
+												{t("rotate")}
+											</DropdownMenuItem>
+										) : null}
 										<DropdownMenuSeparator />
 										<DropdownMenuItem variant="destructive" onClick={() => setConfirm({ kind: "delete", table })}>
 											<Trash2 />

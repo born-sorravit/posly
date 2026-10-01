@@ -242,7 +242,9 @@ export class GuestMenuResponse {
 	@ApiProperty() shopName: string;
 	@ApiProperty({ nullable: true }) logoUrl: string | null;
 	@ApiProperty() tableName: string;
-	@ApiProperty({ description: "Whether staff have opened the table for ordering" })
+	@ApiProperty({ description: "The shop's plan takes orders from the QR at all" })
+	qrOrdering: boolean;
+	@ApiProperty({ description: "Whether a guest may send a round now" })
 	open: boolean;
 	@ApiProperty({ type: [GuestCategoryResponse] })
 	categories: GuestCategoryResponse[];

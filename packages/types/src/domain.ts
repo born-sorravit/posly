@@ -202,7 +202,9 @@ export type FeatureKey =
 	| "MULTI_BRANCH"
 	| "LINE_NOTIFICATION"
 	| "KITCHEN_DISPLAY"
-	| "ADVANCED_PERMISSION";
+	| "ADVANCED_PERMISSION"
+	| "TABLES"
+	| "QR_ORDERING";
 
 export interface SubscriptionPlan {
 	code: "FREE" | "STARTER" | "PRO" | "BUSINESS";

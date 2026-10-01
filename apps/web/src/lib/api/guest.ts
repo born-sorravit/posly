@@ -14,7 +14,9 @@ export interface GuestMenuDto {
 	shopName: string;
 	logoUrl: string | null;
 	tableName: string;
-	/** Staff have opened the table: guests may send rounds. */
+	/** The shop's plan takes orders from the QR at all; printed QR cards outlive a downgrade. */
+	qrOrdering: boolean;
+	/** A guest may send a round now. */
 	open: boolean;
 	categories: { id: string; name: string; icon: string }[];
 	products: {

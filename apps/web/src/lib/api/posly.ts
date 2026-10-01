@@ -64,8 +64,8 @@ export interface SubscriptionDto {
 	onlinePayment: boolean;
 	features: FeatureKey[];
 	/** null is unlimited. `members` counts staff, not the owner. */
-	limits: { orders: number | null; members: number | null; branches: number | null };
-	usage: { ordersThisMonth: number; members: number; branches: number };
+	limits: { orders: number | null; members: number | null; branches: number | null; tables: number | null };
+	usage: { ordersThisMonth: number; members: number; branches: number; tables: number };
 }
 
 export type PlanCode = "FREE" | "STARTER" | "PRO" | "BUSINESS";
@@ -77,6 +77,7 @@ export interface PlanDto {
 	orderLimit: number | null;
 	memberLimit: number | null;
 	branchLimit: number | null;
+	tableLimit: number | null;
 	features: FeatureKey[];
 	/** `soon` = promised on the card but not shipped yet. */
 	highlights: { label: string; soon: boolean }[];

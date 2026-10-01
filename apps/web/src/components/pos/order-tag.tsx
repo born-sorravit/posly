@@ -9,7 +9,7 @@ import {
 	DropdownMenuTrigger,
 } from "@posly/ui/components/dropdown-menu";
 import { useTableBoard } from "@/hooks/use-posly";
-import { useActiveBusiness } from "@/hooks/use-workspace";
+import { useActiveBusiness, useFeature } from "@/hooks/use-workspace";
 import { cn } from "@/lib/utils";
 import { useCartStore } from "@/stores/cart-store";
 import type { ServiceType } from "@posly/types/domain";
@@ -37,7 +37,8 @@ export function OrderTag() {
 	const setLabel = useCartStore((s) => s.setLabel);
 	const kinds = business.businessType !== "RETAIL" && business.businessType !== "SERVICE";
 	// With real tables the label is for a name or a queue number; a table is picked below.
-	const tables = useTableBoard(kinds).data ?? [];
+	const hasTables = useFeature("TABLES");
+	const tables = useTableBoard(kinds && hasTables).data ?? [];
 	const openTabs = tables.filter((table) => table.tab);
 	const setTable = useCartStore((s) => s.setTable);
 

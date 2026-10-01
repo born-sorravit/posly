@@ -4,6 +4,9 @@ import { randomUUID } from "node:crypto";
 
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 
+// The full tab walk-through makes a few dozen requests; the 5 s default is too tight.
+jest.setTimeout(30_000);
+
 interface Tab {
 	id: string;
 	status: string;

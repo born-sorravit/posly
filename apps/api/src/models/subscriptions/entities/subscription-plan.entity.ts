@@ -44,6 +44,9 @@ export class SubscriptionPlan {
 	@Column({ name: "branch_limit", type: "int", nullable: true })
 	branchLimit: number | null;
 
+	@Column({ name: "table_limit", type: "int", nullable: true })
+	tableLimit: number | null;
+
 	/**
 	 * Display lines for the pricing card, in the order shown. `soon` marks a promised
 	 * feature that has not shipped, so the card never claims it works today.

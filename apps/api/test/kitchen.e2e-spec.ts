@@ -156,7 +156,7 @@ describe("kitchen display", () => {
 			.expect(409);
 	});
 
-	it("is for the kitchen role and the Business plan", async () => {
+	it("is for the kitchen role and the Pro plan and up", async () => {
 		// Staff (kitchen crew) may use it by default.
 		const invite = await api(app)
 			.post(`${base}/members`)
@@ -181,10 +181,11 @@ describe("kitchen display", () => {
 		// …and nothing else: no orders list, no POS.
 		await api(app).get(`${base}/orders`).set(auth(chef)).expect(403);
 
-		const pro = await ownerWithShop(app, "PRO");
+		// Pro and up have the kitchen screen (QR rounds need it); Starter does not.
+		const starter = await ownerWithShop(app, "STARTER");
 		await api(app)
-			.get(`/api/v1/businesses/${pro.businessId}/kitchen`)
-			.set(auth(pro.token))
+			.get(`/api/v1/businesses/${starter.businessId}/kitchen`)
+			.set(auth(starter.token))
 			.expect(403);
 	});
 

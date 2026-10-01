@@ -16,6 +16,8 @@ const KNOWN: [RegExp, (match: RegExpMatchArray) => string][] = [
 	[/^Monthly order limit of (\d+) reached$/, (m) => `ครบ ${m[1]} ออเดอร์ของเดือนนี้ตามแพ็กเกจแล้ว อัปเกรดเพื่อขายต่อได้ไม่จำกัด`],
 	[/^Plan allows up to (\d+) employees$/, (m) => `แพ็กเกจนี้มีพนักงานได้สูงสุด ${m[1]} คน`],
 	[/^Plan allows up to (\d+) branches$/, (m) => `แพ็กเกจนี้มีได้สูงสุด ${m[1]} สาขา`],
+	[/^Plan allows up to (\d+) tables$/, (m) => `แพ็กเกจนี้มีโต๊ะได้สูงสุด ${m[1]} โต๊ะ อัปเกรดเพื่อเพิ่มโต๊ะ`],
+	[/^This shop does not take orders from the QR$/, () => "ร้านนี้ยังไม่รับคำสั่งผ่าน QR สั่งกับพนักงานได้เลย"],
 	[/^Cash received is less than the total$/, () => "รับเงินน้อยกว่ายอดชำระ"],
 	[/^You are not allowed to give discounts$/, () => "คุณไม่มีสิทธิ์ให้ส่วนลด"],
 	[/^SKU is already used/, () => "SKU นี้ถูกใช้กับสินค้าอื่นแล้ว"],

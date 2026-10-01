@@ -1,7 +1,7 @@
 "use client";
 
 import { useTableBoard } from "@/hooks/use-posly";
-import { useActiveBusiness } from "@/hooks/use-workspace";
+import { useActiveBusiness, useFeature } from "@/hooks/use-workspace";
 import { useRouter } from "@/i18n/navigation";
 import { TableRequestToast } from "@/components/tables/table-request-toast";
 import { play } from "@/lib/sounds";
@@ -15,7 +15,9 @@ import { toast } from "sonner";
  */
 export function TableRequestAlert() {
 	const { can } = useActiveBusiness();
-	const board = useTableBoard(can("pos:use"));
+	// Only guests send rounds, so only shops that take QR orders listen for them.
+	const qrOrdering = useFeature("QR_ORDERING");
+	const board = useTableBoard(can("pos:use") && qrOrdering);
 	const router = useRouter();
 	const seen = useRef<Map<string, number> | null>(null);
 	const audio = useRef<AudioContext | null>(null);

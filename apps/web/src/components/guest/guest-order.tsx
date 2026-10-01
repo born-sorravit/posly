@@ -14,7 +14,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Skeleton } from "@posly/ui/components/skeleton";
 import { formatBaht, multiply, sum } from "@posly/utils/money";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Loader2, Minus, Plus, ReceiptText, RotateCcw, SearchX, ShoppingBasket, TriangleAlert } from "lucide-react";
+import { Loader2, Minus, Plus, ReceiptText, RotateCcw, SearchX, ShoppingBasket, Store, TriangleAlert } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useMemo, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
@@ -337,7 +337,15 @@ export function GuestOrder({ token }: { token: string }) {
 				) : null}
 			</header>
 
-			{data && !data.open ? (
+			{data && !data.qrOrdering ? (
+				<div className="mx-4 mt-2 flex items-start gap-3 rounded-2xl bg-muted p-4">
+					<Store className="mt-0.5 size-5 shrink-0" />
+					<div>
+						<p className="font-semibold text-sm">{t("noQrTitle")}</p>
+						<p className="text-muted-foreground text-sm">{t("noQrHint")}</p>
+					</div>
+				</div>
+			) : data && !data.open ? (
 				<div className="mx-4 mt-2 flex items-start gap-3 rounded-2xl bg-warning/12 p-4">
 					<TriangleAlert className="mt-0.5 size-5 shrink-0" />
 					<div>
