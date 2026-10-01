@@ -2,7 +2,20 @@ import { ProductThumb } from "@/components/common/product-thumb";
 import { formatBaht } from "@posly/utils/money";
 import { cn } from "@/lib/utils";
 import type { ProductArt } from "@posly/types/domain";
-import { ArrowRight, Check, Minus, Plus, Search, ShoppingBasket, SlidersHorizontal, TrendingUp, TriangleAlert } from "lucide-react";
+import {
+	ArrowRight,
+	Check,
+	Clock3,
+	HandPlatter,
+	Minus,
+	Plus,
+	ReceiptText,
+	Search,
+	ShoppingBasket,
+	SlidersHorizontal,
+	TrendingUp,
+	TriangleAlert,
+} from "lucide-react";
 import { CountUp, DrawnChart, GrowBars } from "@/components/landing/motion";
 import { getTranslations } from "next-intl/server";
 
@@ -39,7 +52,15 @@ const CART = [
 	{ name: "Thai Tea", detail: "L · หวาน 75%", qty: 1, price: 8500, art: "tea" as const, image: photo("thai-tea") },
 ];
 
-function WindowFrame({ children, className }: { children: React.ReactNode; className?: string }) {
+function WindowFrame({
+	children,
+	className,
+	url = "posly.app/pos",
+}: {
+	children: React.ReactNode;
+	className?: string;
+	url?: string;
+}) {
 	return (
 		<div className={cn("overflow-hidden rounded-2xl bg-background shadow-2xl ring-1 ring-foreground/10", className)}>
 			<div className="flex h-9 items-center gap-1.5 border-border/60 border-b bg-muted/40 px-4">
@@ -47,7 +68,7 @@ function WindowFrame({ children, className }: { children: React.ReactNode; class
 				<span className="size-2.5 rounded-full bg-[#febc2e]" />
 				<span className="size-2.5 rounded-full bg-[#28c840]" />
 				<span className="mx-auto h-5 w-44 rounded-md bg-background/80 text-center text-[10px] text-muted-foreground leading-5">
-					posly.app/pos
+					{url}
 				</span>
 			</div>
 			{children}
@@ -266,5 +287,127 @@ export async function DashboardMockup() {
 				</div>
 			</div>
 		</WindowFrame>
+	);
+}
+
+/** Floor states shown in the tables picture: free, seated, a round waiting, the bill asked for. */
+const FLOOR: { n: number; state: "free" | "seated" | "round" | "bill"; total?: number; minutes?: number }[] = [
+	{ n: 1, state: "seated", total: 24_500, minutes: 35 },
+	{ n: 2, state: "free" },
+	{ n: 3, state: "round", total: 14_500, minutes: 12 },
+	{ n: 4, state: "bill", total: 38_000, minutes: 58 },
+	{ n: 5, state: "free" },
+	{ n: 6, state: "seated", total: 9_500, minutes: 8 },
+];
+
+/**
+ * Tables and QR ordering: the floor as staff see it, with a guest's phone in front showing
+ * the table's QR page — the menu, a call for staff and the bill, and the basket being sent.
+ */
+export async function TablesMockup() {
+	const t = await getTranslations("landing.mockTables");
+	return (
+		<div className="relative pb-24 tablet:pr-24 tablet:pb-0">
+			<WindowFrame url="posly.app/tables">
+				<div className="space-y-2.5 bg-muted/30 p-3">
+					<p className="font-semibold text-[12px]">{t("title")}</p>
+					<div className="grid grid-cols-3 gap-2">
+						{FLOOR.map((table) => {
+							if (table.state === "free") {
+								return (
+									<div
+										key={table.n}
+										className="flex min-h-[4.5rem] flex-col justify-between rounded-xl border-[1.5px] border-border border-dashed p-2"
+									>
+										<span className="font-semibold text-[10px] text-muted-foreground">{t("table", { n: table.n })}</span>
+										<span className="flex items-center gap-0.5 text-[9px] text-muted-foreground">
+											<Plus className="size-2.5" />
+											{t("open")}
+										</span>
+									</div>
+								);
+							}
+							const alert = table.state !== "seated";
+							return (
+								<div
+									key={table.n}
+									className={cn(
+										"relative flex min-h-[4.5rem] flex-col gap-0.5 overflow-hidden rounded-xl p-2 pl-2.5",
+										alert ? "bg-warning/15 ring-[1.5px] ring-warning" : "bg-chart-4/12"
+									)}
+								>
+									<span aria-hidden className={cn("absolute inset-y-0 left-0 w-[3px]", alert ? "bg-warning" : "bg-chart-4")} />
+									<span className="flex items-center justify-between gap-1">
+										<span className="font-semibold text-[10px]">{t("table", { n: table.n })}</span>
+										<span className="numeric flex items-center gap-0.5 text-[8px] text-muted-foreground">
+											<Clock3 className="size-2" />
+											{t("minutes", { count: table.minutes ?? 0 })}
+										</span>
+									</span>
+									{alert ? (
+										<span className="flex w-fit items-center gap-0.5 rounded-full bg-warning px-1.5 py-px font-semibold text-[8px] text-warning-foreground">
+											{table.state === "bill" ? <ReceiptText className="size-2" /> : null}
+											{table.state === "bill" ? t("bill") : t("newRound")}
+										</span>
+									) : null}
+									<span className="numeric mt-auto font-bold text-[12px]">{formatBaht(table.total ?? 0)}</span>
+								</div>
+							);
+						})}
+					</div>
+				</div>
+			</WindowFrame>
+
+			{/* The guest's phone, in front of the floor. */}
+			{/* A phone screen keeps the floor readable: the phone sits lower and smaller there. */}
+			<div className="absolute right-3 bottom-0 w-36 overflow-hidden rounded-[1.6rem] bg-background p-1.5 shadow-2xl ring-1 ring-foreground/15 tablet:right-0 tablet:-bottom-6 tablet:w-44">
+				<div className="overflow-hidden rounded-[1.2rem] bg-muted/30">
+					<div className="flex items-center gap-1.5 bg-background px-2.5 pt-3 pb-2">
+						<span className="flex size-5 items-center justify-center rounded-md bg-amber-100 font-semibold text-[9px] text-amber-800 dark:bg-amber-400/15 dark:text-amber-300">
+							S
+						</span>
+						<span className="min-w-0">
+							<span className="block truncate font-semibold text-[9px] leading-tight">Sunny Cafe</span>
+							<span className="block text-[8px] text-muted-foreground">{t("table", { n: 3 })}</span>
+						</span>
+					</div>
+					<div className="grid grid-cols-2 gap-1 px-2 pt-1.5">
+						<span className="flex items-center justify-center gap-0.5 rounded-md bg-card py-1 font-medium text-[7px] shadow-sm">
+							<HandPlatter className="size-2" />
+							{t("waiter")}
+						</span>
+						<span className="flex items-center justify-center gap-0.5 rounded-md bg-card py-1 font-medium text-[7px] shadow-sm">
+							<ReceiptText className="size-2" />
+							{t("bill")}
+						</span>
+					</div>
+					<div className="space-y-1 p-2">
+						{MENU.slice(0, 3).map((p, i) => (
+							<div key={p.name} className="flex items-center gap-1.5 rounded-lg bg-card p-1 shadow-sm">
+								<ProductThumb art={p.art} imageUrl={p.image} name={p.name} className="size-7 shrink-0" rounded="rounded-md" />
+								<span className="min-w-0 flex-1">
+									<span className="block truncate font-medium text-[8px]">{p.name}</span>
+									<span className="numeric block text-[8px] text-muted-foreground">{formatBaht(p.price)}</span>
+								</span>
+								<span
+									className={cn(
+										"flex size-4 items-center justify-center rounded-md font-semibold text-[8px]",
+										i === 0 ? "bg-primary text-primary-foreground" : "bg-accent text-primary"
+									)}
+								>
+									{i === 0 ? "2" : <Plus className="size-2.5" />}
+								</span>
+							</div>
+						))}
+					</div>
+					<div className="px-2 pb-2.5">
+						<span className="brand-gradient flex items-center justify-center gap-1 rounded-lg py-1.5 font-semibold text-[8px] text-white">
+							<ShoppingBasket className="size-2.5" />
+							{t("send", { total: formatBaht(14_000) })}
+						</span>
+					</div>
+				</div>
+			</div>
+		</div>
 	);
 }

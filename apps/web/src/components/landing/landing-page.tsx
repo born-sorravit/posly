@@ -1,7 +1,7 @@
 import { BrandMark } from "@/components/layout/brand";
 import { DemoDialog } from "@/components/demo/demo-dialog";
 import { LandingHeader } from "@/components/landing/landing-header";
-import { DashboardMockup, PosMockup, SalesCard, ToastCards } from "@/components/landing/mockups";
+import { DashboardMockup, PosMockup, SalesCard, TablesMockup, ToastCards } from "@/components/landing/mockups";
 import { Float, Reveal, Stagger, StaggerItem, TiltIn } from "@/components/landing/motion";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@posly/ui/components/accordion";
 import { Button } from "@posly/ui/components/button";
@@ -17,6 +17,7 @@ import {
 	Briefcase,
 	Cake,
 	Check,
+	ChefHat,
 	Clock3,
 	Coffee,
 	CupSoda,
@@ -26,6 +27,7 @@ import {
 	ShoppingBag,
 	Store,
 	UtensilsCrossed,
+	Wallet,
 	Zap,
 	type LucideIcon,
 } from "lucide-react";
@@ -34,10 +36,16 @@ import type { ReactNode } from "react";
 
 const TYPE_ICONS: LucideIcon[] = [Coffee, UtensilsCrossed, CupSoda, Cake, ShoppingBag, Briefcase];
 
-const FEATURES: { key: "pos" | "payment" | "stock" | "reports" | "staff" | "receipt"; icon: LucideIcon }[] = [
+const FEATURES: {
+	key: "pos" | "payment" | "stock" | "reports" | "staff" | "tables" | "qr" | "kitchen" | "receipt";
+	icon: LucideIcon;
+}[] = [
 	{ key: "pos", icon: Zap },
-	{ key: "payment", icon: QrCode },
+	{ key: "payment", icon: Wallet },
 	{ key: "stock", icon: Boxes },
+	{ key: "tables", icon: UtensilsCrossed },
+	{ key: "qr", icon: QrCode },
+	{ key: "kitchen", icon: ChefHat },
 	{ key: "reports", icon: BarChart3 },
 	{ key: "staff", icon: ShieldCheck },
 	{ key: "receipt", icon: ReceiptText },
@@ -297,6 +305,15 @@ export async function LandingPage({ signedIn }: { signedIn: boolean }) {
 					<div className="mt-24 desktop:mt-32">
 						<Showcase
 							reverse
+							eyebrow={t("showcase.tables.eyebrow")}
+							title={t("showcase.tables.title")}
+							body={t("showcase.tables.body")}
+							points={t.raw("showcase.tables.points") as string[]}
+							picture={<TablesMockup />}
+						/>
+					</div>
+					<div className="mt-24 desktop:mt-32">
+						<Showcase
 							eyebrow={t("showcase.reports.eyebrow")}
 							title={t("showcase.reports.title")}
 							body={t("showcase.reports.body")}
