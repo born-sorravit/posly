@@ -48,6 +48,31 @@ import {
 } from "@nestjs/common";
 import { DataSource, EntityManager, In } from "typeorm";
 
+/** One line as asked for: ids and quantities only, never a price. */
+export interface LineInput {
+	productId: string;
+	quantity: number;
+	modifierOptionIds?: string[];
+	note?: string | null;
+}
+
+export interface PricedItem {
+	product: Product;
+	quantity: number;
+	note: string | null;
+	unitPrice: number;
+	unitCost: number;
+	costMissing: boolean;
+	modifiers: {
+		optionId: string;
+		groupName: string;
+		optionName: string;
+		priceDelta: number;
+		costDelta: number;
+	}[];
+	toKitchen: boolean;
+}
+
 const ORDER_RELATIONS = { items: { modifiers: true }, payments: true } as const;
 
 const isUniqueViolation = (error: unknown): boolean =>
@@ -137,50 +162,7 @@ export class OrdersService {
 			where: { id: membership.memberId },
 		});
 
-		const productIds = [...new Set(dto.items.map((i) => i.productId))];
-		const products = await manager.find(Product, {
-			where: { id: In(productIds), businessId: business.id, isActive: true },
-			relations: { modifierGroups: { options: true } },
-		});
-		const byId = new Map(products.map((p) => [p.id, p]));
-		// Which categories cook: lines from the rest never reach the kitchen screen.
-		const categoryIds = [
-			...new Set(
-				products.map((p) => p.categoryId).filter((c): c is string => Boolean(c))
-			),
-		];
-		const kitchenCategories = new Set(
-			categoryIds.length === 0
-				? []
-				: (
-						await manager.find(Category, {
-							where: { id: In(categoryIds), sendToKitchen: true },
-							select: { id: true },
-							withDeleted: true,
-						})
-					).map((c) => c.id)
-		);
-		// Uncategorised products are assumed to be made to order, like the default category.
-		const toKitchen = (product: Product) =>
-			!product.categoryId || kitchenCategories.has(product.categoryId);
-
-		const items = dto.items.map((line) => {
-			const product = byId.get(line.productId);
-			if (!product) throw new NotFoundException("Product not found");
-
-			const chosen = this.resolveModifiers(product, line.modifierOptionIds ?? []);
-			const unitPrice = Money.add(product.price, ...chosen.map((c) => c.priceDelta));
-
-			return {
-				product,
-				quantity: line.quantity,
-				note: line.note?.trim() || null,
-				unitPrice,
-				unitCost: Money.add(product.cost ?? 0, ...chosen.map((c) => c.costDelta)),
-				costMissing: product.cost === null,
-				modifiers: chosen,
-			};
-		});
+		const items = await this.priceLines(manager, business.id, dto.items);
 
 		const totals = computeOrderTotals(
 			items,
@@ -200,64 +182,8 @@ export class OrdersService {
 			throw new BadRequestException("Cash received is less than the total");
 		}
 
-		// Stock: decrement tracked products, refusing to sell what is not there.
-		const needed = new Map<string, number>();
-		for (const item of items) {
-			if (item.product.trackStock) {
-				needed.set(
-					item.product.id,
-					(needed.get(item.product.id) ?? 0) + item.quantity
-				);
-			}
-		}
-		for (const [productId, quantity] of needed) {
-			const result = await manager
-				.createQueryBuilder()
-				.update(Product)
-				.set({ stock: () => `stock - ${quantity}` })
-				.where("id = :productId AND stock >= :quantity", { productId, quantity })
-				.returning(["stock"])
-				.execute();
-			const product = byId.get(productId);
-			if (result.affected !== 1 || !product) {
-				throw new ConflictException(`${product?.name ?? "Product"} is out of stock`);
-			}
-			const after = (result.raw as { stock: number }[])[0].stock;
-			await this.notifications.stockChanged(
-				manager,
-				business.id,
-				product,
-				after + quantity,
-				after
-			);
-		}
-
-		// Recipes: what the sale used comes out of tracked ingredients, never blocking it.
-		const ingredientUsage = await this.inventory.consume(
-			manager,
-			business.id,
-			items.map((i) => ({
-				productId: i.product.id,
-				optionIds: i.modifiers.map((m) => m.optionId),
-				quantity: i.quantity,
-			}))
-		);
-
-		// Per-business sequence under the business row's lock: concurrent tills queue here.
-		// TypeORM's postgres driver answers an UPDATE … RETURNING with [rows, affected].
-		const sequence = (await manager.query(
-			`UPDATE "business" SET "order_seq" = "order_seq" + 1 WHERE "id" = $1 RETURNING "order_seq"`,
-			[business.id]
-		)) as [[{ order_seq: number }], number];
-		const number = sequence[0][0].order_seq;
-		// The increment above holds the business row lock until commit, so checking the
-		// monthly quota here serializes concurrent tills: exactly one can take the last order.
-		const quota = await this.entitlements.assertOrderQuota(
-			manager,
-			business.id,
-			business.timezone
-		);
-		if (quota) await this.warnQuota(manager, business, quota);
+		const ingredientUsage = await this.takeStock(manager, business.id, items);
+		const number = await this.allocateNumber(manager, business);
 
 		const now = new Date();
 		const order = manager.create(Order, {
@@ -272,30 +198,15 @@ export class OrdersService {
 			number,
 			clientOrderId: dto.clientOrderId,
 			status: OrderStatus.PAID,
-			kitchenStatus: items.some((i) => toKitchen(i.product))
-				? KitchenStatus.NEW
-				: null,
-			kitchenUpdatedAt: items.some((i) => toKitchen(i.product)) ? now : null,
+			kitchenStatus: items.some((i) => i.toKitchen) ? KitchenStatus.NEW : null,
+			kitchenUpdatedAt: items.some((i) => i.toKitchen) ? now : null,
 			...totals,
 			ingredientUsage,
 			vatBasisPoints: business.vatBasisPoints,
 			pricesIncludeVat: business.pricesIncludeVat,
 			paidAt: now,
 			items: items.map((item, index) =>
-				manager.create(OrderItem, {
-					productId: item.product.id,
-					name: item.product.name,
-					art: item.product.art,
-					quantity: item.quantity,
-					unitPrice: item.unitPrice,
-					unitCost: item.unitCost,
-					costMissing: item.costMissing,
-					lineTotal: Money.multiply(item.unitPrice, item.quantity),
-					discount: lineDiscounts[index],
-					note: item.note,
-					toKitchen: toKitchen(item.product),
-					modifiers: item.modifiers.map((m) => manager.create(OrderItemModifier, m)),
-				})
+				this.toOrderItem(manager, item, lineDiscounts[index], 1)
 			),
 			payments: [
 				manager.create(Payment, {
@@ -370,6 +281,182 @@ export class OrdersService {
 			throw new BadRequestException(`Unknown option for ${product.name}`);
 		}
 		return chosen;
+	}
+
+	// ------------------------------------------------- shared with table tabs
+
+	/**
+	 * Prices what was asked for from this business's own active products: snapshots of
+	 * price, cost and modifiers, and whether each line goes to the kitchen. A product id from
+	 * another shop, or an inactive one, is "not found".
+	 */
+	async priceLines(
+		manager: EntityManager,
+		businessId: string,
+		lines: LineInput[]
+	): Promise<PricedItem[]> {
+		const productIds = [...new Set(lines.map((i) => i.productId))];
+		const products = await manager.find(Product, {
+			where: { id: In(productIds), businessId, isActive: true },
+			relations: { modifierGroups: { options: true } },
+		});
+		const byId = new Map(products.map((p) => [p.id, p]));
+		// Which categories cook: lines from the rest never reach the kitchen screen.
+		const categoryIds = [
+			...new Set(
+				products.map((p) => p.categoryId).filter((c): c is string => Boolean(c))
+			),
+		];
+		const kitchenCategories = new Set(
+			categoryIds.length === 0
+				? []
+				: (
+						await manager.find(Category, {
+							where: { id: In(categoryIds), sendToKitchen: true },
+							select: { id: true },
+							withDeleted: true,
+						})
+					).map((c) => c.id)
+		);
+
+		return lines.map((line) => {
+			const product = byId.get(line.productId);
+			if (!product) throw new NotFoundException("Product not found");
+
+			const chosen = this.resolveModifiers(product, line.modifierOptionIds ?? []);
+			return {
+				product,
+				quantity: line.quantity,
+				note: line.note?.trim() || null,
+				unitPrice: Money.add(product.price, ...chosen.map((c) => c.priceDelta)),
+				unitCost: Money.add(product.cost ?? 0, ...chosen.map((c) => c.costDelta)),
+				costMissing: product.cost === null,
+				modifiers: chosen,
+				// Uncategorised products are assumed to be made to order, like the default category.
+				toKitchen: !product.categoryId || kitchenCategories.has(product.categoryId),
+			};
+		});
+	}
+
+	/**
+	 * Decrements tracked products, refusing to sell what is not there, then takes what the
+	 * recipes use from ingredients (never refusing). Returns the ingredient usage to keep.
+	 */
+	async takeStock(
+		manager: EntityManager,
+		businessId: string,
+		items: PricedItem[]
+	): Promise<Record<string, number> | null> {
+		const needed = new Map<string, { product: Product; quantity: number }>();
+		for (const item of items) {
+			if (item.product.trackStock) {
+				const entry = needed.get(item.product.id);
+				needed.set(item.product.id, {
+					product: item.product,
+					quantity: (entry?.quantity ?? 0) + item.quantity,
+				});
+			}
+		}
+		for (const [productId, { product, quantity }] of needed) {
+			const result = await manager
+				.createQueryBuilder()
+				.update(Product)
+				.set({ stock: () => `stock - ${quantity}` })
+				.where("id = :productId AND stock >= :quantity", { productId, quantity })
+				.returning(["stock"])
+				.execute();
+			if (result.affected !== 1) {
+				throw new ConflictException(`${product.name} is out of stock`);
+			}
+			const after = (result.raw as { stock: number }[])[0].stock;
+			await this.notifications.stockChanged(
+				manager,
+				businessId,
+				product,
+				after + quantity,
+				after
+			);
+		}
+
+		return this.inventory.consume(
+			manager,
+			businessId,
+			items.map((i) => ({
+				productId: i.product.id,
+				optionIds: i.modifiers.map((m) => m.optionId),
+				quantity: i.quantity,
+			}))
+		);
+	}
+
+	/**
+	 * The next order number, under the business row's lock so concurrent tills queue here,
+	 * and the monthly quota check that lock makes exact: one till takes the last order.
+	 */
+	async allocateNumber(manager: EntityManager, business: Business): Promise<number> {
+		// TypeORM's postgres driver answers an UPDATE … RETURNING with [rows, affected].
+		const sequence = (await manager.query(
+			`UPDATE "business" SET "order_seq" = "order_seq" + 1 WHERE "id" = $1 RETURNING "order_seq"`,
+			[business.id]
+		)) as [[{ order_seq: number }], number];
+		const quota = await this.entitlements.assertOrderQuota(
+			manager,
+			business.id,
+			business.timezone
+		);
+		if (quota) await this.warnQuota(manager, business, quota);
+		return sequence[0][0].order_seq;
+	}
+
+	toOrderItem(
+		manager: EntityManager,
+		item: PricedItem,
+		discount: number,
+		round: number
+	): OrderItem {
+		return manager.create(OrderItem, {
+			productId: item.product.id,
+			name: item.product.name,
+			art: item.product.art,
+			quantity: item.quantity,
+			unitPrice: item.unitPrice,
+			unitCost: item.unitCost,
+			costMissing: item.costMissing,
+			lineTotal: Money.multiply(item.unitPrice, item.quantity),
+			discount,
+			note: item.note,
+			toKitchen: item.toKitchen,
+			round,
+			modifiers: item.modifiers.map((m) => manager.create(OrderItemModifier, m)),
+		});
+	}
+
+	/** Puts back the tracked products and ingredients an order took. */
+	async restock(
+		manager: EntityManager,
+		businessId: string,
+		order: Order
+	): Promise<void> {
+		const items = await manager.find(OrderItem, { where: { orderId: order.id } });
+		const productIds = items
+			.map((i) => i.productId)
+			.filter((p): p is string => Boolean(p));
+		const tracked = await manager.find(Product, {
+			where: { id: In(productIds), businessId, trackStock: true },
+			withDeleted: true,
+		});
+		const trackedIds = new Set(tracked.map((p) => p.id));
+		for (const item of items) {
+			if (item.productId && trackedIds.has(item.productId)) {
+				await manager.increment(
+					Product,
+					{ id: item.productId },
+					"stock",
+					item.quantity
+				);
+			}
+		}
+		await this.inventory.restore(manager, order.ingredientUsage);
 	}
 
 	private async resolveBranch(
@@ -481,101 +568,96 @@ export class OrdersService {
 		status: OrderStatus,
 		action: AuditAction
 	): Promise<OrderResponse> {
-		await this.dataSource.transaction(async (manager) => {
-			// Lock the row so two managers cannot refund the same order twice.
-			const order = await manager
-				.getRepository(Order)
-				.createQueryBuilder("ord")
-				.setLock("pessimistic_write")
-				.where("ord.id = :id AND ord.business_id = :businessId", {
-					id,
-					businessId: membership.businessId,
-				})
-				.getOne();
-			if (!order) throw new NotFoundException("Order not found");
-			if (order.status !== OrderStatus.PAID) {
-				throw new ConflictException(
-					`Order is already ${order.status.toLowerCase()}`
-				);
-			}
-
-			const items = await manager.find(OrderItem, { where: { orderId: order.id } });
-			const productIds = items
-				.map((i) => i.productId)
-				.filter((p): p is string => Boolean(p));
-			const tracked = await manager.find(Product, {
-				where: {
-					id: In(productIds),
-					businessId: membership.businessId,
-					trackStock: true,
-				},
-				withDeleted: true,
-			});
-			const trackedIds = new Set(tracked.map((p) => p.id));
-			for (const item of items) {
-				if (item.productId && trackedIds.has(item.productId)) {
-					await manager.increment(
-						Product,
-						{ id: item.productId },
-						"stock",
-						item.quantity
-					);
-				}
-			}
-
-			await this.inventory.restore(manager, order.ingredientUsage);
-
-			await manager.update(Order, { id: order.id }, { status });
-			await manager.update(
-				Payment,
-				{ orderId: order.id, status: PaymentStatus.SUCCESS },
-				{ status: PaymentStatus.REFUNDED }
-			);
-
-			const actor = await manager.findOneOrFail(BusinessMember, {
-				where: { id: membership.memberId },
-			});
-			await manager.save(
-				manager.create(AuditLog, {
-					businessId: membership.businessId,
-					memberId: membership.memberId,
-					actorName: actor.displayName,
-					action,
-					entity: "order",
-					entityId: order.id,
-					payload: { reason: dto.reason ?? null, total: order.total },
-				})
-			);
-			await this.notifications.emit(
-				manager,
-				membership.businessId,
-				status === OrderStatus.REFUNDED
-					? NotificationKind.REFUND
-					: NotificationKind.CANCELLED,
-				{
-					number: order.number,
-					total: order.total,
-					actor: actor.displayName,
-					reason: dto.reason ?? null,
-				},
-				{ entityId: order.id, branchId: order.branchId }
-			);
-			await this.realtime.publish(manager, {
-				topic: "orders",
-				businessId: membership.businessId,
-				branchId: order.branchId,
-			});
-			if (order.kitchenStatus) {
-				await this.realtime.publish(manager, {
-					topic: "kitchen",
-					businessId: membership.businessId,
-					branchId: order.branchId,
-				});
-			}
-		});
+		await this.dataSource.transaction((manager) =>
+			this.reverseInTransaction(manager, membership, id, dto, status, action)
+		);
 
 		await this.cacheService.bump(CacheKeys.dashboardVersion(membership.businessId));
 		return this.findOne(membership, id);
+	}
+
+	/**
+	 * Refund or void inside the caller's transaction. A PAID order has its payment marked
+	 * refunded; an unpaid table tab (PENDING_PAYMENT) may only be voided, and has none.
+	 */
+	async reverseInTransaction(
+		manager: EntityManager,
+		membership: ResolvedMembership,
+		id: string,
+		dto: ReverseOrderDto,
+		status: OrderStatus,
+		action: AuditAction,
+		/** Only the table tab's own cancel may void its unpaid order. */
+		{ tab = false }: { tab?: boolean } = {}
+	): Promise<void> {
+		// Lock the row so two managers cannot refund the same order twice.
+		const order = await manager
+			.getRepository(Order)
+			.createQueryBuilder("ord")
+			.setLock("pessimistic_write")
+			.where("ord.id = :id AND ord.business_id = :businessId", {
+				id,
+				businessId: membership.businessId,
+			})
+			.getOne();
+		if (!order) throw new NotFoundException("Order not found");
+		const voidingTab =
+			tab &&
+			order.status === OrderStatus.PENDING_PAYMENT &&
+			status === OrderStatus.CANCELLED;
+		if (order.status !== OrderStatus.PAID && !voidingTab) {
+			throw new ConflictException(`Order is already ${order.status.toLowerCase()}`);
+		}
+
+		await this.restock(manager, membership.businessId, order);
+
+		await manager.update(Order, { id: order.id }, { status });
+		await manager.update(
+			Payment,
+			{ orderId: order.id, status: PaymentStatus.SUCCESS },
+			{ status: PaymentStatus.REFUNDED }
+		);
+
+		const actor = await manager.findOneOrFail(BusinessMember, {
+			where: { id: membership.memberId },
+		});
+		await manager.save(
+			manager.create(AuditLog, {
+				businessId: membership.businessId,
+				memberId: membership.memberId,
+				actorName: actor.displayName,
+				action,
+				entity: "order",
+				entityId: order.id,
+				payload: { reason: dto.reason ?? null, total: order.total },
+			})
+		);
+		await this.notifications.emit(
+			manager,
+			membership.businessId,
+			status === OrderStatus.REFUNDED
+				? NotificationKind.REFUND
+				: NotificationKind.CANCELLED,
+			{
+				number: order.number,
+				total: order.total,
+				actor: actor.displayName,
+				reason: dto.reason ?? null,
+			},
+			{ entityId: order.id, branchId: order.branchId }
+		);
+		await this.realtime.publish(manager, {
+			topic: "orders",
+			businessId: membership.businessId,
+			branchId: order.branchId,
+		});
+		if (order.kitchenStatus) {
+			await this.realtime.publish(manager, {
+				topic: "kitchen",
+				businessId: membership.businessId,
+				branchId: order.branchId,
+			});
+		}
 	}
 
 	/**

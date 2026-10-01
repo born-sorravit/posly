@@ -79,6 +79,10 @@ export class OrderItem extends BaseEntity {
 	@Column({ name: "prepared_at", type: "timestamptz", nullable: true })
 	preparedAt: Date | null;
 
+	/** Which round of a table tab added this line; 1 for an ordinary sale. */
+	@Column({ type: "int", default: 1 })
+	round: number;
+
 	@OneToMany(
 		() => OrderItemModifier,
 		(m) => m.item,

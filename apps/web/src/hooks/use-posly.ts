@@ -21,6 +21,10 @@ import {
 	type NotificationListDto,
 	type ProductInput,
 	type ReportQuery,
+	type CloseTabInput,
+	type RoundItem,
+	type TabDto,
+	type TableInput,
 	type ReportRange,
 	type StockAdjustmentFilters,
 	type StockAdjustmentInput,
@@ -697,4 +701,125 @@ export function useSetRecipe() {
 				queryClient.invalidateQueries({ queryKey: ["business", id, "dashboard"] }),
 			]),
 	});
+}
+
+// ---------------------------------------------------------------- tables
+
+/** The shop's tables, for setup and for printing their QR codes. */
+export function useTables(enabled = true) {
+	const id = useBusinessId();
+	return useQuery({
+		queryKey: queryKeys.tables(id),
+		queryFn: ({ signal }) => api.tables.list(id, signal),
+		enabled,
+	});
+}
+
+/**
+ * The floor: every table with its open tab. Guests' rounds arrive on the live stream; while
+ * it is down a quick poll stands in, so a waiting table is never missed for long.
+ */
+export function useTableBoard(enabled = true) {
+	const id = useBusinessId();
+	const live = useRealtime((s) => s.connected);
+	return useQuery({
+		queryKey: queryKeys.tableBoard(id),
+		queryFn: ({ signal }) => api.tables.board(id, signal),
+		// A shop without tables has nothing to watch; adding one invalidates this key anyway.
+		refetchInterval: (query) => (query.state.data?.length ? (live ? 5 * 60_000 : 5000) : false),
+		refetchIntervalInBackground: true,
+		enabled,
+	});
+}
+
+export function useTab(sessionId: string | null) {
+	const id = useBusinessId();
+	const live = useRealtime((s) => s.connected);
+	return useQuery({
+		queryKey: queryKeys.tab(id, sessionId ?? "none"),
+		queryFn: ({ signal }) => api.tables.tab(id, sessionId as string, signal),
+		enabled: Boolean(sessionId),
+		refetchInterval: live ? false : 5000,
+	});
+}
+
+export function useTableMutations() {
+	const id = useBusinessId();
+	const queryClient = useQueryClient();
+	const refresh = () => queryClient.invalidateQueries({ queryKey: queryKeys.tables(id) });
+	return {
+		create: useMutation({
+			mutationFn: (input: TableInput) => api.tables.create(id, input),
+			onSuccess: () => void refresh(),
+		}),
+		update: useMutation({
+			mutationFn: ({ tableId, ...input }: Partial<TableInput> & { tableId: string }) =>
+				api.tables.update(id, tableId, input),
+			onSuccess: () => void refresh(),
+		}),
+		remove: useMutation({
+			mutationFn: (tableId: string) => api.tables.remove(id, tableId),
+			onSuccess: () => void refresh(),
+		}),
+		rotateQr: useMutation({
+			mutationFn: (tableId: string) => api.tables.rotateQr(id, tableId),
+			onSuccess: () => void refresh(),
+		}),
+	};
+}
+
+/** Working a tab. Every change redraws the floor; anything that moves stock or money also redraws sales. */
+export function useTabMutations() {
+	const id = useBusinessId();
+	const queryClient = useQueryClient();
+	const invalidateSales = useInvalidateSales();
+	const put = (tab: TabDto) => queryClient.setQueryData(queryKeys.tab(id, tab.id), tab);
+	const refresh = () => queryClient.invalidateQueries({ queryKey: queryKeys.tables(id) });
+	const sold = () => Promise.all([refresh(), invalidateSales()]);
+	return {
+		open: useMutation({
+			mutationFn: ({ tableId, guests }: { tableId: string; guests?: number }) => api.tables.open(id, tableId, guests),
+			onSuccess: (tab) => {
+				put(tab);
+				void refresh();
+			},
+		}),
+		addRound: useMutation({
+			mutationFn: ({ sessionId, clientRequestId, items }: { sessionId: string; clientRequestId: string; items: RoundItem[] }) =>
+				api.tables.addRound(id, sessionId, clientRequestId, items),
+			onSuccess: (tab) => {
+				put(tab);
+				void sold();
+			},
+			onError: (error) => {
+				if (error instanceof BackendError && error.status === 409) {
+					void queryClient.invalidateQueries({ queryKey: queryKeys.products(id) });
+				}
+			},
+		}),
+		accept: useMutation({
+			mutationFn: (requestId: string) => api.tables.accept(id, requestId),
+			onSuccess: (tab) => {
+				put(tab);
+				void sold();
+			},
+			// A refusal (out of stock, already handled) leaves the tab as the server has it.
+			onError: () => void refresh(),
+		}),
+		reject: useMutation({
+			mutationFn: (requestId: string) => api.tables.reject(id, requestId),
+			onSuccess: (tab) => {
+				put(tab);
+				void refresh();
+			},
+		}),
+		close: useMutation({
+			mutationFn: ({ sessionId, ...input }: CloseTabInput & { sessionId: string }) => api.tables.close(id, sessionId, input),
+			onSuccess: () => void sold(),
+		}),
+		cancel: useMutation({
+			mutationFn: ({ sessionId, reason }: { sessionId: string; reason?: string }) => api.tables.cancel(id, sessionId, reason),
+			onSuccess: () => void sold(),
+		}),
+	};
 }

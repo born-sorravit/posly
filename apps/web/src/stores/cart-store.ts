@@ -80,6 +80,12 @@ interface CartState {
 	setServiceType: (serviceType: ServiceType | null) => void;
 	label: string;
 	setLabel: (label: string) => void;
+	/**
+	 * The table tab this cart is filling, when staff came from the floor to add a round. The
+	 * cart is then sent onto the tab instead of paid; clearing the cart keeps it attached.
+	 */
+	table: { sessionId: string; name: string } | null;
+	setTable: (table: { sessionId: string; name: string } | null) => void;
 	clear: () => void;
 }
 
@@ -107,6 +113,7 @@ export const useCartStore = create<CartState>((set, get) => ({
 	customer: null,
 	serviceType: null,
 	label: "",
+	table: null,
 	activeKey: null,
 	stock: {},
 
@@ -209,6 +216,7 @@ export const useCartStore = create<CartState>((set, get) => ({
 	setCustomer: (customer) => set({ customer }),
 	setServiceType: (serviceType) => set({ serviceType }),
 	setLabel: (label) => set({ label }),
+	setTable: (table) => set({ table }),
 
 	clear: () => set({ lines: [], discount: null, customer: null, label: "", activeKey: null }),
 }));

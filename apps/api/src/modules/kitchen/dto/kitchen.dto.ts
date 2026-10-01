@@ -29,6 +29,8 @@ export class KitchenLineResponse {
 	@ApiProperty({ type: [String], description: "Chosen options, e.g. L, หวาน 50%" })
 	modifiers: string[];
 	@ApiProperty({ nullable: true }) preparedAt: string | null;
+	@ApiProperty({ description: "Which round of a table tab; 1 for an ordinary sale" })
+	round: number;
 }
 
 export class KitchenTicketResponse {

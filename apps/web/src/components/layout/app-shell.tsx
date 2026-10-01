@@ -3,6 +3,7 @@
 import { DemoBanner } from "@/components/demo/demo-banner";
 import { SwitchUserScreen } from "@/components/pin/switch-user";
 import { RealtimeBridge } from "@/components/realtime/realtime";
+import { TableRequestAlert } from "@/components/tables/table-request-alert";
 import { RouteGate } from "@/components/common/permission-gate";
 import { AppHeader } from "@/components/layout/app-header";
 import { AppSidebar } from "@/components/layout/app-sidebar";
@@ -93,6 +94,7 @@ export function AppShell({
 				<ProductTour />
 				<SwitchUserScreen />
 				<RealtimeBridge />
+				<TableRequestAlert />
 			</div>
 		</WorkspaceProvider>
 	);

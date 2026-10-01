@@ -21,6 +21,8 @@ import { type CartLine, type CartTotals, remainingStock, useCartStore } from "@/
 import {
 	ArrowRight,
 	MoreHorizontal,
+	UtensilsCrossed,
+	X,
 	Minus,
 	Plus,
 	ShoppingBasket,
@@ -245,9 +247,12 @@ export function CartPanel({
 	const lines = useCartStore((state) => state.lines);
 	const activeKey = useCartStore((state) => state.activeKey);
 	const clear = useCartStore((state) => state.clear);
+	const table = useCartStore((state) => state.table);
+	const setTable = useCartStore((state) => state.setTable);
 	const empty = lines.length === 0;
-	// The API refuses a discount without this permission; do not offer one.
-	const canDiscount = useActiveBusiness().can("orders:discount");
+	// The API refuses a discount without this permission; do not offer one. A table's
+	// discount is given once, when the whole tab is paid.
+	const canDiscount = useActiveBusiness().can("orders:discount") && !table;
 	// Said before the sale, not after it fails: how many orders the plan has left this month.
 	const { limits, usage } = useSubscription();
 	const ordersLeft = limits.orders === null ? null : Math.max(0, limits.orders - usage.ordersThisMonth);
@@ -261,9 +266,11 @@ export function CartPanel({
 					<p className="text-muted-foreground text-xs">{t("newOrderHint")}</p>
 				</div>
 				<div className="flex items-center gap-1">
-					<span data-tour="pos-customer" className="contents">
-						<CustomerPicker />
-					</span>
+					{table ? null : (
+						<span data-tour="pos-customer" className="contents">
+							<CustomerPicker />
+						</span>
+					)}
 					{empty ? null : (
 						<Button variant="ghost" size="icon-sm" onClick={clear} aria-label={t("clearCart")}>
 							<Trash2 />
@@ -271,7 +278,19 @@ export function CartPanel({
 					)}
 				</div>
 			</div>
-			<OrderTag />
+			{table ? (
+				<div className="px-4 pb-2">
+					<div className="flex h-9 items-center gap-2 rounded-xl bg-accent pr-1 pl-3 text-accent-foreground text-sm">
+						<UtensilsCrossed className="size-4 text-primary" />
+						<span className="min-w-0 flex-1 truncate font-medium">{t("addingToTable", { table: table.name })}</span>
+						<Button variant="ghost" size="icon-sm" onClick={() => setTable(null)} aria-label={t("detachTable")}>
+							<X />
+						</Button>
+					</div>
+				</div>
+			) : (
+				<OrderTag />
+			)}
 
 			<div className="min-h-0 flex-1 overflow-y-auto px-2">
 				{empty ? (
@@ -340,13 +359,15 @@ export function CartPanel({
 							onClick={onCheckout}
 							className="brand-gradient touch-target h-14 w-full rounded-2xl font-semibold text-base shadow-md transition-transform active:scale-[0.98]"
 						>
-							<span className="flex-1 text-left">{t("checkout")}</span>
+							<span className="flex-1 truncate text-left">
+								{table ? t("sendToTable", { table: table.name }) : t("checkout")}
+							</span>
 							<span className="numeric">{formatBaht(totals.total)}</span>
 							<ArrowRight className="size-5" />
 						</Button>
 					</TooltipTrigger>
 					<TooltipContent>
-						{t("checkout")} <kbd className="ml-1 font-mono">Enter</kbd>
+						{table ? t("sendToTable", { table: table.name }) : t("checkout")} <kbd className="ml-1 font-mono">Enter</kbd>
 					</TooltipContent>
 				</Tooltip>
 			</div>

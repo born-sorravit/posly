@@ -60,6 +60,20 @@
     display: block !important;
   }
 
+  /* Table QR cards print on A4, not the receipt roll. */
+  @page qr-sheet {
+    size: A4;
+    margin: 12mm;
+  }
+
+  .qr-sheet {
+    page: qr-sheet;
+  }
+
+  .qr-card {
+    break-inside: avoid;
+  }
+
   html,
   body {
     background: #fff !important;

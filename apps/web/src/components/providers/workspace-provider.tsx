@@ -30,6 +30,9 @@ export const queryKeys = {
 	ingredients: (id: string) => ["business", id, "ingredients"] as const,
 	recipe: (id: string, owner: RecipeOwner) =>
 		["business", id, "recipe", "productId" in owner ? owner.productId : owner.optionId] as const,
+	tables: (id: string) => ["business", id, "tables"] as const,
+	tableBoard: (id: string) => ["business", id, "tables", "board"] as const,
+	tab: (id: string, sessionId: string) => ["business", id, "tables", "tab", sessionId] as const,
 	notifications: (id: string) => ["business", id, "notifications"] as const,
 	notificationPreferences: (id: string) => ["business", id, "notification-preferences"] as const,
 };

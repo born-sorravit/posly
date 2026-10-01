@@ -7,7 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
 /** One shared, lazily created root: a direct child of body, which the print CSS keys on. */
-const printRoot = (): HTMLElement => {
+export const printRoot = (): HTMLElement => {
 	let root = document.getElementById("print-root");
 	if (!root) {
 		root = document.createElement("div");

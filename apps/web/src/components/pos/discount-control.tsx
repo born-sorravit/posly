@@ -34,14 +34,15 @@ const parse = (mode: Mode, text: string, subtotal: Satang): { discount: Discount
 function DiscountEditor({
 	subtotal,
 	current,
+	setDiscount,
 	onDone,
 }: {
 	subtotal: Satang;
 	current: Discount | null;
+	setDiscount: (discount: Discount | null) => void;
 	onDone: () => void;
 }) {
 	const t = useTranslations("pos");
-	const setDiscount = useCartStore((state) => state.setDiscount);
 	const [mode, setMode] = useState<Mode>(current?.kind ?? "percent");
 	const [text, setText] = useState(() =>
 		current ? String(current.kind === "percent" ? current.basisPoints / 100 : current.amount / 100) : ""
@@ -171,10 +172,23 @@ function DiscountEditor({
  * outline, so it reads as something to press, not a label. With one it becomes a chip that
  * says what was given ("ส่วนลด 10%"), the amount it takes off, an edit and a remove.
  */
-export function DiscountControl({ subtotal, off }: { subtotal: Satang; off: Satang }) {
+export function DiscountControl({
+	subtotal,
+	off,
+	value,
+	onChange,
+}: {
+	subtotal: Satang;
+	off: Satang;
+	/** Given together for a discount kept outside the POS cart (a table's bill); otherwise the cart's. */
+	value?: Discount | null;
+	onChange?: (discount: Discount | null) => void;
+}) {
 	const t = useTranslations("pos");
-	const discount = useCartStore((state) => state.discount);
-	const setDiscount = useCartStore((state) => state.setDiscount);
+	const cartDiscount = useCartStore((state) => state.discount);
+	const setCartDiscount = useCartStore((state) => state.setDiscount);
+	const discount = onChange ? (value ?? null) : cartDiscount;
+	const setDiscount = onChange ?? setCartDiscount;
 	const [open, setOpen] = useState(false);
 	const disabled = subtotal <= 0;
 
@@ -215,7 +229,13 @@ export function DiscountControl({ subtotal, off }: { subtotal: Satang; off: Sata
 					</PopoverTrigger>
 				)}
 				<PopoverContent side="top" align="start" className="w-80 p-4">
-					<DiscountEditor key={String(open)} subtotal={subtotal} current={discount} onDone={() => setOpen(false)} />
+					<DiscountEditor
+						key={String(open)}
+						subtotal={subtotal}
+						current={discount}
+						setDiscount={setDiscount}
+						onDone={() => setOpen(false)}
+					/>
 				</PopoverContent>
 			</Popover>
 			<span className={cn("numeric text-sm", off > 0 ? "font-medium text-success" : "text-muted-foreground")}>

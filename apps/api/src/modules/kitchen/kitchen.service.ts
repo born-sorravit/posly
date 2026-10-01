@@ -21,7 +21,7 @@ const OPEN_WINDOW_HOURS = 18;
 const RECALL_MINUTES = 15;
 
 /**
- * The kitchen screen (plan §27): paid orders with something to cook, as tickets that move
+ * The kitchen screen (plan §27): paid orders and open table tabs with something to cook, as tickets that move
  * NEW → PREPARING → READY → SERVED. Only the lines whose category cooks are shown; a
  * refunded or cancelled order leaves the board at once.
  */
@@ -52,7 +52,10 @@ export class KitchenService {
 				.where("ord.business_id = :businessId", {
 					businessId: membership.businessId,
 				})
-				.andWhere("ord.status = :paid", { paid: OrderStatus.PAID });
+				// An open table tab cooks before it is paid.
+				.andWhere("ord.status IN (:...cooking)", {
+					cooking: [OrderStatus.PAID, OrderStatus.PENDING_PAYMENT],
+				});
 			if (query.branchId)
 				qb.andWhere("ord.branch_id = :branchId", { branchId: query.branchId });
 			else if (membership.branchIds) {
@@ -74,7 +77,10 @@ export class KitchenService {
 				.andWhere("ord.kitchen_status IN (:...open)", {
 					open: [KitchenStatus.NEW, KitchenStatus.PREPARING, KitchenStatus.READY],
 				})
-				.andWhere(`ord.created_at > now() - interval '${OPEN_WINDOW_HOURS} hours'`)
+				// A tab's later round counts from when it was sent, not when the table opened.
+				.andWhere(
+					`COALESCE(ord.kitchen_updated_at, ord.created_at) > now() - interval '${OPEN_WINDOW_HOURS} hours'`
+				)
 				.orderBy("ord.created_at", "ASC")
 				.addOrderBy("item.created_at", "ASC")
 				.getMany(),
@@ -195,7 +201,10 @@ export class KitchenService {
 		}
 		if (order.kitchenStatus === null)
 			throw new ConflictException("This order has nothing for the kitchen");
-		if (order.status !== OrderStatus.PAID)
+		if (
+			order.status !== OrderStatus.PAID &&
+			order.status !== OrderStatus.PENDING_PAYMENT
+		)
 			throw new ConflictException(`Order is ${order.status.toLowerCase()}`);
 		return order;
 	}
@@ -234,5 +243,6 @@ const toTicket = (order: Order): KitchenTicketResponse => ({
 		note: item.note,
 		modifiers: (item.modifiers ?? []).map((m) => m.optionName),
 		preparedAt: item.preparedAt?.toISOString() ?? null,
+		round: item.round,
 	})),
 });

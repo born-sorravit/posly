@@ -15,6 +15,8 @@ import { OrderItem } from "@/models/orders/entities/order-item.entity";
 import { OrderItemModifier } from "@/models/orders/entities/order-item-modifier.entity";
 import { Payment } from "@/models/orders/entities/payment.entity";
 import { Subscription } from "@/models/subscriptions/entities/subscription.entity";
+import { DiningTable } from "@/models/tables/entities/dining-table.entity";
+import { newQrToken } from "@/modules/tables/tables.service";
 import { User } from "@/models/users/entities/user.entity";
 import { StockAdjustmentType } from "@/modules/catalog/dto/catalog.dto";
 import { recipeCost, unitCost } from "@/modules/inventory/recipe-cost";
@@ -233,6 +235,25 @@ async function createShop(
 			})
 		)
 	);
+
+	const tables = (shop.tables ?? []).flatMap(({ zone, names }) =>
+		names.map((name) => ({ zone, name }))
+	);
+	if (tables.length > 0) {
+		await m.save(
+			tables.map(({ zone, name }, displayOrder) =>
+				m.create(DiningTable, {
+					businessId: business.id,
+					branchId: branches[0].id,
+					name,
+					zone,
+					displayOrder,
+					isActive: true,
+					qrToken: newQrToken(),
+				})
+			)
+		);
+	}
 
 	const pinHash = await hash(DEMO_PIN, 10);
 	const members = await m.save(

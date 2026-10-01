@@ -13,7 +13,7 @@ import type { EntityManager } from "typeorm";
 import { DataSource } from "typeorm";
 
 /** What changed. A signal only — clients re-read through the normal, permission-checked API. */
-export type RealtimeTopic = "kitchen" | "orders" | "notifications";
+export type RealtimeTopic = "kitchen" | "orders" | "notifications" | "tables";
 
 export interface RealtimeEvent {
 	topic: RealtimeTopic;

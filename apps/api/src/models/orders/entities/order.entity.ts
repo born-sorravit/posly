@@ -106,6 +106,11 @@ export class Order extends BaseEntity {
 	@Column({ name: "paid_at", type: "timestamptz", nullable: true })
 	paidAt: Date | null;
 
+	/** The table tab this order is the bill of; PENDING_PAYMENT until the tab is paid. */
+	@Index("idx_order_table_session_id")
+	@Column({ name: "table_session_id", type: "uuid", nullable: true })
+	tableSessionId: string | null;
+
 	@OneToMany(
 		() => OrderItem,
 		(item) => item.order,

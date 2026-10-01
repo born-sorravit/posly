@@ -48,6 +48,8 @@ export function RealtimeBridge() {
 		const topics: Record<string, readonly (readonly unknown[])[]> = {
 			orders: [b("orders"), b("order"), b("dashboard"), queryKeys.products(businessId), b("customers")],
 			kitchen: [b("kitchen")],
+			// The floor screen, open tabs and guests' rounds waiting to be accepted.
+			tables: [b("tables")],
 			notifications: [queryKeys.notifications(businessId)],
 		};
 

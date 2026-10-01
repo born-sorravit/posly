@@ -12,7 +12,7 @@ import { Receipt } from "@/components/receipt/receipt";
 import { usePrintReceipt } from "@/components/receipt/print-receipt";
 import { useActiveBusiness } from "@/hooks/use-workspace";
 import type { PaymentMethod } from "@posly/types/domain";
-import { Check, Delete, Loader2, Printer, ShoppingCart } from "lucide-react";
+import { Check, Delete, Loader2, type LucideIcon, Printer, ShoppingCart } from "lucide-react";
 import { SendReceiptButton } from "@/components/receipt/send-receipt";
 import { AnimatePresence, motion } from "motion/react";
 import { useTranslations } from "next-intl";
@@ -326,7 +326,17 @@ function SimplePane({ onConfirm, method, total }: { onConfirm: () => void; metho
  * second), then the order number, and the receipt exactly as it will print beside it.
  * "New order" is the primary action and takes focus, so Enter starts the next sale.
  */
-function SuccessPane({ payment, onNewOrder }: { payment: CompletedPayment; onNewOrder: () => void }) {
+function SuccessPane({
+	payment,
+	onNewOrder,
+	doneLabel,
+	doneIcon: DoneIcon = ShoppingCart,
+}: {
+	payment: CompletedPayment;
+	onNewOrder: () => void;
+	doneLabel?: string;
+	doneIcon?: LucideIcon;
+}) {
 	const t = useTranslations("checkout");
 	const tMethod = useTranslations("paymentMethod");
 	const { business } = useActiveBusiness();
@@ -383,8 +393,8 @@ function SuccessPane({ payment, onNewOrder }: { payment: CompletedPayment; onNew
 						onClick={onNewOrder}
 						className="brand-gradient h-14 rounded-2xl font-semibold text-base"
 					>
-						<ShoppingCart className="size-5" />
-						{t("newOrder")}
+						<DoneIcon className="size-5" />
+						{doneLabel ?? t("newOrder")}
 					</Button>
 					<div className="grid grid-cols-2 gap-2">
 						<Button variant="outline" className="h-12 rounded-xl" onClick={() => print(payment.order)}>
@@ -425,6 +435,9 @@ export function CheckoutDialog(props: {
 	promptPayId: string | null;
 	onPay: (method: PaymentMethod, received: Satang | null) => Promise<CompletedPayment>;
 	onNewOrder: () => void;
+	/** The success screen's main button, when it does something other than start a new order. */
+	doneLabel?: string;
+	doneIcon?: LucideIcon;
 }) {
 	// Keyed per order: a fresh method choice and no stale success screen, without an effect.
 	return <CheckoutSession key={props.sessionKey} {...props} />;
@@ -437,6 +450,8 @@ function CheckoutSession({
 	promptPayId,
 	onPay,
 	onNewOrder,
+	doneLabel,
+	doneIcon,
 }: {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
@@ -445,6 +460,8 @@ function CheckoutSession({
 	promptPayId: string | null;
 	onPay: (method: PaymentMethod, received: Satang | null) => Promise<CompletedPayment>;
 	onNewOrder: () => void;
+	doneLabel?: string;
+	doneIcon?: LucideIcon;
 }) {
 	const t = useTranslations("checkout");
 	const [method, setMethod] = useState<PaymentMethod>("CASH");
@@ -486,7 +503,7 @@ function CheckoutSession({
 				<AnimatePresence mode="wait" initial={false}>
 					{done ? (
 						<motion.div key="done" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-							<SuccessPane payment={done} onNewOrder={onNewOrder} />
+							<SuccessPane payment={done} onNewOrder={onNewOrder} doneLabel={doneLabel} doneIcon={doneIcon} />
 						</motion.div>
 					) : (
 						<motion.div

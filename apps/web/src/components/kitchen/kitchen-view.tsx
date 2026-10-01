@@ -22,6 +22,7 @@ import { useFeature } from "@/hooks/use-workspace";
 import { TABLET_UP, useMediaQuery } from "@/hooks/use-media-query";
 import type { KitchenStatus, KitchenTicketDto } from "@/lib/api/posly";
 import { formatClock } from "@posly/utils/format";
+import { TONES, type Tone, play } from "@/lib/sounds";
 import { cn } from "@/lib/utils";
 import { ArrowRight, Bell, BellOff, Check, ChefHat, ChevronDown, History, Loader2, RotateCcw, Undo2, Volume2, WifiOff } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
@@ -50,8 +51,6 @@ const subscribeSound = (notify: () => void) => {
 	soundListeners.add(notify);
 	return () => soundListeners.delete(notify);
 };
-const TONES = ["chime", "bell", "alert", "beep"] as const;
-type Tone = (typeof TONES)[number];
 type SoundSetting = Tone | "off";
 
 let soundFallback: SoundSetting = "off";
@@ -73,47 +72,6 @@ const writeSound = (setting: SoundSetting) => {
 		soundFallback = setting;
 	}
 	for (const notify of soundListeners) notify();
-};
-
-/** One note: a wave at a pitch, rising fast and dying away. */
-const note = (
-	context: AudioContext,
-	{ freq, at, length, type = "sine", peak = 0.25 }: { freq: number; at: number; length: number; type?: OscillatorType; peak?: number }
-) => {
-	const start = context.currentTime + at;
-	const osc = context.createOscillator();
-	const gain = context.createGain();
-	osc.type = type;
-	osc.frequency.value = freq;
-	gain.gain.setValueAtTime(0.0001, start);
-	gain.gain.exponentialRampToValueAtTime(peak, start + 0.015);
-	gain.gain.exponentialRampToValueAtTime(0.0001, start + length);
-	osc.connect(gain).connect(context.destination);
-	osc.start(start);
-	osc.stop(start + length + 0.05);
-};
-
-/**
- * The new-order sounds, made on the spot — no audio file to load or cache. From soft to
- * loud: a counter with music on wants the chime, a kitchen with a fryer going wants the alert.
- */
-const play = (context: AudioContext, tone: Tone) => {
-	switch (tone) {
-		case "chime": // two rising notes
-			note(context, { freq: 880, at: 0, length: 0.35 });
-			note(context, { freq: 1320, at: 0.16, length: 0.35 });
-			break;
-		case "bell": // a service bell: one bright strike with a long ring and an overtone
-			note(context, { freq: 1568, at: 0, length: 1.4, peak: 0.3 });
-			note(context, { freq: 3136, at: 0, length: 0.8, peak: 0.08 });
-			break;
-		case "alert": // three hard beeps, repeated: cuts through a noisy kitchen
-			for (let i = 0; i < 6; i++) note(context, { freq: i % 3 === 2 ? 1175 : 988, at: i * 0.14 + (i >= 3 ? 0.25 : 0), length: 0.1, type: "square", peak: 0.12 });
-			break;
-		case "beep": // one short, quiet pip
-			note(context, { freq: 740, at: 0, length: 0.18, type: "triangle", peak: 0.22 });
-			break;
-	}
 };
 
 /** Minutes since the order was rung up: the one number a kitchen watches. */
@@ -146,6 +104,9 @@ function Ticket({ ticket, now }: { ticket: KitchenTicketDto; now: Date }) {
 	const done = ticket.lines.filter((l) => l.preparedAt).length;
 	const onError = (e: Error) => toast.error(e.message);
 	const prev = PREV[ticket.status];
+	// A table tab sends rounds onto one ticket: each gets a heading, and the wait is the latest round's.
+	const lastRound = Math.max(1, ...ticket.lines.map((l) => l.round));
+	const waitingSince = lastRound > 1 ? ticket.updatedAt : ticket.createdAt;
 
 	return (
 		<motion.article
@@ -164,7 +125,7 @@ function Ticket({ ticket, now }: { ticket: KitchenTicketDto; now: Date }) {
 					{formatClock(ticket.createdAt)}
 				</span>
 				<span className="ml-auto">
-					<Elapsed since={ticket.createdAt} now={now} />
+					<Elapsed since={waitingSince} now={now} />
 				</span>
 			</header>
 			{ticket.serviceType || ticket.label || ticket.customerName ? (
@@ -191,10 +152,16 @@ function Ticket({ ticket, now }: { ticket: KitchenTicketDto; now: Date }) {
 				</div>
 			) : null}
 			<ul className="px-2 pb-2" data-tour="kitchen-ticket">
-				{ticket.lines.map((line) => {
+				{ticket.lines.map((line, index) => {
 					const ticked = line.preparedAt !== null;
+					const startsRound = lastRound > 1 && line.round !== ticket.lines[index - 1]?.round;
 					return (
-						<li key={line.id}>
+						<li key={line.id} className={cn(line.round < lastRound && ticked && "opacity-60")}>
+							{startsRound ? (
+								<p className="px-2 pt-2 pb-0.5 font-semibold text-muted-foreground text-xs">
+									{t("round", { round: line.round })}
+								</p>
+							) : null}
 							<button
 								type="button"
 								onClick={() =>

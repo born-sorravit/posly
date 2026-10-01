@@ -10,7 +10,9 @@ import { ProductCard } from "@/components/pos/product-card";
 import { CategoryChipsSkeleton, ProductGridSkeleton } from "@/components/pos/pos-skeletons";
 import { Button } from "@posly/ui/components/button";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@posly/ui/components/sheet";
-import { useCategories, useCheckout, useProducts } from "@/hooks/use-posly";
+import { useCategories, useCheckout, useProducts, useTabMutations } from "@/hooks/use-posly";
+import { useRouter } from "@/i18n/navigation";
+import { BackendError } from "@/lib/api/backend";
 import { useActiveBusiness } from "@/hooks/use-workspace";
 import { formatBaht, type Satang } from "@posly/utils/money";
 import { type CartLine, computeTotals, remainingStock, useCartStore } from "@/stores/cart-store";
@@ -44,6 +46,8 @@ export function PosScreen() {
 	const productsQuery = useProducts();
 	const categoriesQuery = useCategories();
 	const checkoutMutation = useCheckout();
+	const { addRound } = useTabMutations();
+	const router = useRouter();
 	const [category, setCategory] = useState<string>(ALL);
 	const [query, setQuery] = useState("");
 	const [customising, setCustomising] = useState<Product | null>(null);
@@ -147,15 +151,53 @@ export function PosScreen() {
 	const { limits, usage } = useSubscription();
 	const outOfOrders = limits.orders !== null && usage.ordersThisMonth >= limits.orders;
 
+	/** Adding to a table: the cart goes onto the tab as one round, and staff go back to the floor. */
+	const sendRound = useCallback(() => {
+		const { lines: cartLines, table } = useCartStore.getState();
+		if (!table || addRound.isPending) return;
+		addRound.mutate(
+			{
+				sessionId: table.sessionId,
+				clientRequestId: sessionKey,
+				items: cartLines.map((line) => ({
+					productId: line.productId,
+					quantity: line.quantity,
+					modifierOptionIds: line.modifiers.flatMap((m) => (m.optionId ? [m.optionId] : [])),
+					note: line.note ?? undefined,
+				})),
+			},
+			{
+				onSuccess: () => {
+					toast.success(t("sentToTable", { table: table.name }));
+					clear();
+					useCartStore.getState().setTable(null);
+					setSessionKey(crypto.randomUUID());
+					setCartOpen(false);
+					router.push({ pathname: "/tables", query: { tab: table.sessionId } });
+				},
+				onError: (e) => {
+					toast.error(e.message);
+					// The tab was paid or cancelled meanwhile: the cart stays, as an ordinary sale.
+					if (e instanceof BackendError && e.status === 409 && /tab is already closed/.test(e.raw ?? ""))
+						useCartStore.getState().setTable(null);
+				},
+			}
+		);
+	}, [addRound, sessionKey, clear, router, t]);
+
 	const openCheckout = useCallback(() => {
 		if (useCartStore.getState().lines.length === 0) return;
 		if (outOfOrders) {
 			toast.error(t("quotaReached", { limit: limits.orders ?? 0 }));
 			return;
 		}
+		if (useCartStore.getState().table) {
+			sendRound();
+			return;
+		}
 		setCartOpen(false);
 		setCheckoutOpen(true);
-	}, [outOfOrders, limits.orders, t]);
+	}, [outOfOrders, limits.orders, t, sendRound]);
 
 	/** The server reprices; what it answers is what the success screen shows. */
 	const pay = async (method: PaymentMethod, received: Satang | null): Promise<CompletedPayment> => {

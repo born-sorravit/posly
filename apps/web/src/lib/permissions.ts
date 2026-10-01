@@ -34,6 +34,7 @@ interface RouteRule {
 
 const RULES: RouteRule[] = ([
 	{ prefix: "/pos", permission: "pos:use" },
+	{ prefix: "/tables", permission: "pos:use" },
 	{ prefix: "/orders", permission: "orders:read-own" },
 	{ prefix: "/products/new", exact: true, permission: "products:write" },
 	{ prefix: "/products", permission: "products:read" },

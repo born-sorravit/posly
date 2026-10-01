@@ -385,12 +385,91 @@ export interface KitchenTicketDto {
 	customerName: string | null;
 	serviceType: ServiceType | null;
 	label: string | null;
-	lines: { id: string; name: string; quantity: number; note: string | null; modifiers: string[]; preparedAt: string | null }[];
+	lines: {
+		id: string;
+		name: string;
+		quantity: number;
+		note: string | null;
+		modifiers: string[];
+		preparedAt: string | null;
+		/** Which round of a table tab; 1 for an ordinary sale. */
+		round: number;
+	}[];
 }
 
 export interface KitchenBoardDto {
 	open: KitchenTicketDto[];
 	recent: KitchenTicketDto[];
+}
+
+// ---------------------------------------------------------------- tables
+
+export interface TableDto {
+	id: string;
+	branchId: string;
+	name: string;
+	zone: string | null;
+	displayOrder: number;
+	isActive: boolean;
+	/** What the table's QR carries: `/t/<qrToken>`. */
+	qrToken: string;
+}
+
+export interface TableInput {
+	name: string;
+	zone?: string | null;
+	displayOrder?: number;
+	isActive?: boolean;
+}
+
+export interface BoardTableDto extends TableDto {
+	tab: { id: string; guests: number | null; openedAt: string; total: Satang; itemCount: number; pendingRequests: number } | null;
+}
+
+export type TableRequestStatus = "PENDING" | "ACCEPTED" | "REJECTED";
+
+export interface TableRequestDto {
+	id: string;
+	status: TableRequestStatus;
+	createdAt: string;
+	items: { productId: string; name: string; quantity: number; unitPrice: Satang; modifiers: string[]; note: string | null }[];
+	total: Satang;
+}
+
+export interface TabDto {
+	id: string;
+	tableId: string;
+	tableName: string;
+	status: "OPEN" | "CLOSED" | "CANCELLED";
+	guests: number | null;
+	openedAt: string;
+	orderId: string | null;
+	orderNumber: string | null;
+	kitchenStatus: KitchenStatus | null;
+	lines: {
+		id: string;
+		name: string;
+		quantity: number;
+		unitPrice: Satang;
+		lineTotal: Satang;
+		modifiers: string[];
+		note: string | null;
+		round: number;
+		toKitchen: boolean;
+		preparedAt: string | null;
+	}[];
+	subtotal: Satang;
+	vat: Satang;
+	total: Satang;
+	requests: TableRequestDto[];
+}
+
+export type RoundItem = CheckoutInput["items"][number];
+
+/** Settling a table: the same money as a checkout, for a bill that already exists. */
+export interface CloseTabInput {
+	discount: Satang;
+	payment: { method: PaymentMethod; received?: Satang };
 }
 
 /** Someone who can take over the till, for the lock screen. */
@@ -596,6 +675,27 @@ export const api = {
 			backend.patch<KitchenTicketDto>(`${b(id)}/kitchen/${orderId}`, { status }),
 		setPrepared: (id: string, orderId: string, itemId: string, prepared: boolean) =>
 			backend.patch<KitchenTicketDto>(`${b(id)}/kitchen/${orderId}/items/${itemId}`, { prepared }),
+	},
+	tables: {
+		list: (id: string, signal?: AbortSignal) => backend.get<TableDto[]>(`${b(id)}/tables`, undefined, signal),
+		board: (id: string, signal?: AbortSignal) => backend.get<BoardTableDto[]>(`${b(id)}/tables/board`, undefined, signal),
+		create: (id: string, input: TableInput) => backend.post<TableDto>(`${b(id)}/tables`, input),
+		update: (id: string, tableId: string, input: Partial<TableInput>) =>
+			backend.patch<TableDto>(`${b(id)}/tables/${tableId}`, input),
+		remove: (id: string, tableId: string) => backend.delete(`${b(id)}/tables/${tableId}`),
+		rotateQr: (id: string, tableId: string) => backend.post<TableDto>(`${b(id)}/tables/${tableId}/rotate-qr`),
+		open: (id: string, tableId: string, guests?: number) =>
+			backend.post<TabDto>(`${b(id)}/tables/${tableId}/open`, guests ? { guests } : {}),
+		tab: (id: string, sessionId: string, signal?: AbortSignal) =>
+			backend.get<TabDto>(`${b(id)}/table-sessions/${sessionId}`, undefined, signal),
+		addRound: (id: string, sessionId: string, clientRequestId: string, items: RoundItem[]) =>
+			backend.post<TabDto>(`${b(id)}/table-sessions/${sessionId}/items`, { clientRequestId, items }),
+		close: (id: string, sessionId: string, input: CloseTabInput) =>
+			backend.post<OrderDto>(`${b(id)}/table-sessions/${sessionId}/close`, input),
+		cancel: (id: string, sessionId: string, reason?: string) =>
+			backend.post<{ cancelled: true }>(`${b(id)}/table-sessions/${sessionId}/cancel`, { reason }),
+		accept: (id: string, requestId: string) => backend.post<TabDto>(`${b(id)}/table-requests/${requestId}/accept`),
+		reject: (id: string, requestId: string) => backend.post<TabDto>(`${b(id)}/table-requests/${requestId}/reject`),
 	},
 	billing: {
 		checkout: (id: string, plan: PlanCode) => backend.post<{ url: string }>(`${b(id)}/billing/checkout`, { plan }),

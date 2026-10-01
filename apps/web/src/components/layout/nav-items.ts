@@ -13,12 +13,14 @@ import {
 	Tags,
 	UserRound,
 	UsersRound,
+	UtensilsCrossed,
 	Wallet,
 } from "lucide-react";
 
 export type NavKey =
 	| "overview"
 	| "pos"
+	| "tables"
 	| "orders"
 	| "kitchen"
 	| "products"
@@ -49,6 +51,7 @@ export const NAV_PERMISSION: Record<NavKey, string> = {
 		(
 			[
 				["pos", "/pos"],
+				["tables", "/tables"],
 				["kitchen", "/kitchen"],
 				["orders", "/orders"],
 				["products", "/products"],
@@ -87,6 +90,7 @@ export const NAV_SECTIONS: NavSection[] = [
 		items: [
 			{ key: "overview", href: "/dashboard", icon: LayoutGrid },
 			{ key: "pos", href: "/pos", icon: ShoppingCart },
+			{ key: "tables", href: "/tables", icon: UtensilsCrossed },
 			{ key: "kitchen", href: "/kitchen", icon: ChefHat },
 			{ key: "orders", href: "/orders", icon: ReceiptText },
 		],

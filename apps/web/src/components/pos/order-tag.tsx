@@ -1,11 +1,19 @@
 "use client";
 
 import { Input } from "@posly/ui/components/input";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuLabel,
+	DropdownMenuTrigger,
+} from "@posly/ui/components/dropdown-menu";
+import { useTableBoard } from "@/hooks/use-posly";
 import { useActiveBusiness } from "@/hooks/use-workspace";
 import { cn } from "@/lib/utils";
 import { useCartStore } from "@/stores/cart-store";
 import type { ServiceType } from "@posly/types/domain";
-import { Bike, ShoppingBag, UtensilsCrossed } from "lucide-react";
+import { Armchair, Bike, ShoppingBag, UtensilsCrossed } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 export const SERVICE_ICON: Record<ServiceType, typeof Bike> = {
@@ -27,6 +35,9 @@ export function OrderTag() {
 	const label = useCartStore((s) => s.label);
 	const setLabel = useCartStore((s) => s.setLabel);
 	const kinds = business.businessType !== "RETAIL" && business.businessType !== "SERVICE";
+	// Open tables this cart can go onto instead of being paid now.
+	const openTabs = (useTableBoard(kinds).data ?? []).filter((table) => table.tab);
+	const setTable = useCartStore((s) => s.setTable);
 
 	return (
 		<div className="flex items-center gap-1.5 px-4 pb-2">
@@ -51,6 +62,32 @@ export function OrderTag() {
 						);
 					})
 				: null}
+			{openTabs.length > 0 ? (
+				<DropdownMenu>
+					<DropdownMenuTrigger asChild>
+						<button
+							type="button"
+							aria-label={t("pickTable")}
+							title={t("pickTable")}
+							className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted/70 text-muted-foreground transition-colors hover:bg-muted"
+						>
+							<Armchair className="size-3.5" />
+						</button>
+					</DropdownMenuTrigger>
+					<DropdownMenuContent align="start" className="max-h-72 w-52 overflow-y-auto">
+						<DropdownMenuLabel className="text-muted-foreground text-xs">{t("pickTableHint")}</DropdownMenuLabel>
+						{openTabs.map((table) => (
+							<DropdownMenuItem
+								key={table.id}
+								onClick={() => table.tab && setTable({ sessionId: table.tab.id, name: table.name })}
+							>
+								<UtensilsCrossed />
+								{table.name}
+							</DropdownMenuItem>
+						))}
+					</DropdownMenuContent>
+				</DropdownMenu>
+			) : null}
 			<Input
 				value={label}
 				maxLength={40}
