@@ -5,7 +5,7 @@ import { useActiveBusiness, useFeature } from "@/hooks/use-workspace";
 import { useRouter } from "@/i18n/navigation";
 import { TableRequestToast } from "@/components/tables/table-request-toast";
 import { play } from "@/lib/sounds";
-import { HandPlatter, ReceiptText } from "lucide-react";
+import { HandPlatter, ReceiptText, Wallet } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
@@ -47,10 +47,13 @@ export function TableRequestAlert() {
 			toast.custom(
 				(toastId) => (
 					<TableRequestToast
-						title={t(call.kind === "BILL" ? "billTitle" : "waiterTitle", { table: table.name })}
-						hint={t("callHint")}
+						title={t(
+							call.kind === "PAID" ? "paidTitle" : call.kind === "BILL" ? "billTitle" : "waiterTitle",
+							{ table: table.name }
+						)}
+						hint={call.kind === "PAID" ? t("paidCallHint") : t("callHint")}
 						viewLabel={t("viewTable")}
-						icon={call.kind === "BILL" ? ReceiptText : HandPlatter}
+						icon={call.kind === "PAID" ? Wallet : call.kind === "BILL" ? ReceiptText : HandPlatter}
 						onView={() => {
 							toast.dismiss(toastId);
 							go();

@@ -4,6 +4,7 @@ import { Segmented } from "@/components/common/controls";
 import { EmptyState, StatusBadge } from "@/components/common/primitives";
 import { ProductThumb } from "@/components/common/product-thumb";
 import { StoreAvatar } from "@/components/layout/brand";
+import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { ModifierDialog } from "@/components/pos/modifier-dialog";
 import { type GuestProductDto, guestApi } from "@/lib/api/guest";
 import type { TableCallKind } from "@/lib/api/posly";
@@ -14,10 +15,12 @@ import { Button } from "@posly/ui/components/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@posly/ui/components/sheet";
 import { Skeleton } from "@posly/ui/components/skeleton";
 import { formatBaht, multiply, sum } from "@posly/utils/money";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { Check, HandPlatter, Loader2, Minus, Plus, ReceiptText, RotateCcw, SearchX, ShoppingBasket, Store, TriangleAlert } from "lucide-react";
+import { promptPayPayload } from "@posly/utils/promptpay";
+import { QRCodeSVG } from "qrcode.react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Check, Download, HandPlatter, Loader2, Minus, Plus, ReceiptText, RotateCcw, SearchX, ShoppingBasket, Store, TriangleAlert } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 
 interface GuestLine {
@@ -106,16 +109,102 @@ const useStoredCart = (token: string) => {
 	return [lines, update] as const;
 };
 
+/**
+ * Pay the bill by PromptPay from the guest's own phone. The QR carries the amount; a phone
+ * cannot scan its own screen, so the picture can be saved and opened from the banking app.
+ * There is no gateway: "I paid" tells staff, who check their bank app before closing the bill.
+ */
+function PromptPaySection({
+	promptPayId,
+	total,
+	claimed,
+	pending,
+	onPaid,
+}: {
+	promptPayId: string;
+	total: number;
+	claimed: boolean;
+	pending: boolean;
+	onPaid: () => void;
+}) {
+	const t = useTranslations("guest");
+	const qr = useRef<HTMLDivElement>(null);
+
+	// The QR as a PNG on white, through the share sheet where there is one (iOS "Save Image").
+	const save = async () => {
+		const svg = qr.current?.querySelector("svg");
+		if (!svg) return;
+		const image = new Image();
+		image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(new XMLSerializer().serializeToString(svg))}`;
+		await image.decode();
+		const pad = 32;
+		const canvas = document.createElement("canvas");
+		canvas.width = image.width * 2 + pad * 2;
+		canvas.height = image.height * 2 + pad * 2;
+		const context = canvas.getContext("2d");
+		if (!context) return;
+		context.fillStyle = "#ffffff";
+		context.fillRect(0, 0, canvas.width, canvas.height);
+		context.drawImage(image, pad, pad, image.width * 2, image.height * 2);
+		const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+		if (!blob) return;
+		const file = new File([blob], "promptpay.png", { type: "image/png" });
+		if (navigator.canShare?.({ files: [file] })) {
+			await navigator.share({ files: [file] }).catch(() => undefined);
+			return;
+		}
+		const link = document.createElement("a");
+		link.href = URL.createObjectURL(blob);
+		link.download = "promptpay.png";
+		link.click();
+		URL.revokeObjectURL(link.href);
+	};
+
+	return (
+		<section className="space-y-3 rounded-2xl bg-card p-4 shadow-sm">
+			<p className="font-semibold">{t("payTitle")}</p>
+			{/* White in both themes: banking apps read dark-on-light. */}
+			<div ref={qr} className="mx-auto flex w-fit flex-col items-center gap-2 rounded-2xl bg-white p-4 ring-1 ring-black/5">
+				<span className="rounded bg-[#0f3d68] px-1.5 py-0.5 font-bold text-[10px] text-white">PromptPay</span>
+				<QRCodeSVG value={promptPayPayload(promptPayId, total)} size={192} level="M" marginSize={1} />
+				<span className="numeric font-bold text-black text-xl">{formatBaht(total)}</span>
+			</div>
+			<p className="text-center text-muted-foreground text-xs">{t("payHint")}</p>
+			{claimed ? (
+				<p className="flex items-center justify-center gap-2 rounded-xl bg-success/12 px-3 py-2.5 font-medium text-sm">
+					<Check className="size-4" />
+					{t("paidWaiting")}
+				</p>
+			) : (
+				<div className="grid grid-cols-2 gap-2">
+					<Button variant="outline" className="h-11 rounded-xl" onClick={() => void save()}>
+						<Download />
+						{t("saveQr")}
+					</Button>
+					<Button className="h-11 rounded-xl" disabled={pending} onClick={onPaid}>
+						{pending ? <Loader2 className="animate-spin" /> : <Check />}
+						{t("paidButton")}
+					</Button>
+				</div>
+			)}
+		</section>
+	);
+}
+
 function GuestBill({
 	token,
 	tableOpen,
 	open,
 	onOpenChange,
+	onPaid,
+	paying,
 }: {
 	token: string;
 	tableOpen: boolean;
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
+	onPaid: () => void;
+	paying: boolean;
 }) {
 	const t = useTranslations("guest");
 	// A room of phones often shares one Wi-Fi address: poll quickly only while the bill is on screen.
@@ -126,6 +215,10 @@ function GuestBill({
 		refetchInterval: open ? 5000 : 60_000,
 	});
 	const data = tab.data;
+	// Said "I paid", then staff closed the bill: thank them rather than show an empty bill.
+	const [claimedPaid, setClaimedPaid] = useState(false);
+	if (data?.call?.kind === "PAID" && !claimedPaid) setClaimedPaid(true);
+	const settled = claimedPaid && data !== undefined && !data.open;
 	const waiting = data?.requests.filter((r) => r.status === "PENDING") ?? [];
 	const rejected = data?.requests.filter((r) => r.status === "REJECTED") ?? [];
 	const rounds = useMemo(() => {
@@ -164,7 +257,9 @@ function GuestBill({
 							</span>
 						</p>
 					))}
-					{tab.isPending ? (
+					{settled ? (
+						<EmptyState icon={Check} title={t("thanks")} className="py-8" />
+					) : tab.isPending ? (
 						<Skeleton className="h-24 w-full rounded-2xl" />
 					) : rounds.length === 0 && waiting.length === 0 ? (
 						<EmptyState icon={ReceiptText} title={t("billEmpty")} className="py-8" />
@@ -192,12 +287,23 @@ function GuestBill({
 							</section>
 						))
 					)}
+					{data?.open && data.promptPayId && data.total > 0 ? (
+						<PromptPaySection
+							promptPayId={data.promptPayId}
+							total={data.total}
+							claimed={data.call?.kind === "PAID"}
+							pending={paying}
+							onPaid={onPaid}
+						/>
+					) : null}
 				</div>
 				<div className="space-y-3 border-t px-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
-					<div className="flex items-baseline justify-between">
-						<span className="font-semibold">{t("billTotal")}</span>
-						<span className="numeric font-bold text-2xl tracking-tight">{formatBaht(data?.total ?? 0)}</span>
-					</div>
+					{settled ? null : (
+						<div className="flex items-baseline justify-between">
+							<span className="font-semibold">{t("billTotal")}</span>
+							<span className="numeric font-bold text-2xl tracking-tight">{formatBaht(data?.total ?? 0)}</span>
+						</div>
+					)}
 					<Button variant="outline" size="lg" className="h-11 w-full" onClick={() => onOpenChange(false)}>
 						{t("close")}
 					</Button>
@@ -253,16 +359,18 @@ export function GuestOrder({ token }: { token: string }) {
 	const guestTab = useQuery({
 		queryKey: ["guest", token, "tab"],
 		queryFn: ({ signal }) => guestApi.tab(token, signal),
-		enabled: Boolean(data?.open),
+		enabled: Boolean(data?.qrOrdering),
 		refetchInterval: 60_000,
 	});
 	const hasBill = (guestTab.data?.lines.length ?? 0) > 0;
 	// A call is answered by staff walking over, not on screen: the button rests for a minute.
+	const queryClient = useQueryClient();
 	const [called, setCalled] = useState<Partial<Record<TableCallKind, boolean>>>({});
 	const callStaff = useMutation({
 		mutationFn: (kind: TableCallKind) => guestApi.call(token, kind),
 		onSuccess: (_, kind) => {
-			toast.success(kind === "BILL" ? t("billToast") : t("calledToast"));
+			toast.success(kind === "PAID" ? t("paidToast") : kind === "BILL" ? t("billToast") : t("calledToast"));
+			void queryClient.invalidateQueries({ queryKey: ["guest", token, "tab"] });
 			setCalled((c) => ({ ...c, [kind]: true }));
 			window.setTimeout(() => setCalled((c) => ({ ...c, [kind]: false })), 60_000);
 		},
@@ -341,6 +449,8 @@ export function GuestOrder({ token }: { token: string }) {
 							</>
 						)}
 					</div>
+					{/* The same light/dark switch as the app's top bar: a dim restaurant wants the dark one. */}
+					<ThemeToggle />
 					<Button variant="outline" className="h-11 rounded-xl" onClick={() => setBillOpen(true)} disabled={!data?.open}>
 						<ReceiptText />
 						{t("bill")}
@@ -512,7 +622,14 @@ export function GuestOrder({ token }: { token: string }) {
 					setCustomising(null);
 				}}
 			/>
-			<GuestBill token={token} tableOpen={Boolean(data?.open)} open={billOpen} onOpenChange={setBillOpen} />
+			<GuestBill
+				token={token}
+				tableOpen={Boolean(data?.qrOrdering)}
+				open={billOpen}
+				onOpenChange={setBillOpen}
+				onPaid={() => callStaff.mutate("PAID")}
+				paying={callStaff.isPending}
+			/>
 		</main>
 	);
 }

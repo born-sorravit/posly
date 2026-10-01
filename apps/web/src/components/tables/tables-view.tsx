@@ -30,7 +30,7 @@ import { Input } from "@posly/ui/components/input";
 import { Skeleton } from "@posly/ui/components/skeleton";
 import { formatClock } from "@posly/utils/format";
 import { addedTax, formatBaht, includedTax, type Satang } from "@posly/utils/money";
-import { Ban, Check, Clock3, HandPlatter, Loader2, MoreHorizontal, Plus, QrCode, ReceiptText, Settings2, Users, TriangleAlert, UtensilsCrossed, X } from "lucide-react";
+import { Ban, Check, Clock3, HandPlatter, Loader2, MoreHorizontal, Plus, QrCode, ReceiptText, Settings2, Users, TriangleAlert, UtensilsCrossed, Wallet, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -53,10 +53,16 @@ const tabTotals = (tab: TabDto, discount: Discount | null, vatBasisPoints: numbe
 	};
 };
 
+const CALL_ICON: Record<TableCallKind, typeof ReceiptText> = {
+	WAITER: HandPlatter,
+	BILL: ReceiptText,
+	PAID: Wallet,
+};
+
 /** A guest at the table is asking for staff or the bill: loud until someone acknowledges it. */
 function CallChip({ kind }: { kind: TableCallKind }) {
 	const t = useTranslations("tables.call");
-	const Icon = kind === "BILL" ? ReceiptText : HandPlatter;
+	const Icon = CALL_ICON[kind];
 	return (
 		<span className="flex w-fit shrink-0 items-center gap-1 rounded-full bg-warning px-2 py-0.5 font-semibold text-[11px] text-warning-foreground">
 			<Icon className="size-3" />
@@ -65,12 +71,24 @@ function CallChip({ kind }: { kind: TableCallKind }) {
 	);
 }
 
-/** The call on the table, with the button staff press once they have answered it. */
-function CallBanner({ table }: { table: BoardTableDto }) {
+/**
+ * The call on the table, with the button staff press once they have answered it. "I paid"
+ * is answered by checking the bank app and taking the payment, so it leads to check-out.
+ */
+function CallBanner({
+	table,
+	total,
+	onCheckPaid,
+}: {
+	table: BoardTableDto;
+	total?: number;
+	onCheckPaid?: () => void;
+}) {
 	const t = useTranslations("tables.call");
 	const { dismissCall } = useTableMutations();
 	if (!table.call) return null;
-	const Icon = table.call.kind === "BILL" ? ReceiptText : HandPlatter;
+	const Icon = CALL_ICON[table.call.kind];
+	const paid = table.call.kind === "PAID";
 	return (
 		<div className="flex items-center gap-3 rounded-2xl bg-warning/12 p-3 ring-1 ring-warning/40">
 			<span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-warning text-warning-foreground">
@@ -79,9 +97,17 @@ function CallBanner({ table }: { table: BoardTableDto }) {
 			<div className="min-w-0 flex-1">
 				<p className="font-semibold text-sm">{t(table.call.kind)}</p>
 				<p className="numeric text-muted-foreground text-xs" suppressHydrationWarning>
-					{formatClock(table.call.at)}
+					{paid && total !== undefined
+						? `${formatClock(table.call.at)} · ${t("paidHint", { total: formatBaht(total) })}`
+						: formatClock(table.call.at)}
 				</p>
 			</div>
+			{paid && onCheckPaid ? (
+				<Button size="sm" className="shrink-0" onClick={onCheckPaid}>
+					<Check />
+					{t("checkPaid")}
+				</Button>
+			) : (
 			<Button
 				variant="outline"
 				size="sm"
@@ -96,6 +122,7 @@ function CallBanner({ table }: { table: BoardTableDto }) {
 				{dismissCall.isPending ? <Loader2 className="animate-spin" /> : <Check />}
 				{t("dismiss")}
 			</Button>
+			)}
 		</div>
 	);
 }
@@ -406,6 +433,8 @@ function TabSheet({ sessionId, onClose }: { sessionId: string | null; onClose: (
 	const hasQr = useFeature("QR_ORDERING");
 	const [discount, setDiscount] = useState<Discount | null>(null);
 	const [paying, setPaying] = useState(false);
+	// The method check-out opens on: PromptPay when the guest has said they transferred.
+	const [payMethod, setPayMethod] = useState<PaymentMethod>("CASH");
 	const [cancelling, setCancelling] = useState(false);
 	const [showQr, setShowQr] = useState(false);
 	const [replacingCart, setReplacingCart] = useState(false);
@@ -477,7 +506,20 @@ function TabSheet({ sessionId, onClose }: { sessionId: string | null; onClose: (
 							<EmptyState icon={ReceiptText} title={t("notFound")} className="py-10" />
 						) : data ? (
 							<>
-								{table ? <CallBanner table={table} /> : null}
+								{table ? (
+									<CallBanner
+										table={table}
+										total={totals?.total}
+										onCheckPaid={
+											data.orderId
+												? () => {
+														setPayMethod("PROMPTPAY");
+														setPaying(true);
+													}
+												: undefined
+										}
+									/>
+								) : null}
 								{pending.length > 0 ? (
 									<section className="space-y-2">
 										<h3 className="font-semibold text-sm">
@@ -580,7 +622,10 @@ function TabSheet({ sessionId, onClose }: { sessionId: string | null; onClose: (
 								<Button
 									className="brand-gradient h-12 flex-1 rounded-xl font-semibold"
 									disabled={!data.orderId || pending.length > 0}
-									onClick={() => setPaying(true)}
+									onClick={() => {
+										setPayMethod("CASH");
+										setPaying(true);
+									}}
 								>
 									<ReceiptText />
 									{t("checkout")}
@@ -599,6 +644,8 @@ function TabSheet({ sessionId, onClose }: { sessionId: string | null; onClose: (
 					sessionKey={data.id}
 					promptPayId={business.promptPayId}
 					onPay={pay}
+					key={payMethod}
+					initialMethod={payMethod}
 					doneLabel={t("backToTables")}
 					doneIcon={UtensilsCrossed}
 					onNewOrder={() => {

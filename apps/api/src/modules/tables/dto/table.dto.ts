@@ -285,5 +285,12 @@ export class GuestTabResponse {
 	@ApiProperty() open: boolean;
 	@ApiProperty({ type: [GuestTabLineResponse] }) lines: GuestTabLineResponse[];
 	@ApiProperty() total: number;
+	@ApiProperty({
+		nullable: true,
+		description: "Set once there is something to pay, when the shop takes PromptPay",
+	})
+	promptPayId: string | null;
+	@ApiProperty({ type: () => TableCallResponse, nullable: true })
+	call: TableCallResponse | null;
 	@ApiProperty({ type: [TableRequestResponse] }) requests: TableRequestResponse[];
 }

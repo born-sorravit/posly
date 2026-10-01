@@ -421,7 +421,7 @@ export interface TableDto {
 	call: TableCallDto | null;
 }
 
-export type TableCallKind = "WAITER" | "BILL";
+export type TableCallKind = "WAITER" | "BILL" | "PAID";
 
 export interface TableCallDto {
 	kind: TableCallKind;

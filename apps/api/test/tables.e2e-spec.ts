@@ -383,6 +383,30 @@ describe("tables and QR ordering", () => {
 			bell.find((n) => n.kind === "TABLE_CALL" && n.data.kind === "BILL")
 		).toBeDefined();
 
+		// The guest's bill carries the shop's PromptPay number once there is something to pay.
+		await api(app)
+			.patch(base)
+			.set(auth(owner.token))
+			.send({ promptPayId: "0812345678" })
+			.expect(200);
+		const guestTab = (
+			await api(app)
+				.get(`${guest(third.qrToken)}/tab`)
+				.expect(200)
+		).body.data;
+		expect(guestTab.promptPayId).toBe("0812345678");
+		// "I paid" outranks the bill and a later call for staff.
+		expect((await call("PAID")).body.data.kind).toBe("PAID");
+		expect((await call("WAITER")).body.data.kind).toBe("PAID");
+		expect(await boardCall()).toMatchObject({ kind: "PAID" });
+		const paidBell = (
+			await api(app).get(`${base}/notifications`).set(auth(owner.token)).expect(200)
+		).body.data.items as { kind: string; data: Record<string, unknown> }[];
+		expect(
+			paidBell.find((n) => n.kind === "TABLE_CALL" && n.data.kind === "PAID")?.data
+				.total
+		).toBe(guestTab.total);
+
 		// Paying the tab answers the call.
 		await api(app)
 			.post(`${base}/table-sessions/${tab.id}/close`)

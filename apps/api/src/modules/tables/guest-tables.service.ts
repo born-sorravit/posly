@@ -26,6 +26,7 @@ import {
 } from "@/modules/tables/tables.service";
 import { NotificationKind } from "@/shared/enums/notification.enum";
 import {
+	CALL_RANK,
 	TableCallKind,
 	TableRequestStatus,
 	TableSessionStatus,
@@ -196,7 +197,7 @@ export class GuestTablesService {
 			)
 				throw new ForbiddenException("This shop does not take orders from the QR");
 			const session = await this.openSession(manager, table);
-			if (dto.kind === TableCallKind.BILL && !session?.orderId)
+			if (dto.kind !== TableCallKind.WAITER && !session?.orderId)
 				throw new ConflictException("Nothing to bill yet");
 
 			const locked = await manager
@@ -213,10 +214,10 @@ export class GuestTablesService {
 				return { kind: dto.kind, at: locked.calledAt.toISOString() };
 
 			const at = new Date();
-			// Asking for the bill outranks a call for staff, never the other way round.
+			// A call nearer to settling up stays: "I paid" is not undone by "call staff".
 			const kind =
-				locked.callKind === TableCallKind.BILL && dto.kind === TableCallKind.WAITER
-					? TableCallKind.BILL
+				locked.callKind && CALL_RANK[locked.callKind] > CALL_RANK[dto.kind]
+					? locked.callKind
 					: dto.kind;
 			await manager.update(
 				DiningTable,
@@ -232,7 +233,22 @@ export class GuestTablesService {
 				manager,
 				table.businessId,
 				NotificationKind.TABLE_CALL,
-				{ table: table.name, kind: dto.kind },
+				{
+					table: table.name,
+					kind: dto.kind,
+					// What the guest says they transferred, for staff to match in the bank app.
+					...(dto.kind === TableCallKind.PAID && session?.orderId
+						? {
+								total:
+									(
+										await manager.findOne(Order, {
+											where: { id: session.orderId },
+											select: { id: true, total: true },
+										})
+									)?.total ?? 0,
+							}
+						: {}),
+				},
 				{ entityId: session?.id, branchId: table.branchId }
 			);
 			return { kind, at: at.toISOString() };
@@ -242,7 +258,15 @@ export class GuestTablesService {
 	async tab(token: string): Promise<GuestTabResponse> {
 		const table = await this.loadTable(this.dataSource.manager, token);
 		const session = await this.openSession(this.dataSource.manager, table);
-		if (!session) return { open: false, lines: [], total: 0, requests: [] };
+		if (!session)
+			return {
+				open: false,
+				lines: [],
+				total: 0,
+				requests: [],
+				promptPayId: null,
+				call: null,
+			};
 		const [order, requests] = await Promise.all([
 			session.orderId
 				? this.dataSource.getRepository(Order).findOne({
@@ -258,6 +282,16 @@ export class GuestTablesService {
 				order: { createdAt: "ASC" },
 			}),
 		]);
+		// Shown only with a bill to pay: it is the shop's PromptPay number, the same one the QR
+		// on the counter carries.
+		const business =
+			order && order.total > 0
+				? await this.dataSource.getRepository(Business).findOne({
+						where: { id: table.businessId },
+						select: { id: true, promptPayId: true },
+					})
+				: null;
+		const promptPayId = business?.promptPayId ?? null;
 		return {
 			open: true,
 			lines: sortedItems(order).map((item) => ({
@@ -271,6 +305,11 @@ export class GuestTablesService {
 			})),
 			total: order?.total ?? 0,
 			requests: await this.tables.describeRequests(table.businessId, requests),
+			promptPayId,
+			call:
+				table.callKind && table.calledAt
+					? { kind: table.callKind, at: table.calledAt.toISOString() }
+					: null,
 		};
 	}
 

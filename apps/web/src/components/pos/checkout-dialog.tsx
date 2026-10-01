@@ -438,6 +438,8 @@ export function CheckoutDialog(props: {
 	/** The success screen's main button, when it does something other than start a new order. */
 	doneLabel?: string;
 	doneIcon?: LucideIcon;
+	/** Opens on this method, e.g. PromptPay when the guest says they already transferred. */
+	initialMethod?: PaymentMethod;
 }) {
 	// Keyed per order: a fresh method choice and no stale success screen, without an effect.
 	return <CheckoutSession key={props.sessionKey} {...props} />;
@@ -452,6 +454,7 @@ function CheckoutSession({
 	onNewOrder,
 	doneLabel,
 	doneIcon,
+	initialMethod = "CASH",
 }: {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
@@ -462,9 +465,10 @@ function CheckoutSession({
 	onNewOrder: () => void;
 	doneLabel?: string;
 	doneIcon?: LucideIcon;
+	initialMethod?: PaymentMethod;
 }) {
 	const t = useTranslations("checkout");
-	const [method, setMethod] = useState<PaymentMethod>("CASH");
+	const [method, setMethod] = useState<PaymentMethod>(initialMethod);
 	const [done, setDone] = useState<CompletedPayment | null>(null);
 	const [pending, setPending] = useState(false);
 

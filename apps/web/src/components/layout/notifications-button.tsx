@@ -91,6 +91,11 @@ function useWording() {
 					body: t("tableRequestBody", { count: num("items") }),
 				};
 			case "TABLE_CALL":
+				if (d.kind === "PAID")
+					return {
+						title: t("tablePaidTitle", { table: str("table") }),
+						body: t("tablePaidBody", { total: formatBaht(num("total")) }),
+					};
 				return {
 					title: t(d.kind === "BILL" ? "tableBillTitle" : "tableWaiterTitle", { table: str("table") }),
 					body: t(d.kind === "BILL" ? "tableBillBody" : "tableWaiterBody"),

@@ -43,6 +43,10 @@ export interface GuestTabDto {
 	open: boolean;
 	lines: { name: string; quantity: number; lineTotal: Satang; modifiers: string[]; note: string | null; round: number; ready: boolean }[];
 	total: Satang;
+	/** The shop's PromptPay number, once there is something to pay (null if it takes none). */
+	promptPayId: string | null;
+	/** What the table has asked staff for and not yet had answered. */
+	call: TableCallDto | null;
 	/** Rounds still waiting for staff, and ones they turned down. */
 	requests: TableRequestDto[];
 }
