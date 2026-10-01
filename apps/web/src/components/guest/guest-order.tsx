@@ -6,6 +6,7 @@ import { ProductThumb } from "@/components/common/product-thumb";
 import { StoreAvatar } from "@/components/layout/brand";
 import { ModifierDialog } from "@/components/pos/modifier-dialog";
 import { type GuestProductDto, guestApi } from "@/lib/api/guest";
+import type { TableCallKind } from "@/lib/api/posly";
 import { BackendError } from "@/lib/api/backend";
 import { cn } from "@/lib/utils";
 import type { OrderItemModifier, Product } from "@posly/types/domain";
@@ -14,7 +15,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Skeleton } from "@posly/ui/components/skeleton";
 import { formatBaht, multiply, sum } from "@posly/utils/money";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Loader2, Minus, Plus, ReceiptText, RotateCcw, SearchX, ShoppingBasket, Store, TriangleAlert } from "lucide-react";
+import { Check, HandPlatter, Loader2, Minus, Plus, ReceiptText, RotateCcw, SearchX, ShoppingBasket, Store, TriangleAlert } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useMemo, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
@@ -248,6 +249,26 @@ export function GuestOrder({ token }: { token: string }) {
 	const change = (key: string, by: number) =>
 		setLines((current) => current.map((l) => (l.key === key ? { ...l, quantity: l.quantity + by } : l)).filter((l) => l.quantity > 0));
 
+	// The bill can be asked for once something is on it; the same query the bill sheet polls.
+	const guestTab = useQuery({
+		queryKey: ["guest", token, "tab"],
+		queryFn: ({ signal }) => guestApi.tab(token, signal),
+		enabled: Boolean(data?.open),
+		refetchInterval: 60_000,
+	});
+	const hasBill = (guestTab.data?.lines.length ?? 0) > 0;
+	// A call is answered by staff walking over, not on screen: the button rests for a minute.
+	const [called, setCalled] = useState<Partial<Record<TableCallKind, boolean>>>({});
+	const callStaff = useMutation({
+		mutationFn: (kind: TableCallKind) => guestApi.call(token, kind),
+		onSuccess: (_, kind) => {
+			toast.success(kind === "BILL" ? t("billToast") : t("calledToast"));
+			setCalled((c) => ({ ...c, [kind]: true }));
+			window.setTimeout(() => setCalled((c) => ({ ...c, [kind]: false })), 60_000);
+		},
+		onError: (e) => toast.error(e.message),
+	});
+
 	const send = useMutation({
 		mutationFn: () =>
 			guestApi.send(
@@ -352,6 +373,29 @@ export function GuestOrder({ token }: { token: string }) {
 						<p className="font-semibold text-sm">{t("closedTitle")}</p>
 						<p className="text-muted-foreground text-sm">{t("closedHint")}</p>
 					</div>
+				</div>
+			) : null}
+
+			{data?.qrOrdering ? (
+				<div className="mx-4 mt-3 grid grid-cols-2 gap-2">
+					<Button
+						variant="outline"
+						className="h-11 rounded-xl"
+						disabled={called.WAITER || callStaff.isPending}
+						onClick={() => callStaff.mutate("WAITER")}
+					>
+						{called.WAITER ? <Check /> : <HandPlatter />}
+						{called.WAITER ? t("called") : t("callWaiter")}
+					</Button>
+					<Button
+						variant="outline"
+						className="h-11 rounded-xl"
+						disabled={!hasBill || called.BILL || callStaff.isPending}
+						onClick={() => callStaff.mutate("BILL")}
+					>
+						{called.BILL ? <Check /> : <ReceiptText />}
+						{called.BILL ? t("called") : t("askBill")}
+					</Button>
 				</div>
 			) : null}
 

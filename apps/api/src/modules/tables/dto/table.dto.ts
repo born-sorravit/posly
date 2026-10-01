@@ -1,7 +1,11 @@
 import { CheckoutItemDto, CheckoutPaymentDto } from "@/modules/orders/dto/order.dto";
 import { trimmed } from "@/shared/dto/transform.util";
 import { KitchenStatus, ModifierSelection } from "@/shared/enums/order.enum";
-import { TableRequestStatus, TableSessionStatus } from "@/shared/enums/table.enum";
+import {
+	TableCallKind,
+	TableRequestStatus,
+	TableSessionStatus,
+} from "@/shared/enums/table.enum";
 import { ApiProperty, ApiPropertyOptional, PartialType } from "@nestjs/swagger";
 import { Transform, Type } from "class-transformer";
 import {
@@ -9,6 +13,7 @@ import {
 	ArrayMinSize,
 	IsArray,
 	IsBoolean,
+	IsEnum,
 	IsInt,
 	IsOptional,
 	IsString,
@@ -73,6 +78,19 @@ export class TableResponse {
 	@ApiProperty() displayOrder: number;
 	@ApiProperty() isActive: boolean;
 	@ApiProperty({ description: "What the table's QR carries" }) qrToken: string;
+	@ApiProperty({ type: () => TableCallResponse, nullable: true })
+	call: TableCallResponse | null;
+}
+
+export class TableCallResponse {
+	@ApiProperty({ enum: TableCallKind }) kind: TableCallKind;
+	@ApiProperty() at: string;
+}
+
+export class GuestCallDto {
+	@ApiProperty({ enum: TableCallKind })
+	@IsEnum(TableCallKind)
+	kind: TableCallKind;
 }
 
 // ---------------------------------------------------------------- the floor

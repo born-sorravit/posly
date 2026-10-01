@@ -2,7 +2,7 @@ import messages from "@/../messages/th.json";
 import { BackendError, friendlyMessage } from "@/lib/api/backend";
 import type { ProductArt } from "@posly/types/domain";
 import type { Satang } from "@posly/utils/money";
-import type { TableRequestDto } from "@/lib/api/posly";
+import type { TableCallDto, TableCallKind, TableRequestDto } from "@/lib/api/posly";
 import { env } from "@/lib/env";
 
 /**
@@ -71,6 +71,8 @@ const token = (value: string) => encodeURIComponent(value);
 export const guestApi = {
 	menu: (qrToken: string, signal?: AbortSignal) => call<GuestMenuDto>(token(qrToken), { signal }),
 	tab: (qrToken: string, signal?: AbortSignal) => call<GuestTabDto>(`${token(qrToken)}/tab`, { signal }),
+	call: (qrToken: string, kind: TableCallKind) =>
+		call<TableCallDto>(`${token(qrToken)}/call`, { method: "POST", body: { kind } }),
 	send: (
 		qrToken: string,
 		clientRequestId: string,

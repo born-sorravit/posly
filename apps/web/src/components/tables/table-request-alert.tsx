@@ -5,6 +5,8 @@ import { useActiveBusiness, useFeature } from "@/hooks/use-workspace";
 import { useRouter } from "@/i18n/navigation";
 import { TableRequestToast } from "@/components/tables/table-request-toast";
 import { play } from "@/lib/sounds";
+import { HandPlatter, ReceiptText } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 
@@ -19,7 +21,10 @@ export function TableRequestAlert() {
 	const qrOrdering = useFeature("QR_ORDERING");
 	const board = useTableBoard(can("pos:use") && qrOrdering);
 	const router = useRouter();
+	const t = useTranslations("tables.alert");
 	const seen = useRef<Map<string, number> | null>(null);
+	// When each table last called, so only a new call (not the same one on every refetch) rings.
+	const seenCalls = useRef<Map<string, string> | null>(null);
 	const audio = useRef<AudioContext | null>(null);
 
 	useEffect(() => {
@@ -27,9 +32,35 @@ export function TableRequestAlert() {
 		const counts = new Map(board.data.flatMap((table) => (table.tab ? [[table.tab.id, table.tab.pendingRequests] as const] : [])));
 		const before = seen.current;
 		seen.current = counts;
-		if (!before) return;
+		const calls = new Map(board.data.flatMap((table) => (table.call ? [[table.id, table.call.at] as const] : [])));
+		const callsBefore = seenCalls.current;
+		seenCalls.current = calls;
+		if (!before || !callsBefore) return;
 
 		let rang = false;
+		for (const table of board.data) {
+			const call = table.call;
+			if (!call || callsBefore.get(table.id) === call.at) continue;
+			rang = true;
+			const go = () =>
+				router.push(table.tab ? { pathname: "/tables", query: { tab: table.tab.id } } : "/tables");
+			toast.custom(
+				(toastId) => (
+					<TableRequestToast
+						title={t(call.kind === "BILL" ? "billTitle" : "waiterTitle", { table: table.name })}
+						hint={t("callHint")}
+						viewLabel={t("viewTable")}
+						icon={call.kind === "BILL" ? ReceiptText : HandPlatter}
+						onView={() => {
+							toast.dismiss(toastId);
+							go();
+						}}
+						onDismiss={() => toast.dismiss(toastId)}
+					/>
+				),
+				{ id: `table-call-${table.id}`, duration: 15_000 }
+			);
+		}
 		for (const table of board.data) {
 			const tab = table.tab;
 			if (!tab || tab.pendingRequests <= (before.get(tab.id) ?? 0)) continue;
@@ -38,8 +69,9 @@ export function TableRequestAlert() {
 			toast.custom(
 				(toastId) => (
 					<TableRequestToast
-						table={table.name}
-						waiting={tab.pendingRequests}
+						title={t("new", { table: table.name })}
+						hint={t("waiting", { count: tab.pendingRequests })}
+						viewLabel={t("view")}
 						onView={() => {
 							toast.dismiss(toastId);
 							router.push({ pathname: "/tables", query: { tab: tab.id } });
@@ -59,7 +91,7 @@ export function TableRequestAlert() {
 				// No audio before the first tap on the page, or none at all: the toast still shows.
 			}
 		}
-	}, [board.data, router]);
+	}, [board.data, router, t]);
 
 	return null;
 }

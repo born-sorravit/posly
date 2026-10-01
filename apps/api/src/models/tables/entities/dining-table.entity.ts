@@ -1,4 +1,5 @@
 import { BaseEntity } from "@/models/base.entity";
+import { TableCallKind } from "@/shared/enums/table.enum";
 import { Column, Entity, Index } from "typeorm";
 
 /**
@@ -33,6 +34,13 @@ export class DiningTable extends BaseEntity {
 
 	@Column({ name: "is_active", type: "boolean", default: true })
 	isActive: boolean;
+
+	/** A guest's call for staff or the bill, until staff acknowledge it or the tab ends. */
+	@Column({ name: "call_kind", type: "varchar", length: 10, nullable: true })
+	callKind: TableCallKind | null;
+
+	@Column({ name: "called_at", type: "timestamptz", nullable: true })
+	calledAt: Date | null;
 
 	@Index("uq_dining_table_qr_token", { unique: true })
 	@Column({ name: "qr_token", type: "varchar", length: 64 })

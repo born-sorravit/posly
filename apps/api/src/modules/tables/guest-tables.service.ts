@@ -13,7 +13,9 @@ import { EntitlementsService } from "@/modules/subscriptions/entitlements.servic
 import { Feature } from "@/shared/enums/subscription.enum";
 import { StorageService } from "@/modules/storage/storage.service";
 import {
+	GuestCallDto,
 	GuestMenuResponse,
+	TableCallResponse,
 	GuestRequestDto,
 	GuestTabResponse,
 } from "@/modules/tables/dto/table.dto";
@@ -23,7 +25,11 @@ import {
 	toRequestLine,
 } from "@/modules/tables/tables.service";
 import { NotificationKind } from "@/shared/enums/notification.enum";
-import { TableRequestStatus, TableSessionStatus } from "@/shared/enums/table.enum";
+import {
+	TableCallKind,
+	TableRequestStatus,
+	TableSessionStatus,
+} from "@/shared/enums/table.enum";
 import {
 	ConflictException,
 	ForbiddenException,
@@ -175,6 +181,62 @@ export class GuestTablesService {
 			);
 		});
 		return this.tab(token);
+	}
+
+	/**
+	 * A guest calls for staff or asks for the bill. The call stays on the table until staff
+	 * acknowledge it; asking again within a minute rings nothing new, so a nervous double tap
+	 * (or a bored child) does not flood the floor.
+	 */
+	async call(token: string, dto: GuestCallDto): Promise<TableCallResponse> {
+		return this.dataSource.transaction(async (manager) => {
+			const table = await this.loadTable(manager, token);
+			if (
+				!(await this.entitlements.hasFeature(table.businessId, Feature.QR_ORDERING))
+			)
+				throw new ForbiddenException("This shop does not take orders from the QR");
+			const session = await this.openSession(manager, table);
+			if (dto.kind === TableCallKind.BILL && !session?.orderId)
+				throw new ConflictException("Nothing to bill yet");
+
+			const locked = await manager
+				.getRepository(DiningTable)
+				.createQueryBuilder("t")
+				.setLock("pessimistic_write")
+				.where("t.id = :id", { id: table.id })
+				.getOneOrFail();
+			const repeat =
+				locked.callKind === dto.kind &&
+				locked.calledAt !== null &&
+				Date.now() - locked.calledAt.getTime() < 60_000;
+			if (repeat && locked.calledAt)
+				return { kind: dto.kind, at: locked.calledAt.toISOString() };
+
+			const at = new Date();
+			// Asking for the bill outranks a call for staff, never the other way round.
+			const kind =
+				locked.callKind === TableCallKind.BILL && dto.kind === TableCallKind.WAITER
+					? TableCallKind.BILL
+					: dto.kind;
+			await manager.update(
+				DiningTable,
+				{ id: table.id },
+				{ callKind: kind, calledAt: at }
+			);
+			await this.realtime.publish(manager, {
+				topic: "tables",
+				businessId: table.businessId,
+				branchId: table.branchId,
+			});
+			await this.notifications.emit(
+				manager,
+				table.businessId,
+				NotificationKind.TABLE_CALL,
+				{ table: table.name, kind: dto.kind },
+				{ entityId: session?.id, branchId: table.branchId }
+			);
+			return { kind, at: at.toISOString() };
+		});
 	}
 
 	async tab(token: string): Promise<GuestTabResponse> {

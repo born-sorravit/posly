@@ -324,6 +324,78 @@ describe("tables and QR ordering", () => {
 			.expect(409);
 	});
 
+	it("lets guests call for staff and ask for the bill, until staff answer", async () => {
+		const third = (
+			await api(app)
+				.post(`${base}/tables`)
+				.set(auth(owner.token))
+				.send({ name: "โต๊ะ 3" })
+				.expect(201)
+		).body.data as { id: string; qrToken: string };
+		const call = (kind: string, status = 200) =>
+			api(app)
+				.post(`${guest(third.qrToken)}/call`)
+				.send({ kind })
+				.expect(status);
+		const boardCall = async () =>
+			(
+				(
+					await api(app)
+						.get(`${base}/tables/board`)
+						.set(auth(owner.token))
+						.expect(200)
+				).body.data as { id: string; call: { kind: string; at: string } | null }[]
+			).find((t) => t.id === third.id)?.call;
+
+		// A free table can call for staff, but there is no bill to ask for yet.
+		const first = (await call("WAITER")).body.data;
+		expect(first.kind).toBe("WAITER");
+		expect((await call("WAITER")).body.data.at).toBe(first.at); // a double tap rings once
+		await call("BILL", 409);
+		expect(await boardCall()).toMatchObject({ kind: "WAITER" });
+
+		await api(app)
+			.post(`${base}/tables/${third.id}/call/dismiss`)
+			.set(auth(owner.token))
+			.expect(200);
+		expect(await boardCall()).toBeNull();
+
+		const tab = (
+			await api(app)
+				.post(`${base}/tables/${third.id}/open`)
+				.set(auth(owner.token))
+				.send({})
+				.expect(201)
+		).body.data as { id: string };
+		await api(app)
+			.post(`${base}/table-sessions/${tab.id}/items`)
+			.set(auth(owner.token))
+			.send({
+				clientRequestId: randomUUID(),
+				items: [{ productId: pie.id, quantity: 1 }],
+			})
+			.expect(200);
+		expect((await call("BILL")).body.data.kind).toBe("BILL");
+		const bell = (
+			await api(app).get(`${base}/notifications`).set(auth(owner.token)).expect(200)
+		).body.data.items as { kind: string; data: Record<string, unknown> }[];
+		expect(
+			bell.find((n) => n.kind === "TABLE_CALL" && n.data.kind === "BILL")
+		).toBeDefined();
+
+		// Paying the tab answers the call.
+		await api(app)
+			.post(`${base}/table-sessions/${tab.id}/close`)
+			.set(auth(owner.token))
+			.send({ payment: { method: "CARD" } })
+			.expect(200);
+		expect(await boardCall()).toBeNull();
+		await api(app)
+			.delete(`${base}/tables/${third.id}`)
+			.set(auth(owner.token))
+			.expect(200);
+	});
+
 	it("voids a tab and puts back what it took", async () => {
 		const opened = (
 			await api(app)

@@ -100,7 +100,11 @@
 		"paymentFailedBody": "อัปเดตบัตรเพื่อใช้ {plan} ต่อ ระหว่างนี้ร้านใช้สิทธิ์ของ Free",
 		"announcementTitle": "ประกาศจาก Posly",
 		"tableRequestTitle": "{table} สั่งอาหาร",
-		"tableRequestBody": "{count} รายการ รอพนักงานยืนยัน"
+		"tableRequestBody": "{count} รายการ รอพนักงานยืนยัน",
+		"tableWaiterTitle": "{table} เรียกพนักงาน",
+		"tableWaiterBody": "ลูกค้าที่โต๊ะต้องการให้พนักงานไปที่โต๊ะ",
+		"tableBillTitle": "{table} ขอเช็คบิล",
+		"tableBillBody": "ลูกค้าพร้อมจ่ายแล้ว"
 	},
 	"mobileNav": {
 		"label": "เมนูหลัก",
@@ -1119,6 +1123,10 @@
 				"TABLE_REQUEST": {
 					"title": "ลูกค้าสั่งจาก QR",
 					"hint": "เมื่อลูกค้าที่โต๊ะส่งคำสั่งเข้ามา รอพนักงานยืนยัน"
+				},
+				"TABLE_CALL": {
+					"title": "ลูกค้าเรียกพนักงาน / ขอเช็คบิล",
+					"hint": "เมื่อลูกค้ากดเรียกพนักงานหรือขอเช็คบิลจาก QR"
 				}
 			}
 		}
@@ -2057,7 +2065,18 @@
 			"cartInUseClear": "ล้างตะกร้าแล้วไปต่อ",
 			"cartInUseKeep": "ยังไม่ล้าง"
 		},
+		"call": {
+			"WAITER": "เรียกพนักงาน",
+			"BILL": "ขอเช็คบิล",
+			"ago": "{time}",
+			"dismiss": "รับทราบ",
+			"dismissed": "รับทราบแล้ว"
+		},
 		"alert": {
+			"waiterTitle": "{table} เรียกพนักงาน",
+			"billTitle": "{table} ขอเช็คบิล",
+			"callHint": "ไปที่โต๊ะแล้วกดรับทราบ",
+			"viewTable": "ดูโต๊ะ",
 			"new": "{table} สั่งอาหาร",
 			"waiting": "รอยืนยัน {count} คำสั่ง",
 			"view": "ดูคำสั่ง",
@@ -2139,6 +2158,11 @@
 		"notFoundHint": "QR นี้อาจถูกเปลี่ยนแล้ว แจ้งพนักงานเพื่อขอ QR ใหม่",
 		"error": "โหลดเมนูไม่สำเร็จ ลองใหม่อีกครั้ง",
 		"retry": "ลองอีกครั้ง",
-		"poweredBy": "สั่งผ่าน Posly"
+		"poweredBy": "สั่งผ่าน Posly",
+		"callWaiter": "เรียกพนักงาน",
+		"askBill": "ขอเช็คบิล",
+		"called": "แจ้งพนักงานแล้ว",
+		"calledToast": "แจ้งพนักงานแล้ว รอสักครู่",
+		"billToast": "แจ้งขอเช็คบิลแล้ว พนักงานจะนำบิลมาให้"
 	}
 }

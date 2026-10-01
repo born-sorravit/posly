@@ -30,6 +30,7 @@ import {
 	Ban,
 	Bell,
 	BellRing,
+	HandPlatter,
 	ChartNoAxesColumn,
 	Check,
 	Clock3,
@@ -876,6 +877,7 @@ const NOTIFICATION_ICON: Record<NotificationKind, typeof Bell> = {
 	PAYMENT_FAILED: CreditCard,
 	ANNOUNCEMENT: Megaphone,
 	TABLE_REQUEST: BellRing,
+	TABLE_CALL: HandPlatter,
 };
 
 /**

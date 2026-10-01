@@ -31,6 +31,7 @@ const KNOWN: [RegExp, (match: RegExpMatchArray) => string][] = [
 	[/^This table is turned off$/, () => "โต๊ะนี้ปิดใช้งานอยู่"],
 	[/^This tab is already closed$/, () => "บิลนี้ปิดไปแล้ว"],
 	[/^Nothing on this tab yet/, () => "ยังไม่มีรายการในบิล ใช้ยกเลิกบิลแทน"],
+	[/^Nothing to bill yet$/, () => "ยังไม่มีรายการในบิล สั่งอาหารก่อนแล้วค่อยขอเช็คบิล"],
 	[/^Request is already (\w+)$/, () => "คำสั่งนี้มีคนจัดการไปแล้ว"],
 	[/^A table with this name already exists$/, () => "มีโต๊ะชื่อนี้อยู่แล้ว"],
 	[/^Close the table's tab before/, () => "ปิดบิลของโต๊ะนี้ก่อน"],

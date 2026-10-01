@@ -5,10 +5,12 @@ import {
 	CancelTabDto,
 	CloseTabDto,
 	CreateTableDto,
+	GuestCallDto,
 	GuestMenuResponse,
 	GuestRequestDto,
 	GuestTabResponse,
 	OpenTableDto,
+	TableCallResponse,
 	TabResponse,
 	TableResponse,
 	UpdateTableDto,
@@ -114,6 +116,18 @@ export class TablesController {
 		@Param("tableId", ParseUUIDPipe) id: string
 	): Promise<TableResponse> {
 		return this.tablesService.rotateQr(m, id);
+	}
+
+	@Post("tables/:tableId/call/dismiss")
+	@HttpCode(200)
+	@RequirePermission(Permission.POS_USE)
+	@ApiOperation({ summary: "Acknowledge a guest's call for staff or the bill" })
+	@ApiOkResponse({ type: TableResponse })
+	dismissCall(
+		@CurrentMembership() m: ResolvedMembership,
+		@Param("tableId", ParseUUIDPipe) id: string
+	): Promise<TableResponse> {
+		return this.tablesService.dismissCall(m, id);
 	}
 
 	@Post("tables/:tableId/open")
@@ -242,6 +256,19 @@ export class GuestTablesController {
 	@ApiOkResponse({ type: GuestTabResponse })
 	tab(@Param("token") token: string): Promise<GuestTabResponse> {
 		return this.guestTables.tab(token);
+	}
+
+	@Public()
+	@Throttle(SEND_THROTTLE)
+	@Post(":token/call")
+	@HttpCode(200)
+	@ApiOperation({ summary: "Call for staff, or ask for the bill" })
+	@ApiOkResponse({ type: TableCallResponse })
+	call(
+		@Param("token") token: string,
+		@Body() dto: GuestCallDto
+	): Promise<TableCallResponse> {
+		return this.guestTables.call(token, dto);
 	}
 
 	@Public()

@@ -7,12 +7,12 @@ import { type CompletedPayment, CheckoutDialog } from "@/components/pos/checkout
 import { DiscountControl } from "@/components/pos/discount-control";
 import { TableQrDialog } from "@/components/tables/table-qr";
 import { TableGridSkeleton } from "@/components/tables/tables-skeletons";
-import { useTab, useTabMutations, useTableBoard } from "@/hooks/use-posly";
+import { useTab, useTabMutations, useTableBoard, useTableMutations } from "@/hooks/use-posly";
 import { useNow } from "@/hooks/use-now";
 import { useActiveBusiness, useFeature } from "@/hooks/use-workspace";
 import { FeatureLocked } from "@/components/common/feature-locked";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
-import type { BoardTableDto, TabDto, TableRequestDto } from "@/lib/api/posly";
+import type { BoardTableDto, TabDto, TableCallKind, TableRequestDto } from "@/lib/api/posly";
 import { cn } from "@/lib/utils";
 import { type CartTotals, type Discount, resolveDiscount, useCartStore } from "@/stores/cart-store";
 import type { PaymentMethod } from "@posly/types/domain";
@@ -30,7 +30,7 @@ import { Input } from "@posly/ui/components/input";
 import { Skeleton } from "@posly/ui/components/skeleton";
 import { formatClock } from "@posly/utils/format";
 import { addedTax, formatBaht, includedTax, type Satang } from "@posly/utils/money";
-import { Ban, Check, Clock3, Loader2, MoreHorizontal, Plus, QrCode, ReceiptText, Settings2, Users, TriangleAlert, UtensilsCrossed, X } from "lucide-react";
+import { Ban, Check, Clock3, HandPlatter, Loader2, MoreHorizontal, Plus, QrCode, ReceiptText, Settings2, Users, TriangleAlert, UtensilsCrossed, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -53,6 +53,53 @@ const tabTotals = (tab: TabDto, discount: Discount | null, vatBasisPoints: numbe
 	};
 };
 
+/** A guest at the table is asking for staff or the bill: loud until someone acknowledges it. */
+function CallChip({ kind }: { kind: TableCallKind }) {
+	const t = useTranslations("tables.call");
+	const Icon = kind === "BILL" ? ReceiptText : HandPlatter;
+	return (
+		<span className="flex w-fit shrink-0 items-center gap-1 rounded-full bg-warning px-2 py-0.5 font-semibold text-[11px] text-warning-foreground">
+			<Icon className="size-3" />
+			{t(kind)}
+		</span>
+	);
+}
+
+/** The call on the table, with the button staff press once they have answered it. */
+function CallBanner({ table }: { table: BoardTableDto }) {
+	const t = useTranslations("tables.call");
+	const { dismissCall } = useTableMutations();
+	if (!table.call) return null;
+	const Icon = table.call.kind === "BILL" ? ReceiptText : HandPlatter;
+	return (
+		<div className="flex items-center gap-3 rounded-2xl bg-warning/12 p-3 ring-1 ring-warning/40">
+			<span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-warning text-warning-foreground">
+				<Icon className="size-4" />
+			</span>
+			<div className="min-w-0 flex-1">
+				<p className="font-semibold text-sm">{t(table.call.kind)}</p>
+				<p className="numeric text-muted-foreground text-xs" suppressHydrationWarning>
+					{formatClock(table.call.at)}
+				</p>
+			</div>
+			<Button
+				variant="outline"
+				size="sm"
+				disabled={dismissCall.isPending}
+				onClick={() =>
+					dismissCall.mutate(table.id, {
+						onSuccess: () => toast(t("dismissed")),
+						onError: (e) => toast.error(e.message),
+					})
+				}
+			>
+				{dismissCall.isPending ? <Loader2 className="animate-spin" /> : <Check />}
+				{t("dismiss")}
+			</Button>
+		</div>
+	);
+}
+
 /**
  * One table on the floor. Free tables are quiet outlines, seated ones are filled with their
  * bill, and one with a guest's round waiting is the loudest thing on the screen.
@@ -62,6 +109,7 @@ function TableCard({ table, now, onSelect }: { table: BoardTableDto; now: Date; 
 	const tKitchen = useTranslations("kitchen");
 	const tab = table.tab;
 	const waiting = tab?.pendingRequests ?? 0;
+	const alerting = waiting > 0 || Boolean(table.call);
 
 	if (!tab) {
 		return (
@@ -71,9 +119,11 @@ function TableCard({ table, now, onSelect }: { table: BoardTableDto; now: Date; 
 				disabled={!table.isActive}
 				className={cn(
 					"group flex min-h-28 flex-col justify-between rounded-2xl border-2 border-dashed p-4 text-left transition-colors",
-					table.isActive
-						? "border-border hover:border-primary/50 hover:bg-primary/5"
-						: "cursor-not-allowed border-border/60 opacity-50"
+					table.call
+						? "border-warning bg-warning/10"
+						: table.isActive
+							? "border-border hover:border-primary/50 hover:bg-primary/5"
+							: "cursor-not-allowed border-border/60 opacity-50"
 				)}
 			>
 				<span>
@@ -84,6 +134,11 @@ function TableCard({ table, now, onSelect }: { table: BoardTableDto; now: Date; 
 						<span className="mt-0.5 flex items-center gap-1 whitespace-nowrap text-muted-foreground text-xs">
 							<Users className="size-3.5" />
 							{t("seats", { count: table.seats })}
+						</span>
+					) : null}
+					{table.call ? (
+						<span className="mt-1.5 block">
+							<CallChip kind={table.call.kind} />
 						</span>
 					) : null}
 				</span>
@@ -105,19 +160,19 @@ function TableCard({ table, now, onSelect }: { table: BoardTableDto; now: Date; 
 		<button
 			type="button"
 			onClick={onSelect}
-			style={toneStyle(waiting > 0 ? "warning" : "info")}
+			style={toneStyle(alerting ? "warning" : "info")}
 			className={cn(
 				"tint-surface surface-hover relative flex min-h-28 flex-col gap-1 overflow-hidden rounded-2xl p-4 pl-5 text-left",
-				waiting > 0 && "ring-2 ring-warning"
+				alerting && "ring-2 ring-warning"
 			)}
 		>
 			{/* Seated at a glance across the room, like a ticket's edge on the kitchen screen. */}
 			<span
 				aria-hidden
-				className={cn("absolute inset-y-0 left-0 w-1", waiting > 0 ? "bg-warning" : "bg-chart-4")}
+				className={cn("absolute inset-y-0 left-0 w-1", alerting ? "bg-warning" : "bg-chart-4")}
 			/>
 			<span className="flex items-start justify-between gap-2">
-				<span className="font-semibold text-base leading-tight">{table.name}</span>
+				<span className="min-w-0 font-semibold text-base leading-tight">{table.name}</span>
 				{waiting > 0 ? (
 					<span className="flex shrink-0 items-center gap-1 rounded-full bg-warning px-2 py-0.5 font-semibold text-[11px] text-warning-foreground">
 						<span className="relative flex size-1.5">
@@ -133,6 +188,7 @@ function TableCard({ table, now, onSelect }: { table: BoardTableDto; now: Date; 
 					</span>
 				)}
 			</span>
+			{table.call ? <CallChip kind={table.call.kind} /> : null}
 			<span className="numeric mt-auto font-bold text-xl tracking-tight">{formatBaht(tab.total)}</span>
 			<span className="flex flex-wrap items-center gap-x-3 gap-y-0.5 whitespace-nowrap text-muted-foreground text-xs">
 				<span className="flex items-center gap-1">
@@ -161,6 +217,7 @@ const MAX_GUESTS = 99;
 function OpenTableDialog({ table, onOpenChange, onOpened }: { table: BoardTableDto | null; onOpenChange: (open: boolean) => void; onOpened: (tab: TabDto) => void }) {
 	const t = useTranslations("tables.open");
 	const { open } = useTabMutations();
+	const { dismissCall } = useTableMutations();
 	const [guests, setGuests] = useState(0);
 	// What is typed for a big party; the count only takes it once it is a valid number.
 	const [manyText, setManyText] = useState("");
@@ -178,6 +235,7 @@ function OpenTableDialog({ table, onOpenChange, onOpened }: { table: BoardTableD
 						{table?.seats ? `${t("description")} · ${t("seatsHint", { count: table.seats })}` : t("description")}
 					</DialogDescription>
 				</DialogHeader>
+				{table ? <CallBanner table={table} /> : null}
 				<div className="space-y-2.5">
 					<p className="font-medium text-sm">{t("guests")}</p>
 					{/* One tap picks; tapping the picked one again leaves it unset — it is optional. */}
@@ -260,6 +318,8 @@ function OpenTableDialog({ table, onOpenChange, onOpened }: { table: BoardTableD
 								{
 									onSuccess: (tab) => {
 										toast.success(t("opened", { table: table.name }));
+										// Staff came over and seated them: a call for staff is answered.
+										if (table.call?.kind === "WAITER") dismissCall.mutate(table.id);
 										onOpened(tab);
 									},
 									onError: (e) => toast.error(e.message),
@@ -417,6 +477,7 @@ function TabSheet({ sessionId, onClose }: { sessionId: string | null; onClose: (
 							<EmptyState icon={ReceiptText} title={t("notFound")} className="py-10" />
 						) : data ? (
 							<>
+								{table ? <CallBanner table={table} /> : null}
 								{pending.length > 0 ? (
 									<section className="space-y-2">
 										<h3 className="font-semibold text-sm">
@@ -624,13 +685,14 @@ export function TablesView() {
 	}, [tables]);
 	const occupied = tables.filter((x) => x.tab).length;
 	const free = tables.filter((x) => !x.tab && x.isActive).length;
-	const waiting = tables.filter((x) => (x.tab?.pendingRequests ?? 0) > 0).length;
+	const needsStaff = (x: BoardTableDto) => (x.tab?.pendingRequests ?? 0) > 0 || Boolean(x.call);
+	const waiting = tables.filter(needsStaff).length;
 	const [filter, setFilter] = useState<"all" | "free" | "occupied" | "waiting">("all");
 	const shown = (table: BoardTableDto) =>
 		filter === "all" ||
 		(filter === "free" && !table.tab && table.isActive) ||
 		(filter === "occupied" && Boolean(table.tab)) ||
-		(filter === "waiting" && (table.tab?.pendingRequests ?? 0) > 0);
+		(filter === "waiting" && needsStaff(table));
 
 	if (!hasTables && !board.isPending && tables.length === 0)
 		return <FeatureLocked title={t("lockedTitle")} hint={t("lockedHint")} action={t("upgrade")} />;

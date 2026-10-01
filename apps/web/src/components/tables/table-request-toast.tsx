@@ -1,22 +1,26 @@
 "use client";
 
 import { Button } from "@posly/ui/components/button";
-import { BellRing, X } from "lucide-react";
+import { BellRing, type LucideIcon, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 /**
- * A guest's round as a toast card: which table, how many rounds wait, and one button to open
- * it. Rendered through `toast.custom`, so it carries the app's own surface rather than
- * sonner's default strip.
+ * Something a table needs from staff, as a toast card: a guest's round, a call for staff, a
+ * request for the bill — and one button to go to it. Rendered through `toast.custom`, so it
+ * carries the app's own surface rather than sonner's default strip.
  */
 export function TableRequestToast({
-	table,
-	waiting,
+	title,
+	hint,
+	viewLabel,
+	icon: Icon = BellRing,
 	onView,
 	onDismiss,
 }: {
-	table: string;
-	waiting: number;
+	title: string;
+	hint: string;
+	viewLabel: string;
+	icon?: LucideIcon;
 	onView: () => void;
 	onDismiss: () => void;
 }) {
@@ -27,15 +31,15 @@ export function TableRequestToast({
 			    pulse behind it: the one thing on screen asking for attention. */}
 			<span className="relative flex size-10 shrink-0 items-center justify-center rounded-xl bg-warning text-warning-foreground shadow-sm">
 				<span className="absolute inset-0 animate-ping rounded-xl bg-warning opacity-30" aria-hidden />
-				<BellRing className="relative size-5" strokeWidth={2.25} />
+				<Icon className="relative size-5" strokeWidth={2.25} />
 			</span>
 			<div className="min-w-0 flex-1 space-y-3">
 				<div>
-					<p className="font-semibold text-sm">{t("new", { table })}</p>
-					<p className="text-muted-foreground text-xs">{t("waiting", { count: waiting })}</p>
+					<p className="font-semibold text-sm">{title}</p>
+					<p className="text-muted-foreground text-xs">{hint}</p>
 				</div>
 				<Button size="sm" className="h-9 w-full rounded-lg" onClick={onView}>
-					{t("view")}
+					{viewLabel}
 				</Button>
 			</div>
 			<button

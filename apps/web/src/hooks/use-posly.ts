@@ -785,6 +785,10 @@ export function useTableMutations() {
 			mutationFn: (tableId: string) => api.tables.rotateQr(id, tableId),
 			onSuccess: () => void refresh(),
 		}),
+		dismissCall: useMutation({
+			mutationFn: (tableId: string) => api.tables.dismissCall(id, tableId),
+			onSuccess: () => void refresh(),
+		}),
 	};
 }
 

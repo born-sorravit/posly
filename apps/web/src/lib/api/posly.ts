@@ -417,6 +417,15 @@ export interface TableDto {
 	isActive: boolean;
 	/** What the table's QR carries: `/t/<qrToken>`. */
 	qrToken: string;
+	/** A guest's call for staff or the bill, until someone acknowledges it. */
+	call: TableCallDto | null;
+}
+
+export type TableCallKind = "WAITER" | "BILL";
+
+export interface TableCallDto {
+	kind: TableCallKind;
+	at: string;
 }
 
 export interface TableInput {
@@ -497,7 +506,8 @@ export type NotificationKind =
 	| "ORDER_QUOTA"
 	| "PAYMENT_FAILED"
 	| "ANNOUNCEMENT"
-	| "TABLE_REQUEST";
+	| "TABLE_REQUEST"
+	| "TABLE_CALL";
 
 /** An event, as facts; the words are written here from `kind` + `data`. */
 export interface NotificationDto {
@@ -690,6 +700,7 @@ export const api = {
 			backend.patch<TableDto>(`${b(id)}/tables/${tableId}`, input),
 		remove: (id: string, tableId: string) => backend.delete(`${b(id)}/tables/${tableId}`),
 		rotateQr: (id: string, tableId: string) => backend.post<TableDto>(`${b(id)}/tables/${tableId}/rotate-qr`),
+		dismissCall: (id: string, tableId: string) => backend.post<TableDto>(`${b(id)}/tables/${tableId}/call/dismiss`),
 		open: (id: string, tableId: string, guests?: number) =>
 			backend.post<TabDto>(`${b(id)}/tables/${tableId}/open`, guests ? { guests } : {}),
 		tab: (id: string, sessionId: string, signal?: AbortSignal) =>

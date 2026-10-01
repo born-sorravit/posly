@@ -505,6 +505,31 @@ export class TablesService {
 		return { cancelled: true };
 	}
 
+	/** Staff have heard the guest's call (or brought the bill): the table stops asking. */
+	async dismissCall(
+		membership: ResolvedMembership,
+		tableId: string
+	): Promise<TableResponse> {
+		const table = await this.loadTable(membership, tableId);
+		await this.dataSource.transaction(async (manager) => {
+			await manager.update(
+				DiningTable,
+				{ id: table.id },
+				{ callKind: null, calledAt: null }
+			);
+			await this.realtime.publish(manager, {
+				topic: "tables",
+				businessId: table.businessId,
+				branchId: table.branchId,
+			});
+		});
+		return toTableResponse({
+			...table,
+			callKind: null,
+			calledAt: null,
+		} as DiningTable);
+	}
+
 	// ------------------------------------------------------------ internals
 
 	/**
@@ -631,6 +656,12 @@ export class TablesService {
 			TableRequest,
 			{ sessionId: session.id, status: TableRequestStatus.PENDING },
 			{ status: TableRequestStatus.REJECTED, handledAt: new Date() }
+		);
+		// The party has gone: whatever they called for is answered.
+		await manager.update(
+			DiningTable,
+			{ id: session.tableId },
+			{ callKind: null, calledAt: null }
 		);
 	}
 
@@ -831,4 +862,8 @@ const toTableResponse = (table: DiningTable): TableResponse => ({
 	displayOrder: table.displayOrder,
 	isActive: table.isActive,
 	qrToken: table.qrToken,
+	call:
+		table.callKind && table.calledAt
+			? { kind: table.callKind, at: table.calledAt.toISOString() }
+			: null,
 });
