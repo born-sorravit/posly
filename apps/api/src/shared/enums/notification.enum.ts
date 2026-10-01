@@ -14,4 +14,6 @@ export enum NotificationKind {
 	TABLE_REQUEST = "TABLE_REQUEST",
 	/** A guest called for staff or asked for the bill: `{ table, kind }`, entityId = the table. */
 	TABLE_CALL = "TABLE_CALL",
+	/** Staff sent a round onto a tab from the till: `{ table, items, round, by }`, entityId = the tab. */
+	TABLE_ROUND = "TABLE_ROUND",
 }

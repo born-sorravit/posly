@@ -1,5 +1,6 @@
 "use client";
 
+import { CountUp } from "@/components/motion/count-up";
 import { MetricCard, PageContainer, StatTrend } from "@/components/common/primitives";
 import { DashboardBodySkeleton, HeroFigureSkeleton } from "@/components/dashboard/dashboard-skeletons";
 import { PaymentBreakdown, StockAlerts, TopProducts } from "@/components/dashboard/dashboard-panels";
@@ -156,7 +157,7 @@ export function DashboardOverview() {
 							tone="success"
 							icon={Coins}
 							label={period === "today" ? t("metrics.revenue") : t("metrics.revenueRange")}
-							value={formatBaht(m.revenue)}
+							value={<CountUp value={m.revenue} format={formatBaht} step={100} />}
 							change={trendOf(m.revenueChange)}
 							changeLabel={vs}
 							previous={roughBaht(m.previousRevenue)}
@@ -170,7 +171,7 @@ export function DashboardOverview() {
 							tone="primary"
 							icon={ShoppingBag}
 							label={t("metrics.orders")}
-							value={formatNumber(m.orders)}
+							value={<CountUp value={m.orders} format={formatNumber} />}
 							change={trendOf(m.ordersChange)}
 							changeLabel={vs}
 							previous={formatNumber(m.previousOrders)}
@@ -183,7 +184,7 @@ export function DashboardOverview() {
 							tone="info"
 							icon={ReceiptText}
 							label={t("metrics.averageOrder")}
-							value={formatBaht(m.averageOrder)}
+							value={<CountUp value={m.averageOrder} format={formatBaht} step={100} />}
 							change={trendOf(m.averageOrderChange)}
 							changeLabel={vs}
 							previous={roughBaht(m.previousAverageOrder)}
@@ -198,7 +199,7 @@ export function DashboardOverview() {
 							// Gross, not net: one rent payment recorded today must not make today look
 							// like a loss. Net profit lives on the reports page, over whole periods.
 							label={t("metrics.profit")}
-							value={formatBaht(m.grossProfit)}
+							value={<CountUp value={m.grossProfit} format={formatBaht} step={100} />}
 							change={trendOf(m.grossProfitChange)}
 							changeLabel={vs}
 							previous={roughBaht(m.previousGrossProfit)}

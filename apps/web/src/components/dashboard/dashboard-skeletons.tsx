@@ -64,7 +64,7 @@ export function HeroSkeleton() {
  * One tinted `MetricCard`: icon chip and label, the figure, the change pill over the comparison
  * line, then the sparkline. Tightens below tablet like the card does.
  */
-function MetricCardSkeleton({ tone, className }: { tone: Tone; className?: string }) {
+export function MetricCardSkeleton({ tone, className }: { tone: Tone; className?: string }) {
 	return (
 		<div
 			className={cn(

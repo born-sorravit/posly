@@ -177,7 +177,7 @@ export function CustomersView() {
 			header: t("name"),
 			cell: (c) => (
 				<span className="flex items-center gap-3">
-					<UserAvatar name={c.name} className="bg-none bg-muted text-foreground" />
+					<UserAvatar name={c.name} soft />
 					<span className="min-w-0">
 						<span className="block font-medium">{c.name}</span>
 						<span className="numeric block truncate text-muted-foreground text-xs">

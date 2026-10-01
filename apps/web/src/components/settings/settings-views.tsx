@@ -31,6 +31,7 @@ import {
 	Bell,
 	BellRing,
 	HandPlatter,
+	UtensilsCrossed,
 	ChartNoAxesColumn,
 	Check,
 	Clock3,
@@ -878,6 +879,7 @@ const NOTIFICATION_ICON: Record<NotificationKind, typeof Bell> = {
 	ANNOUNCEMENT: Megaphone,
 	TABLE_REQUEST: BellRing,
 	TABLE_CALL: HandPlatter,
+	TABLE_ROUND: UtensilsCrossed,
 };
 
 /**

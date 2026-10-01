@@ -151,19 +151,8 @@ export function PosScreen() {
 	const { limits, usage } = useSubscription();
 	const outOfOrders = limits.orders !== null && usage.ordersThisMonth >= limits.orders;
 
-	/** Adding to a table: the cart goes onto the tab as one round, and staff go back to the floor. */
-	// From the tap until the floor has opened: the request is only the first half of the wait.
+	/** Adding to a table: the cart goes onto the tab as one round, and the till is ready for the next. */
 	const [sending, setSending] = useState(false);
-	const sent = useRef(false);
-	// The cart is emptied once the POS is gone, so it never flashes empty while the floor loads.
-	useEffect(
-		() => () => {
-			if (!sent.current) return;
-			useCartStore.getState().clear();
-			useCartStore.getState().setTable(null);
-		},
-		[]
-	);
 
 	const sendRound = useCallback(() => {
 		const { lines: cartLines, table } = useCartStore.getState();
@@ -181,10 +170,21 @@ export function PosScreen() {
 				})),
 			},
 			{
-				onSuccess: () => {
-					toast.success(t("sentToTable", { table: table.name }));
-					sent.current = true;
-					router.push({ pathname: "/tables", query: { tab: table.sessionId } });
+				onSuccess: (tab) => {
+					setSending(false);
+					const count = cartLines.reduce((n, line) => n + line.quantity, 0);
+					const round = Math.max(0, ...tab.lines.map((line) => line.round));
+					useCartStore.getState().clear();
+					useCartStore.getState().setTable(null);
+					// A fresh key: the next round is a new request, not a retry of this one.
+					setSessionKey(crypto.randomUUID());
+					toast.success(t("sentToTable", { table: table.name }), {
+						description: t("sentToTableHint", { count, round }),
+						action: {
+							label: t("viewTab"),
+							onClick: () => router.push({ pathname: "/tables", query: { tab: table.sessionId } }),
+						},
+					});
 				},
 				onError: (e) => {
 					setSending(false);

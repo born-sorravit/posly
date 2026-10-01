@@ -5,10 +5,10 @@ import { Skeleton } from "@posly/ui/components/skeleton";
 /** The floor's grid of table cards. */
 export function TableGridSkeleton() {
 	return (
-		<div className="grid grid-cols-2 gap-3 tablet:grid-cols-3 desktop:grid-cols-5">
+		<div className="grid grid-cols-2 gap-3 tablet:grid-cols-4 desktop:grid-cols-5 desktop:gap-4">
 			{Array.from({ length: 10 }, (_, i) => (
 				// biome-ignore lint/suspicious/noArrayIndexKey: static placeholders
-				<Skeleton key={i} className="h-32 rounded-2xl" />
+				<Skeleton key={i} className="h-36 rounded-2xl" />
 			))}
 		</div>
 	);

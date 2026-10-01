@@ -10,7 +10,7 @@ import type { NotificationDto, NotificationKind } from "@/lib/api/posly";
 import { formatRelative, formatThaiDate } from "@posly/utils/format";
 import { formatBaht } from "@posly/utils/money";
 import { cn } from "@/lib/utils";
-import { Ban, Bell, BellOff, BellRing, HandPlatter, ChartNoAxesColumn, CreditCard, Gauge, Megaphone, PackageMinus, PackageX, Undo2 } from "lucide-react";
+import { Ban, Bell, BellOff, BellRing, HandPlatter, ChartNoAxesColumn, CreditCard, Gauge, Megaphone, PackageMinus, PackageX, Undo2, UtensilsCrossed } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 
@@ -25,6 +25,7 @@ const KIND: Record<NotificationKind, { icon: typeof Bell; tint: string }> = {
 	ANNOUNCEMENT: { icon: Megaphone, tint: "var(--primary)" },
 	TABLE_REQUEST: { icon: BellRing, tint: "var(--warning)" },
 	TABLE_CALL: { icon: HandPlatter, tint: "var(--warning)" },
+	TABLE_ROUND: { icon: UtensilsCrossed, tint: "var(--primary)" },
 };
 
 /** Where a notification leads: the thing it is about. */
@@ -46,6 +47,7 @@ const hrefOf = (n: NotificationDto): string => {
 			return "/notifications";
 		case "TABLE_REQUEST":
 		case "TABLE_CALL":
+		case "TABLE_ROUND":
 			return n.entityId ? `/tables?tab=${n.entityId}` : "/tables";
 	}
 };
@@ -89,6 +91,13 @@ function useWording() {
 				return {
 					title: t("tableRequestTitle", { table: str("table") }),
 					body: t("tableRequestBody", { count: num("items") }),
+				};
+			case "TABLE_ROUND":
+				return {
+					title: t("tableRoundTitle", { table: str("table"), round: num("round") }),
+					body: d.by
+						? t("tableRoundBodyBy", { count: num("items"), by: str("by") })
+						: t("tableRoundBody", { count: num("items") }),
 				};
 			case "TABLE_CALL":
 				if (d.kind === "PAID")

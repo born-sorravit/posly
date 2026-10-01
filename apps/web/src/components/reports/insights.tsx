@@ -1,6 +1,7 @@
 "use client";
 
 import { type Column, DataTable, Segmented } from "@/components/common/controls";
+import { CountUp } from "@/components/motion/count-up";
 import { EmptyState, MetricCard, SectionTitle, StatusBadge, Surface } from "@/components/common/primitives";
 import { ProductThumb } from "@/components/common/product-thumb";
 import type { InsightsCustomerRow, InsightsDto } from "@/lib/api/posly";
@@ -38,6 +39,8 @@ const heatOf = (metric: "orders" | "revenue", value: number, max: number) => {
 };
 
 const percent = (part: number, whole: number) => (whole > 0 ? Math.round((part / whole) * 1000) / 10 : null);
+/** A percentage counted in tenths, so the count lands on the one decimal `percent` keeps. */
+const tenthsPercent = (tenths: number) => `${tenths / 10}%`;
 
 type Metric = "orders" | "revenue";
 type Active = { dow: number; hour: number; x: number; y: number };
@@ -523,10 +526,10 @@ export function ProfitInsights({ data }: { data: InsightsDto }) {
 	return (
 		<>
 			<div className="grid grid-cols-2 gap-3 desktop:grid-cols-4">
-				<MetricCard icon={Coins} tone="success" label={t("linesRevenue")} value={formatBaht(totals.revenue)} />
-				<MetricCard icon={Wallet} tone="danger" label={t("cost")} value={formatBaht(totals.cost)} />
-				<MetricCard icon={PiggyBank} tone="warning" label={t("profit")} value={formatBaht(totals.profit)} />
-				<MetricCard icon={Percent} tone="info" label={t("margin")} value={`${margin(totals) ?? 0}%`} />
+				<MetricCard tinted icon={Coins} tone="success" label={t("linesRevenue")} value={<CountUp value={totals.revenue} format={formatBaht} step={100} />} />
+				<MetricCard tinted icon={Wallet} tone="danger" label={t("cost")} value={<CountUp value={totals.cost} format={formatBaht} step={100} />} />
+				<MetricCard tinted icon={PiggyBank} tone="warning" label={t("profit")} value={<CountUp value={totals.profit} format={formatBaht} step={100} />} />
+				<MetricCard tinted icon={Percent} tone="info" label={t("margin")} value={<CountUp value={Math.round((margin(totals) ?? 0) * 10)} format={tenthsPercent} />} />
 			</div>
 			<p className="text-muted-foreground text-xs leading-relaxed">{t("profitHint")}</p>
 
@@ -610,14 +613,15 @@ export function CustomerInsights({ data }: { data: InsightsDto }) {
 	return (
 		<>
 			<div className="grid grid-cols-2 gap-3 desktop:grid-cols-4">
-				<MetricCard icon={Users} tone="primary" label={t("customers")} value={formatNumber(c.customers)} />
-				<MetricCard icon={UserPlus} tone="success" label={t("newCustomers")} value={formatNumber(c.newCustomers)} />
-				<MetricCard icon={Repeat} tone="info" label={t("returning")} value={formatNumber(c.returningCustomers)} />
+				<MetricCard tinted icon={Users} tone="primary" label={t("customers")} value={<CountUp value={c.customers} format={formatNumber} />} />
+				<MetricCard tinted icon={UserPlus} tone="success" label={t("newCustomers")} value={<CountUp value={c.newCustomers} format={formatNumber} />} />
+				<MetricCard tinted icon={Repeat} tone="info" label={t("returning")} value={<CountUp value={c.returningCustomers} format={formatNumber} />} />
 				<MetricCard
+					tinted
 					icon={UserSearch}
 					tone="warning"
 					label={t("linkedShare")}
-					value={linked === null ? "–" : `${linked}%`}
+					value={linked === null ? "–" : <CountUp value={Math.round(linked * 10)} format={tenthsPercent} />}
 					note={t("linkedOrders", { count: c.identifiedOrders, total: c.orders })}
 				/>
 			</div>

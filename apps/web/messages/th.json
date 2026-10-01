@@ -106,7 +106,10 @@
 		"tableBillTitle": "{table} ขอเช็คบิล",
 		"tableBillBody": "ลูกค้าพร้อมจ่ายแล้ว",
 		"tablePaidTitle": "{table} แจ้งโอน PromptPay แล้ว",
-		"tablePaidBody": "ตรวจยอด {total} ในแอปธนาคารก่อนเช็คบิล"
+		"tablePaidBody": "ตรวจยอด {total} ในแอปธนาคารก่อนเช็คบิล",
+		"tableRoundTitle": "เพิ่มรายการเข้า{table} · รอบที่ {round}",
+		"tableRoundBody": "{count} รายการ ส่งเข้าครัวแล้ว",
+		"tableRoundBodyBy": "{count} รายการ โดย {by}"
 	},
 	"mobileNav": {
 		"label": "เมนูหลัก",
@@ -200,6 +203,8 @@
 		"detachTable": "เลิกเพิ่มเข้าโต๊ะ",
 		"sendToTable": "ส่งเข้า{table}",
 		"sentToTable": "ส่งเข้า{table}แล้ว",
+		"sentToTableHint": "{count} รายการ · รอบที่ {round}",
+		"viewTab": "ดูบิล",
 		"viewCart": "ดูตะกร้า · {count} รายการ",
 		"increase": "เพิ่มจำนวน",
 		"decrease": "ลดจำนวน",
@@ -1129,6 +1134,10 @@
 				"TABLE_CALL": {
 					"title": "ลูกค้าเรียกพนักงาน / ขอเช็คบิล",
 					"hint": "เมื่อลูกค้ากดเรียกพนักงานหรือขอเช็คบิลจาก QR"
+				},
+				"TABLE_ROUND": {
+					"title": "เพิ่มรายการเข้าโต๊ะ",
+					"hint": "เมื่อพนักงานส่งรายการเพิ่มเข้าบิลโต๊ะจาก POS"
 				}
 			}
 		}
@@ -1785,6 +1794,27 @@
 		"previousPage": "หน้าก่อนหน้า",
 		"nextPage": "หน้าถัดไป",
 		"amountInvalid": "ใส่จำนวนเงินมากกว่า 0",
+		"insights": {
+			"total": "ค่าใช้จ่ายรวม",
+			"vsPrevious": "ช่วงก่อนหน้า",
+			"count": "จำนวนรายการ",
+			"countNote": "จ่ายใน {count} วัน",
+			"perDay": "เฉลี่ยต่อวัน",
+			"perDayNote": "จาก {days} วัน",
+			"ofSales": "เทียบยอดขาย",
+			"ofSalesNote": "ยอดขาย {revenue}",
+			"ofSalesNone": "เลือกช่วงเวลาเพื่อเทียบกับยอดขาย",
+			"ofSalesNoSales": "ยังไม่มียอดขายในช่วงนี้",
+			"trend": "ค่าใช้จ่ายตามช่วงเวลา",
+			"trendDaily": "รายวัน แยกตามหมวด",
+			"trendWeekly": "รายสัปดาห์ แยกตามหมวด",
+			"trendMonthly": "รายเดือน แยกตามหมวด",
+			"weekOf": "สัปดาห์ {from} – {to}",
+			"split": "แยกตามหมวด",
+			"largest": "มากที่สุด",
+			"sum": "รวม",
+			"emptyChart": "ยังไม่มีค่าใช้จ่ายในช่วงนี้"
+		},
 		"categories": {
 			"INGREDIENTS": "วัตถุดิบ",
 			"UTILITIES": "ค่าน้ำค่าไฟ",
@@ -2033,6 +2063,10 @@
 		"guestsOfSeats": "{count}/{seats} คน",
 		"seats": "{count} ที่นั่ง",
 		"items": "{count} รายการ",
+		"noItems": "ยังไม่มีรายการ",
+		"sitMinutes": "{count} นาที",
+		"sitHours": "{hours} ชม.",
+		"sitHoursMinutes": "{hours} ชม. {minutes} น.",
 		"newRequests": "สั่งใหม่ {count}",
 		"noZone": "ไม่ระบุโซน",
 		"summary": "ว่าง {free} · มีลูกค้า {occupied}",

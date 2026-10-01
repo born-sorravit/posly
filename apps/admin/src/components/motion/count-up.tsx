@@ -36,11 +36,14 @@ const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)"
 export function CountUp({
 	value,
 	format,
+	step = 1,
 	duration = 1.1,
 	className,
 }: {
 	value: number;
 	format: (n: number) => string;
+	/** Rounds the figures in between (100 = whole baht); the last frame is the exact value. */
+	step?: number;
 	duration?: number;
 	className?: string;
 }) {
@@ -60,7 +63,7 @@ export function CountUp({
 		if (!node || !inView) return;
 		const write = (n: number) => {
 			shown.current = n;
-			node.textContent = format(Math.round(n));
+			node.textContent = format(n === value ? value : Math.round(n / step) * step);
 		};
 
 		if (reducedMotion()) {
@@ -74,7 +77,7 @@ export function CountUp({
 			onUpdate: write,
 		});
 		return () => controls.stop();
-	}, [inView, value, duration, format]);
+	}, [inView, value, duration, format, step]);
 
 	return (
 		<span ref={ref} className={className}>

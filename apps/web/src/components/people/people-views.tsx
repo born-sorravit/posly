@@ -256,7 +256,7 @@ export function EmployeesView() {
 			header: t("name"),
 			cell: (e) => (
 				<span className="flex items-center gap-3">
-					<UserAvatar name={e.name} />
+					<UserAvatar name={e.name} soft />
 					<span className="min-w-0">
 						<span className="block font-medium">{e.name}</span>
 						<span className="block truncate text-muted-foreground text-xs">{e.email}</span>
@@ -429,7 +429,7 @@ export function EmployeesView() {
 							const hasExtras = status !== null || e.hasPin || e.customPermissions;
 							return (
 								<div className="flex items-center gap-3">
-									<UserAvatar name={e.name} className="size-10" />
+									<UserAvatar name={e.name} soft className="size-10" />
 									<div className="min-w-0 flex-1">
 										<p className="truncate font-medium text-sm leading-tight">{e.name}</p>
 										<p className="mt-0.5 truncate text-muted-foreground text-xs">{e.email}</p>

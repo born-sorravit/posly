@@ -169,13 +169,15 @@ export class KitchenService {
 		});
 	}
 
-	/** Every kitchen screen for this branch redraws — the tap on one tablet shows on all. */
-	private announce(manager: EntityManager, order: Order): Promise<void> {
-		return this.realtime.publish(manager, {
-			topic: "kitchen",
-			businessId: order.businessId,
-			branchId: order.branchId,
-		});
+	/**
+	 * Every kitchen screen for this branch redraws — the tap on one tablet shows on all. A table's
+	 * ticket also redraws its tab, so the floor sees "served" without a refresh.
+	 */
+	private async announce(manager: EntityManager, order: Order): Promise<void> {
+		const target = { businessId: order.businessId, branchId: order.branchId };
+		await this.realtime.publish(manager, { topic: "kitchen", ...target });
+		if (order.tableSessionId)
+			await this.realtime.publish(manager, { topic: "tables", ...target });
 	}
 
 	/** A paid order of this shop that has a ticket, locked for the change. */

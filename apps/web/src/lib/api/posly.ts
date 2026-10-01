@@ -49,6 +49,15 @@ export interface BusinessDetailDto extends BusinessSummaryDto {
 	subscription: SubscriptionDto;
 }
 
+/** The shop to open, loaded on the server so the first paint is the page, not a blank shell. */
+export interface InitialWorkspace {
+	businessId: string;
+	detail: BusinessDetailDto;
+	branches: Branch[];
+	/** When it was read, so the client treats it as fresh for its normal stale time. */
+	fetchedAt: number;
+}
+
 /** What this shop may do right now, resolved by the API (plan §25: it is the source of truth). */
 export interface SubscriptionDto {
 	/** The plan in force — FREE while a paid plan has lapsed. */
@@ -364,6 +373,19 @@ export interface ExpenseDto {
 	createdAt: string;
 }
 
+/** The filters' expenses added up: the page's cards and charts. */
+export interface ExpenseSummaryDto {
+	total: Satang;
+	byCategory: Partial<Record<ExpenseCategory, Satang>>;
+	count: number;
+	/** Only days that had any, oldest first. */
+	byDay: { date: string; byCategory: Partial<Record<ExpenseCategory, Satang>> }[];
+	/** The equal-length window just before `from`; null without both ends of a range. */
+	previousTotal: Satang | null;
+	/** Paid sales over the same days; null without both ends of a range. */
+	revenue: Satang | null;
+}
+
 export type ExpenseFilters = { from?: string; to?: string; category?: ExpenseCategory; page?: number };
 
 export interface ExpenseInput {
@@ -513,7 +535,8 @@ export type NotificationKind =
 	| "PAYMENT_FAILED"
 	| "ANNOUNCEMENT"
 	| "TABLE_REQUEST"
-	| "TABLE_CALL";
+	| "TABLE_CALL"
+	| "TABLE_ROUND";
 
 /** An event, as facts; the words are written here from `kind` + `data`. */
 export interface NotificationDto {
@@ -670,7 +693,7 @@ export const api = {
 		list: (id: string, query: ExpenseFilters & { limit?: number }, signal?: AbortSignal) =>
 			backend.page<ExpenseDto>(`${b(id)}/expenses`, query, signal),
 		summary: (id: string, query: Omit<ExpenseFilters, "page">, signal?: AbortSignal) =>
-			backend.get<{ total: Satang; byCategory: Partial<Record<ExpenseCategory, Satang>> }>(
+			backend.get<ExpenseSummaryDto>(
 				`${b(id)}/expenses/summary`,
 				query,
 				signal

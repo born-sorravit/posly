@@ -4,7 +4,7 @@ import { type Column, ConfirmDialog, DataTable, FilterBar, FilterMenu, Pager } f
 import { FeatureLocked } from "@/components/common/feature-locked";
 import { EmptyState, PageContainer, PageHeader, Surface } from "@/components/common/primitives";
 import { PagerSkeleton } from "@/components/catalog/inventory-skeletons";
-import { ExpenseRowsSkeleton, ExpenseSplitSkeleton, ExpenseTotalSkeleton } from "@/components/expenses/expense-skeletons";
+import { ExpenseRowsSkeleton } from "@/components/expenses/expense-skeletons";
 import { Button } from "@posly/ui/components/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@posly/ui/components/dialog";
 import {
@@ -23,36 +23,18 @@ import { formatBaht, fromBaht } from "@posly/utils/money";
 import { cn } from "@/lib/utils";
 import {
 	CalendarDays,
-	Ellipsis,
-	HandCoins,
-	House,
-	type LucideIcon,
 	MoreHorizontal,
 	Pencil,
 	Plus,
 	Shapes,
-	ShoppingBasket,
 	Trash2,
 	Wallet,
-	Wrench,
-	Zap,
 } from "lucide-react";
+import { CATEGORY, EXPENSE_CATEGORIES } from "@/components/expenses/expense-categories";
+import { ExpenseInsights } from "@/components/expenses/expense-charts";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { toast } from "sonner";
-
-export const EXPENSE_CATEGORIES: { value: ExpenseCategory; icon: LucideIcon; ink: string; dot: string }[] = [
-	{ value: "INGREDIENTS", icon: ShoppingBasket, ink: "text-[#16a34a] bg-[#16a34a]/12", dot: "bg-[#16a34a]" },
-	{ value: "UTILITIES", icon: Zap, ink: "text-[#d97706] bg-[#d97706]/12", dot: "bg-[#d97706]" },
-	{ value: "SALARY", icon: HandCoins, ink: "text-[#635bff] bg-[#635bff]/12", dot: "bg-[#635bff]" },
-	{ value: "RENT", icon: House, ink: "text-[#0891b2] bg-[#0891b2]/12", dot: "bg-[#0891b2]" },
-	{ value: "EQUIPMENT", icon: Wrench, ink: "text-[#db2777] bg-[#db2777]/12", dot: "bg-[#db2777]" },
-	{ value: "OTHER", icon: Ellipsis, ink: "text-muted-foreground bg-muted", dot: "bg-muted-foreground/50" },
-];
-const CATEGORY = Object.fromEntries(EXPENSE_CATEGORIES.map((c) => [c.value, c])) as Record<
-	ExpenseCategory,
-	(typeof EXPENSE_CATEGORIES)[number]
->;
 
 type Period = "thisMonth" | "lastMonth" | "last3" | "all";
 
@@ -233,10 +215,6 @@ export function ExpensesView() {
 
 	const rows = expenses.data?.data ?? [];
 	const meta = expenses.data?.meta;
-	const total = summary.data?.total ?? 0;
-	const split = EXPENSE_CATEGORIES.map((c) => ({ ...c, amount: summary.data?.byCategory[c.value] ?? 0 })).filter(
-		(c) => c.amount > 0
-	);
 
 	const columns: Column<ExpenseDto>[] = [
 		{
@@ -316,44 +294,8 @@ export function ExpensesView() {
 				}
 			/>
 
-			{/* The period's total and where it went, before the line items. */}
-			<Surface className="space-y-4" data-tour="expenses-summary">
-				<div className="flex items-end justify-between gap-4">
-					<div>
-						<p className="text-muted-foreground text-sm">{t("total")}</p>
-						{summary.isPending ? (
-							<ExpenseTotalSkeleton />
-						) : (
-							<p className="numeric font-bold text-3xl tracking-tight">{formatBaht(total)}</p>
-						)}
-					</div>
-					<Wallet className="size-8 text-muted-foreground/40" />
-				</div>
-				{summary.isPending ? (
-					<ExpenseSplitSkeleton />
-				) : split.length ? (
-					<>
-						<div className="flex h-2.5 gap-0.5 overflow-hidden rounded-full">
-							{split.map((c) => (
-								<span
-									key={c.value}
-									className={cn("h-full", c.dot)}
-									style={{ width: `${(c.amount / total) * 100}%` }}
-								/>
-							))}
-						</div>
-						<ul className="grid gap-x-6 gap-y-2 tablet:grid-cols-3">
-							{split.map((c) => (
-								<li key={c.value} className="flex items-center gap-2 text-sm">
-									<span className={cn("size-2 rounded-full", c.dot)} />
-									<span className="flex-1 text-muted-foreground">{t(`categories.${c.value}`)}</span>
-									<span className="numeric font-medium">{formatBaht(c.amount)}</span>
-								</li>
-							))}
-						</ul>
-					</>
-				) : null}
-			</Surface>
+			{/* The period's figures and where the money went, before the line items. */}
+			<ExpenseInsights summary={summary.data} from={filters.from} to={filters.to} />
 
 			<Surface className="overflow-hidden p-0" data-tour="expenses-list">
 				<FilterBar onClear={category !== "all" ? () => setCategory("all") : undefined}>

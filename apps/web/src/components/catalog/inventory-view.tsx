@@ -3,6 +3,8 @@
 import { type Column, DataTable, FilterBar, FilterMenu, PagedFooter, SearchInput } from "@/components/common/controls";
 import { usePagedRows } from "@/hooks/use-paged-rows";
 import { StockBadge } from "@/components/common/order-badges";
+import { CountUp } from "@/components/motion/count-up";
+import { formatNumber } from "@posly/utils/format";
 import {
 	EmptyState,
 	MetricCard,
@@ -53,7 +55,8 @@ export function InventoryView() {
 	);
 	const paged = usePagedRows(rows, `${filter}|${search}`);
 	// Until the products land, the counts are unknown, not zero.
-	const count = (n: number) => (products.isPending ? <Skeleton className="h-6 w-10 tablet:h-7" aria-hidden /> : n);
+	const count = (n: number) =>
+		products.isPending ? <Skeleton className="h-6 w-10 tablet:h-7" aria-hidden /> : <CountUp value={n} format={formatNumber} />;
 
 	if (!enabled) {
 		return (

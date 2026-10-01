@@ -31,6 +31,7 @@ const AUDIENCE: Record<NotificationKind, Permission | null> = {
 	// Whoever works the floor: the people who can accept the round.
 	[NotificationKind.TABLE_REQUEST]: Permission.POS_USE,
 	[NotificationKind.TABLE_CALL]: Permission.POS_USE,
+	[NotificationKind.TABLE_ROUND]: Permission.POS_USE,
 };
 
 interface StockProduct {

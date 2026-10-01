@@ -1,5 +1,5 @@
 import { AppShell } from "@/components/layout/app-shell";
-import { fetchMyBusinesses } from "@/lib/api/server";
+import { fetchInitialWorkspace, fetchMyBusinesses } from "@/lib/api/server";
 import { requireUser } from "@/lib/auth/require-user";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
@@ -14,5 +14,12 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 	const businesses = await fetchMyBusinesses();
 	if (businesses && businesses.length === 0) redirect("/onboarding");
 
-	return <AppShell initialBusinesses={businesses ?? []}>{children}</AppShell>;
+	// The shop itself comes with the page, so the shell never waits on the browser for it.
+	const workspace = businesses ? await fetchInitialWorkspace(businesses) : null;
+
+	return (
+		<AppShell initialBusinesses={businesses ?? []} initialWorkspace={workspace}>
+			{children}
+		</AppShell>
+	);
 }

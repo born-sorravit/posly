@@ -79,4 +79,22 @@ export class ExpenseSummaryResponse {
 	@ApiProperty({ description: "Sum over the filters, every page" }) total: number;
 	@ApiProperty({ description: "Satang per category over the filters" })
 	byCategory: Partial<Record<ExpenseCategory, number>>;
+	@ApiProperty({ description: "How many expenses match the filters" }) count: number;
+	@ApiProperty({
+		description:
+			"Satang per category per day that had any, oldest first — the chart's bars",
+	})
+	byDay: { date: string; byCategory: Partial<Record<ExpenseCategory, number>> }[];
+	@ApiProperty({
+		nullable: true,
+		description:
+			"The same filters over the equal-length window just before `from`; null without both ends",
+	})
+	previousTotal: number | null;
+	@ApiProperty({
+		nullable: true,
+		description:
+			"Paid sales over the same days, so expenses read against what came in; null without both ends",
+	})
+	revenue: number | null;
 }

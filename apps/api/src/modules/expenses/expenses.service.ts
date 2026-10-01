@@ -12,6 +12,9 @@ import { CacheKeys } from "@/shared/cache/cache-keys";
 import { CacheService } from "@/shared/cache/cache.service";
 import type { ResolvedMembership } from "@/shared/decorators/current-membership.decorator";
 import { OrderDirection } from "@/shared/dto/pagination.dto";
+import { ExpenseCategory } from "@/shared/enums/expense-category.enum";
+import { OrderStatus } from "@/shared/enums/order.enum";
+import { BANGKOK_TIME_ZONE } from "@/shared/utils/date.util";
 import { PaginatedResponse, paginate } from "@/shared/utils/pagination.util";
 import { Injectable, NotFoundException } from "@nestjs/common";
 import type { SelectQueryBuilder } from "typeorm";
@@ -25,6 +28,18 @@ const toResponse = (e: Expense): ExpenseResponse => ({
 	recordedBy: e.recordedBy,
 	createdAt: e.createdAt,
 });
+
+/** Days from `from` to `to`, both included. */
+const dayCount = (from: string, to: string): number =>
+	Math.round(
+		(Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000
+	) + 1;
+
+/** `YYYY-MM-DD` moved by whole days on the calendar. */
+const shiftDate = (date: string, days: number): string =>
+	new Date(Date.parse(`${date}T00:00:00Z`) + days * 86_400_000)
+		.toISOString()
+		.slice(0, 10);
 
 /** Expenses (plan §19), each keyed by the shop and stamped with who recorded it. */
 @Injectable()
@@ -80,7 +95,61 @@ export class ExpensesService {
 		const byCategory = Object.fromEntries(
 			rows.map((r) => [r.category, Number(r.sum)])
 		);
-		return { total: rows.reduce((s, r) => s + Number(r.sum), 0), byCategory };
+		const count = await this.filtered(membership, query).getCount();
+
+		const days = (await this.filtered(membership, query)
+			.select("e.spent_on::text", "date")
+			.addSelect("e.category", "category")
+			.addSelect("SUM(e.amount)::bigint", "sum")
+			.groupBy("e.spent_on")
+			.addGroupBy("e.category")
+			.orderBy("e.spent_on", "ASC")
+			.getRawMany()) as { date: string; category: ExpenseCategory; sum: string }[];
+		const byDay: ExpenseSummaryResponse["byDay"] = [];
+		for (const row of days) {
+			let day = byDay.at(-1);
+			if (day?.date !== row.date)
+				byDay.push((day = { date: row.date, byCategory: {} }));
+			day.byCategory[row.category] = Number(row.sum);
+		}
+
+		let previousTotal: number | null = null;
+		let revenue: number | null = null;
+		if (query.from && query.to) {
+			// The window just before, as long as this one: September against August.
+			const length = dayCount(query.from, query.to);
+			const [previous] = (await this.filtered(membership, {
+				...query,
+				from: shiftDate(query.from, -length),
+				to: shiftDate(query.from, -1),
+			})
+				.select("COALESCE(SUM(e.amount), 0)::bigint", "sum")
+				.getRawMany()) as { sum: string }[];
+			previousTotal = Number(previous?.sum ?? 0);
+			const [sales] = (await this.expenseRepository.manager.query(
+				`SELECT COALESCE(SUM(total), 0)::bigint AS revenue FROM "order"
+				  WHERE business_id = $1 AND status = $2 AND deleted_at IS NULL
+				    AND created_at >= $3::date::timestamp AT TIME ZONE $5
+				    AND created_at < ($4::date + 1)::timestamp AT TIME ZONE $5`,
+				[
+					membership.businessId,
+					OrderStatus.PAID,
+					query.from,
+					query.to,
+					BANGKOK_TIME_ZONE,
+				]
+			)) as { revenue: string }[];
+			revenue = Number(sales?.revenue ?? 0);
+		}
+
+		return {
+			total: rows.reduce((s, r) => s + Number(r.sum), 0),
+			byCategory,
+			count,
+			byDay,
+			previousTotal,
+			revenue,
+		};
 	}
 
 	async create(

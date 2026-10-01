@@ -49,12 +49,29 @@ const AVATAR_COLORS = [
 	"from-lime-600 to-green-700",
 ] as const;
 
-export function UserAvatar({ name, className }: { name: string; className?: string }) {
+/**
+ * The same hues, quiet: a wash of the colour behind a darker letter, the way `IconChip` tints
+ * an icon. For lists — a table of twenty bright gradients shouts over the names beside them.
+ * Index for index with AVATAR_COLORS, so a person keeps their hue in either style.
+ */
+const AVATAR_SOFT = [
+	"bg-indigo-500/12 text-indigo-700 dark:bg-indigo-400/15 dark:text-indigo-300",
+	"bg-sky-500/12 text-sky-700 dark:bg-sky-400/15 dark:text-sky-300",
+	"bg-teal-500/12 text-teal-700 dark:bg-teal-400/15 dark:text-teal-300",
+	"bg-rose-500/12 text-rose-700 dark:bg-rose-400/15 dark:text-rose-300",
+	"bg-amber-500/14 text-amber-700 dark:bg-amber-400/15 dark:text-amber-300",
+	"bg-fuchsia-500/12 text-fuchsia-700 dark:bg-fuchsia-400/15 dark:text-fuchsia-300",
+	"bg-cyan-500/12 text-cyan-700 dark:bg-cyan-400/15 dark:text-cyan-300",
+	"bg-lime-600/14 text-lime-800 dark:bg-lime-400/15 dark:text-lime-300",
+] as const;
+
+export function UserAvatar({ name, soft = false, className }: { name: string; soft?: boolean; className?: string }) {
+	const index = nameColorIndex(name, AVATAR_COLORS.length);
 	return (
 		<span
 			className={cn(
-				"flex size-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br font-medium text-sm text-white",
-				AVATAR_COLORS[nameColorIndex(name, AVATAR_COLORS.length)],
+				"flex size-9 shrink-0 items-center justify-center rounded-full font-medium text-sm",
+				soft ? AVATAR_SOFT[index] : ["bg-gradient-to-br text-white", AVATAR_COLORS[index]],
 				className
 			)}
 			aria-hidden

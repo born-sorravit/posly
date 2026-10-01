@@ -1,6 +1,7 @@
 "use client";
 
 import { type Column, DataTable, Segmented } from "@/components/common/controls";
+import { CountUp } from "@/components/motion/count-up";
 import { EmptyState, MetricCard, PageContainer, PageHeader, SectionTitle, Surface } from "@/components/common/primitives";
 import { ProductThumb } from "@/components/common/product-thumb";
 import { PaymentBreakdown } from "@/components/dashboard/dashboard-panels";
@@ -33,6 +34,9 @@ import { cn } from "@/lib/utils";
 type Tab = "sales" | "products" | "peak" | "profit" | "customers" | "payments" | "employees";
 
 /** The tabs that read the Advanced report. */
+/** The comparison figure in whole baht: it gives the percentage a scale, not an audit. */
+const roughBaht = (amount: number) => formatBaht(Math.round(amount / 100) * 100);
+
 const INSIGHT_TABS = new Set<Tab>(["peak", "profit", "customers"]);
 
 function AdvancedLocked() {
@@ -248,6 +252,10 @@ export function ReportsView() {
 	const chooseMode = (mode: PeriodMode) =>
 		mode === "custom" ? setPeriod((p) => ({ ...p, mode })) : choosePreset(mode);
 	const tBreakdown = useTranslations("reports.breakdown");
+	const tPeriod = useTranslations("reports.period");
+	/** The line under each headline card names what it is compared with. */
+	const versus = tPeriod(query.compare === "year" ? "compareYear" : "comparePrevious");
+	const revenueTrend = data?.series.map((b) => b.revenue);
 	const tMethod = useTranslations("paymentMethod");
 
 	/**
@@ -361,11 +369,52 @@ export function ReportsView() {
 				<>
 					{tab === "sales" ? (
 						<>
-							<div className="grid grid-cols-2 gap-3 desktop:grid-cols-4">
-								<MetricCard icon={Coins} tone="success" label={t("revenue")} value={formatBaht(data.metrics.revenue)} change={data.metrics.revenueChange} />
-								<MetricCard icon={ShoppingBag} tone="primary" label={t("orders")} value={formatNumber(data.metrics.orders)} change={data.metrics.ordersChange} />
-								<MetricCard icon={ReceiptText} tone="info" label={t("average")} value={formatBaht(data.metrics.averageOrder)} change={data.metrics.averageOrderChange} />
-								<MetricCard icon={PiggyBank} tone="warning" label={t("profit")} value={formatBaht(data.metrics.estimatedProfit)} change={data.metrics.profitChange} />
+							{/* The same headline cards as the dashboard: tinted, with the period's line under each. */}
+							<div className="grid grid-cols-2 gap-3 desktop:grid-cols-4 desktop:gap-4">
+								<MetricCard
+									tinted
+									tone="success"
+									icon={Coins}
+									label={t("revenue")}
+									value={<CountUp value={data.metrics.revenue} format={formatBaht} step={100} />}
+									change={data.metrics.revenueChange}
+									changeLabel={versus}
+									previous={roughBaht(data.metrics.previousRevenue)}
+									trend={revenueTrend}
+								/>
+								<MetricCard
+									tinted
+									tone="primary"
+									icon={ShoppingBag}
+									label={t("orders")}
+									value={<CountUp value={data.metrics.orders} format={formatNumber} />}
+									change={data.metrics.ordersChange}
+									changeLabel={versus}
+									previous={formatNumber(data.metrics.previousOrders)}
+									trend={data.series.map((b) => b.orders)}
+								/>
+								<MetricCard
+									tinted
+									tone="info"
+									icon={ReceiptText}
+									label={t("average")}
+									value={<CountUp value={data.metrics.averageOrder} format={formatBaht} step={100} />}
+									change={data.metrics.averageOrderChange}
+									changeLabel={versus}
+									previous={roughBaht(data.metrics.previousAverageOrder)}
+									trend={data.series.map((b) => (b.orders > 0 ? b.revenue / b.orders : 0))}
+								/>
+								<MetricCard
+									tinted
+									tone="warning"
+									icon={PiggyBank}
+									label={t("profit")}
+									value={<CountUp value={data.metrics.estimatedProfit} format={formatBaht} step={100} />}
+									change={data.metrics.profitChange}
+									changeLabel={versus}
+									previous={roughBaht(data.metrics.previousEstimatedProfit)}
+									trend={revenueTrend}
+								/>
 							</div>
 							<div data-tour="reports-profit">
 								<ProfitBreakdown metrics={data.metrics} productsWithoutCost={data.productsWithoutCost} />

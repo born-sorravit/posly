@@ -263,6 +263,18 @@ describe("tables and QR ordering", () => {
 		expect(current.lines.map((l) => l.round)).toEqual([1, 2]);
 		ticket = (await kitchen()).find((t) => t.id === current.orderId);
 		expect(ticket?.lines.map((l) => l.round)).toEqual([1, 2]);
+		// A round from the till rings the bell for the floor, and leads back to the tab.
+		const rounds = (
+			await api(app).get(`${base}/notifications`).set(auth(owner.token)).expect(200)
+		).body.data.items as {
+			kind: string;
+			entityId: string;
+			data: Record<string, unknown>;
+		}[];
+		expect(rounds.find((n) => n.kind === "TABLE_ROUND")).toMatchObject({
+			entityId: opened.id,
+			data: { items: 1, round: 2 },
+		});
 
 		// The guest sees the bill; a round left pending at check-out is turned down.
 		await api(app)

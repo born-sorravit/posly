@@ -1,6 +1,12 @@
 "use client";
 
-import { api, type BusinessDetailDto, type BusinessSummaryDto, type RecipeOwner } from "@/lib/api/posly";
+import {
+	api,
+	type BusinessDetailDto,
+	type BusinessSummaryDto,
+	type InitialWorkspace,
+	type RecipeOwner,
+} from "@/lib/api/posly";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import type { Branch, Business, FeatureKey } from "@posly/types/domain";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -83,11 +89,14 @@ const toBusiness = (detail: BusinessDetailDto, branches: Branch[]): Business => 
  */
 export function WorkspaceProvider({
 	initialBusinesses,
+	initialWorkspace = null,
 	children,
 	fallback,
 	errorFallback,
 }: {
 	initialBusinesses: BusinessSummaryDto[];
+	/** The shop the server already loaded, so the first render needs no request. */
+	initialWorkspace?: InitialWorkspace | null;
 	children: ReactNode;
 	fallback: ReactNode;
 	/** Shown when the shop cannot be loaded at all — never an endless skeleton. */
@@ -113,11 +122,14 @@ export function WorkspaceProvider({
 	});
 
 	const list = useMemo(() => businesses.data ?? [], [businesses.data]);
+	// Before the stored choice is read, the shop the server loaded (the same choice, from the
+	// workspace cookie); after, the stored one if it is still in the list.
 	const businessId = !hydrated
-		? null
+		? (initialWorkspace?.businessId ?? null)
 		: list.some((b) => b.id === storedId)
 			? storedId
-			: (list[0]?.id ?? null);
+			: (initialWorkspace?.businessId ?? list[0]?.id ?? null);
+	const seeded = initialWorkspace && businessId === initialWorkspace.businessId ? initialWorkspace : null;
 
 	useEffect(() => {
 		if (hydrated && businessId && businessId !== storedId) {
@@ -131,11 +143,15 @@ export function WorkspaceProvider({
 		queryKey: queryKeys.business(businessId ?? "none"),
 		queryFn: ({ signal }) => api.businesses.get(businessId as string, signal),
 		enabled: Boolean(businessId),
+		initialData: seeded?.detail,
+		initialDataUpdatedAt: seeded?.fetchedAt,
 	});
 	const branches = useQuery({
 		queryKey: queryKeys.branches(businessId ?? "none"),
 		queryFn: ({ signal }) => api.businesses.branches(businessId as string, signal),
 		enabled: Boolean(businessId),
+		initialData: seeded?.branches,
+		initialDataUpdatedAt: seeded?.fetchedAt,
 	});
 
 	const value = useMemo<WorkspaceValue | null>(() => {

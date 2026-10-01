@@ -17,7 +17,7 @@ import { Skeleton } from "@posly/ui/components/skeleton";
 import { RotateCcw, WifiOff } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useOnlineStatus } from "@/hooks/use-online-status";
-import type { BusinessSummaryDto } from "@/lib/api/posly";
+import type { BusinessSummaryDto, InitialWorkspace } from "@/lib/api/posly";
 import type { ReactNode } from "react";
 
 /** The shell's own shape while the shop is being resolved — no spinner, no layout jump. */
@@ -67,15 +67,18 @@ function ShellError({ retry }: { retry: () => void }) {
 export function AppShell({
 	children,
 	initialBusinesses,
+	initialWorkspace,
 }: {
 	children: ReactNode;
 	initialBusinesses: BusinessSummaryDto[];
+	initialWorkspace: InitialWorkspace | null;
 }) {
 	useOnlineStatus();
 
 	return (
 		<WorkspaceProvider
 			initialBusinesses={initialBusinesses}
+			initialWorkspace={initialWorkspace}
 			fallback={<ShellSkeleton />}
 			errorFallback={(retry) => <ShellError retry={retry} />}
 		>

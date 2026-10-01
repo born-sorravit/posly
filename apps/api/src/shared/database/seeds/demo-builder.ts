@@ -60,6 +60,49 @@ import { type EntityManager, In, Like } from "typeorm";
 
 const logger = new Logger("DemoSeed");
 export const DAYS = 30;
+
+/** `YYYY-MM-DD` this many days before `date`, on the calendar (no time zone involved). */
+const daysBefore = (date: string, days: number): string => {
+	const [y, mo, d] = date.split("-").map(Number);
+	return new Date(Date.UTC(y, mo - 1, d - days)).toISOString().slice(0, 10);
+};
+
+/**
+ * A demo shop's expenses for the window ending `today`, as `[category, share of the window's
+ * gross profit, note, spentOn]`. The monthly bills fall on fixed days of the month — rent on
+ * the 1st, electricity and water on the 5th — so "this month" on the expenses page is never
+ * empty, even on the 1st; each lands exactly once in the window. Stock is bought every few
+ * days, today included.
+ */
+export const demoBills = (
+	today: string,
+	random: () => number
+): [ExpenseCategory, number, string, string][] => {
+	const start = daysBefore(today, DAYS - 1);
+	const onDay = (day: number): string => {
+		const thisMonth = `${today.slice(0, 8)}${String(day).padStart(2, "0")}`;
+		const lastMonth =
+			daysBefore(`${today.slice(0, 8)}01`, 1).slice(0, 8) +
+			String(day).padStart(2, "0");
+		return thisMonth <= today ? thisMonth : lastMonth < start ? start : lastMonth;
+	};
+	const bills: [ExpenseCategory, number, string, string][] = [
+		[ExpenseCategory.RENT, 0.18, "ค่าเช่าร้าน", onDay(1)],
+		[ExpenseCategory.UTILITIES, 0.05, "ค่าไฟ", onDay(5)],
+		[ExpenseCategory.UTILITIES, 0.01, "ค่าน้ำ", onDay(5)],
+		[ExpenseCategory.EQUIPMENT, 0.03, "ซ่อมเครื่อง / อุปกรณ์", daysBefore(today, 11)],
+		[ExpenseCategory.OTHER, 0.01, "ถุงและบรรจุภัณฑ์", daysBefore(today, 4)],
+	];
+	for (let day = 0; day <= DAYS - 3; day += 4) {
+		bills.push([
+			ExpenseCategory.INGREDIENTS,
+			0.012 + random() * 0.008,
+			"ซื้อวัตถุดิบ",
+			daysBefore(today, day),
+		]);
+	}
+	return bills;
+};
 const CHUNK = 400;
 
 /** mulberry32: small, fast, deterministic. */
@@ -770,32 +813,15 @@ export async function createShop(
 		.filter((o) => o.status === OrderStatus.PAID)
 		.reduce((sum, o) => sum + (o.total as number) - (o.totalCost as number), 0);
 	const round10 = (satang: number) => Math.round(satang / 1000) * 1000;
-	const dayAgo = (days: number) =>
-		getLocalDateString(new Date(Date.now() - days * 86_400_000));
-	const bills: [ExpenseCategory, number, string, number][] = [
-		[ExpenseCategory.RENT, 0.18, "ค่าเช่าร้านเดือนนี้", DAYS - 2],
-		[ExpenseCategory.UTILITIES, 0.05, "ค่าไฟ", DAYS - 6],
-		[ExpenseCategory.UTILITIES, 0.01, "ค่าน้ำ", DAYS - 6],
-		[ExpenseCategory.EQUIPMENT, 0.03, "ซ่อมเครื่อง / อุปกรณ์", 11],
-		[ExpenseCategory.OTHER, 0.01, "ถุงและบรรจุภัณฑ์", 4],
-	];
-	// Stock bought every few days.
-	for (let day = DAYS - 3; day >= 1; day -= 4) {
-		bills.push([
-			ExpenseCategory.INGREDIENTS,
-			0.012 + random() * 0.008,
-			"ซื้อวัตถุดิบ",
-			day,
-		]);
-	}
+	const bills = demoBills(getLocalDateString(new Date()), random);
 	await m.save(
-		bills.map(([category, share, note, days]) =>
+		bills.map(([category, share, note, spentOn]) =>
 			m.create(Expense, {
 				businessId: business.id,
 				category,
 				amount: Math.max(1000, round10(grossProfit * share)),
 				note,
-				spentOn: dayAgo(days),
+				spentOn,
 				memberId: owner.id,
 				recordedBy: owner.displayName,
 			})

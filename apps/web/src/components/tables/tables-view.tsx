@@ -34,7 +34,7 @@ import { addedTax, formatBaht, includedTax, type Satang } from "@posly/utils/mon
 import { ArrowRightLeft, Ban, Check, Clock3, Combine, HandPlatter, Loader2, MoreHorizontal, Plus, QrCode, ReceiptText, Settings2, Split, Users, TriangleAlert, UtensilsCrossed, Wallet, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
-import { useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 const minutesSince = (iso: string, now: Date) => Math.max(0, Math.floor((now.getTime() - new Date(iso).getTime()) / 60_000));
@@ -53,6 +53,10 @@ const tabTotals = (tab: TabDto, discount: Discount | null, vatBasisPoints: numbe
 		total: pricesIncludeVat ? taxable : taxable + vat,
 	};
 };
+
+/** Roomy rows for the tab's "…" menu: thumb-sized, with the icon set apart from the words. */
+const MENU_ROW = "h-10 gap-3 rounded-lg px-2.5 text-sm [&_svg]:size-[18px]";
+const MENU_ITEM = `${MENU_ROW} [&_svg]:text-muted-foreground`;
 
 const CALL_ICON: Record<TableCallKind, typeof ReceiptText> = {
 	WAITER: HandPlatter,
@@ -129,13 +133,57 @@ function CallBanner({
 }
 
 /**
+ * How long a table has sat, as a colour: fresh is green, an hour in is blue, two hours amber.
+ * Never red — a long lunch is not an error — and never the warning fill, which means a guest
+ * is waiting on staff.
+ */
+const sittingTone = (minutes: number) =>
+	minutes < 60 ? "bg-success/12 text-success" : minutes < 120 ? "bg-chart-4/15 text-chart-4" : "bg-chart-3/15 text-chart-3";
+
+/** A zone's own colour on its heading, so "ในร้าน" and "ระเบียง" separate at a glance. */
+const ZONE_COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)"];
+
+/** A filter option with the dot of the state it shows — the same colours as the cards. */
+function FilterLabel({ dot, children }: { dot: string; children: ReactNode }) {
+	return (
+		<span className="flex items-center gap-1.5">
+			<span className={cn("size-1.5 rounded-full", dot)} aria-hidden />
+			{children}
+		</span>
+	);
+}
+
+/** Beside a zone's name: how many of its tables are free and how many seated. */
+function ZoneSplit({ tables }: { tables: BoardTableDto[] }) {
+	const t = useTranslations("tables");
+	const seated = tables.filter((table) => table.tab).length;
+	const free = tables.filter((table) => !table.tab && table.isActive).length;
+	return (
+		<span className="flex items-center gap-1.5 font-normal text-xs">
+			{free ? (
+				<span className="rounded-full bg-success/12 px-2 py-0.5 text-success">{t("filter.free", { count: free })}</span>
+			) : null}
+			{seated ? (
+				<span className="rounded-full bg-chart-4/15 px-2 py-0.5 text-chart-4">{t("filter.occupied", { count: seated })}</span>
+			) : null}
+		</span>
+	);
+}
+
+/**
  * One table on the floor. Free tables are quiet outlines, seated ones are filled with their
  * bill, and one with a guest's round waiting is the loudest thing on the screen.
  */
 function TableCard({ table, now, onSelect }: { table: BoardTableDto; now: Date; onSelect: () => void }) {
 	const t = useTranslations("tables");
-	const tKitchen = useTranslations("kitchen");
 	const tab = table.tab;
+	/** "45 นาที" under an hour, then "6 ชม." or "6 ชม. 12 น." — short enough for a phone's card. */
+	const sitting = (minutes: number) =>
+		minutes < 60
+			? t("sitMinutes", { count: minutes })
+			: minutes % 60 === 0
+				? t("sitHours", { hours: Math.floor(minutes / 60) })
+				: t("sitHoursMinutes", { hours: Math.floor(minutes / 60), minutes: minutes % 60 });
 	const waiting = tab?.pendingRequests ?? 0;
 	const alerting = waiting > 0 || Boolean(table.call);
 
@@ -146,7 +194,7 @@ function TableCard({ table, now, onSelect }: { table: BoardTableDto; now: Date; 
 				onClick={onSelect}
 				disabled={!table.isActive}
 				className={cn(
-					"group flex min-h-28 flex-col justify-between rounded-2xl border-2 border-dashed p-4 text-left transition-colors",
+					"group flex min-h-36 flex-col justify-between rounded-2xl border-2 border-dashed p-4 text-left transition-colors",
 					table.call
 						? "border-warning bg-warning/10"
 						: table.isActive
@@ -190,8 +238,10 @@ function TableCard({ table, now, onSelect }: { table: BoardTableDto; now: Date; 
 			onClick={onSelect}
 			style={toneStyle(alerting ? "warning" : "info")}
 			className={cn(
-				"tint-surface surface-hover relative flex min-h-28 flex-col gap-1 overflow-hidden rounded-2xl p-4 pl-5 text-left",
-				alerting && "ring-2 ring-warning"
+				"tint-surface surface-hover relative flex min-h-36 flex-col gap-3 overflow-hidden rounded-2xl p-4 pl-5 text-left",
+				// A shadow alone is lost on the dark theme: the edge and the wash say "this opens".
+				"transition-[background-color,box-shadow,transform] hover:-translate-y-0.5 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+				alerting ? "ring-2 ring-warning hover:bg-warning/8" : "hover:bg-chart-4/8 hover:ring-1 hover:ring-chart-4/50"
 			)}
 		>
 			{/* Seated at a glance across the room, like a ticket's edge on the kitchen screen. */}
@@ -200,7 +250,7 @@ function TableCard({ table, now, onSelect }: { table: BoardTableDto; now: Date; 
 				className={cn("absolute inset-y-0 left-0 w-1", alerting ? "bg-warning" : "bg-chart-4")}
 			/>
 			<span className="flex items-start justify-between gap-2">
-				<span className="min-w-0 font-semibold text-base leading-tight">{table.name}</span>
+				<span className="min-w-0 truncate font-semibold text-base leading-tight">{table.name}</span>
 				{waiting > 0 ? (
 					<span className="flex shrink-0 items-center gap-1 rounded-full bg-warning px-2 py-0.5 font-semibold text-[11px] text-warning-foreground">
 						<span className="relative flex size-1.5">
@@ -210,29 +260,40 @@ function TableCard({ table, now, onSelect }: { table: BoardTableDto; now: Date; 
 						{t("newRequests", { count: waiting })}
 					</span>
 				) : (
-					<span className="numeric flex shrink-0 items-center gap-1 text-muted-foreground text-xs" suppressHydrationWarning>
-						<Clock3 className="size-3.5" />
-						{tKitchen("minutes", { count: minutesSince(tab.openedAt, now) })}
+					<span
+						className={cn(
+							"numeric flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 font-medium text-[11px]",
+							sittingTone(minutesSince(tab.openedAt, now))
+						)}
+						suppressHydrationWarning
+					>
+						<Clock3 className="size-3" />
+						{sitting(minutesSince(tab.openedAt, now))}
 					</span>
 				)}
 			</span>
 			{table.call ? <CallChip kind={table.call.kind} /> : null}
-			<span className="numeric mt-auto font-bold text-xl tracking-tight">{formatBaht(tab.total)}</span>
-			<span className="flex flex-wrap items-center gap-x-3 gap-y-0.5 whitespace-nowrap text-muted-foreground text-xs">
-				<span className="flex items-center gap-1">
-					<ReceiptText className="size-3.5" />
-					{t("items", { count: tab.itemCount })}
+			{/* The bill, then what's on it — one quiet line, so the total has room to read across the room. */}
+			<span className="mt-auto flex flex-col gap-1.5">
+				{tab.itemCount > 0 ? (
+					<span className="numeric font-bold text-2xl leading-none tracking-tight">{formatBaht(tab.total)}</span>
+				) : (
+					<span className="font-medium text-muted-foreground text-sm leading-tight">{t("noItems")}</span>
+				)}
+				<span className="flex min-w-0 items-center gap-1.5 truncate text-muted-foreground text-xs">
+					{tab.itemCount > 0 ? <span>{t("items", { count: tab.itemCount })}</span> : null}
+					{tab.itemCount > 0 && (tab.guests || table.seats) ? <span aria-hidden>·</span> : null}
+					{tab.guests || table.seats ? (
+						<span className="flex items-center gap-1">
+							<Users className="size-3.5 shrink-0" />
+							{tab.guests && table.seats
+								? t("guestsOfSeats", { count: tab.guests, seats: table.seats })
+								: tab.guests
+									? t("guests", { count: tab.guests })
+									: t("seats", { count: table.seats ?? 0 })}
+						</span>
+					) : null}
 				</span>
-				{tab.guests || table.seats ? (
-					<span className="flex items-center gap-1">
-						<Users className="size-3.5" />
-						{tab.guests && table.seats
-							? t("guestsOfSeats", { count: tab.guests, seats: table.seats })
-							: tab.guests
-								? t("guests", { count: tab.guests })
-								: t("seats", { count: table.seats ?? 0 })}
-					</span>
-				) : null}
 			</span>
 		</button>
 	);
@@ -601,33 +662,35 @@ function TabSheet({ sessionId, onClose }: { sessionId: string | null; onClose: (
 											<MoreHorizontal />
 										</Button>
 									</DropdownMenuTrigger>
-									<DropdownMenuContent align="start" side="top">
+									<DropdownMenuContent align="start" side="top" className="w-60 p-1.5">
+										{/* Grouped by what each acts on: the table, the bill, then the one that throws it away. */}
 										{hasTables ? (
 											<>
-												<DropdownMenuItem onClick={() => setAction("move")}>
+												<DropdownMenuItem className={MENU_ITEM} onClick={() => setAction("move")}>
 													<ArrowRightLeft />
 													{tActions("move")}
 												</DropdownMenuItem>
-												<DropdownMenuItem onClick={() => setAction("merge")}>
+												<DropdownMenuItem className={MENU_ITEM} onClick={() => setAction("merge")}>
 													<Combine />
 													{tActions("merge")}
 												</DropdownMenuItem>
+												<DropdownMenuSeparator className="my-1.5" />
 											</>
 										) : null}
 										{data.orderId && data.lines.length > 0 ? (
-											<DropdownMenuItem onClick={() => setAction("split")}>
+											<DropdownMenuItem className={MENU_ITEM} onClick={() => setAction("split")}>
 												<Split />
 												{tActions("split")}
 											</DropdownMenuItem>
 										) : null}
 										{table && hasQr ? (
-											<DropdownMenuItem onClick={() => setShowQr(true)}>
+											<DropdownMenuItem className={MENU_ITEM} onClick={() => setShowQr(true)}>
 												<QrCode />
 												{t("showQr")}
 											</DropdownMenuItem>
 										) : null}
-										<DropdownMenuSeparator />
-										<DropdownMenuItem variant="destructive" onClick={() => setCancelling(true)}>
+										<DropdownMenuSeparator className="my-1.5" />
+										<DropdownMenuItem variant="destructive" className={MENU_ROW} onClick={() => setCancelling(true)}>
 											<Ban />
 											{t("cancelTab")}
 										</DropdownMenuItem>
@@ -849,23 +912,35 @@ export function TablesView() {
 						onChange={setFilter}
 						options={[
 							{ value: "all", label: t("filter.all", { count: tables.length }) },
-							{ value: "free", label: t("filter.free", { count: free }) },
-							{ value: "occupied", label: t("filter.occupied", { count: occupied }) },
-							...(waiting > 0 ? [{ value: "waiting" as const, label: t("filter.waiting", { count: waiting }) }] : []),
+							{ value: "free", label: <FilterLabel dot="bg-success">{t("filter.free", { count: free })}</FilterLabel> },
+							{
+								value: "occupied",
+								label: <FilterLabel dot="bg-chart-4">{t("filter.occupied", { count: occupied })}</FilterLabel>,
+							},
+							...(waiting > 0
+								? [
+										{
+											value: "waiting" as const,
+											label: <FilterLabel dot="bg-warning">{t("filter.waiting", { count: waiting })}</FilterLabel>,
+										},
+									]
+								: []),
 						]}
 					/>
-					{zones.map(([zone, all]) => {
+					{zones.map(([zone, all], zoneIndex) => {
 						const list = all.filter(shown);
 						if (list.length === 0) return null;
 						return (
 					<section key={zone} className="space-y-3">
 						{zones.length > 1 ? (
-							<h2 className="flex items-baseline gap-2 font-semibold text-sm">
+							<h2 className="flex flex-wrap items-center gap-x-2 gap-y-1 font-semibold text-sm">
+								<span className="size-2 rounded-full" style={{ background: ZONE_COLORS[zoneIndex % ZONE_COLORS.length] }} aria-hidden />
 								{zone || t("noZone")}
 								<span className="font-normal text-muted-foreground text-xs">{t("zoneCount", { count: all.length })}</span>
+								<ZoneSplit tables={all} />
 							</h2>
 						) : null}
-						<div className="grid grid-cols-2 gap-3 tablet:grid-cols-4 desktop:grid-cols-6">
+						<div className="grid grid-cols-2 gap-3 tablet:grid-cols-4 desktop:grid-cols-5 desktop:gap-4">
 							{list.map((table) => (
 								<TableCard
 									key={table.id}

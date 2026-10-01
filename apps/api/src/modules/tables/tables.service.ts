@@ -14,6 +14,7 @@ import {
 import { TableSession } from "@/models/tables/entities/table-session.entity";
 import { OrderResponse } from "@/modules/orders/dto/order.dto";
 import { InventoryService } from "@/modules/inventory/inventory.service";
+import { NotificationsService } from "@/modules/notifications/notifications.service";
 import { OrdersService } from "@/modules/orders/orders.service";
 import { allocateDiscount, computeOrderTotals } from "@/modules/orders/pricing";
 import { RealtimeService } from "@/modules/realtime/realtime.service";
@@ -38,6 +39,7 @@ import { CacheKeys } from "@/shared/cache/cache-keys";
 import { CacheService } from "@/shared/cache/cache.service";
 import type { ResolvedMembership } from "@/shared/decorators/current-membership.decorator";
 import { AuditAction } from "@/shared/enums/audit-action.enum";
+import { NotificationKind } from "@/shared/enums/notification.enum";
 import {
 	KitchenStatus,
 	OrderStatus,
@@ -84,7 +86,8 @@ export class TablesService {
 		private readonly realtime: RealtimeService,
 		private readonly cacheService: CacheService,
 		private readonly entitlements: EntitlementsService,
-		private readonly inventory: InventoryService
+		private readonly inventory: InventoryService,
+		private readonly notifications: NotificationsService
 	) {}
 
 	// ------------------------------------------------------------ setup
@@ -321,7 +324,27 @@ export class TablesService {
 						handledAt: new Date(),
 					})
 				);
-				await this.appendRound(manager, membership, session, lines);
+				const round = await this.appendRound(manager, membership, session, lines);
+				// The bell keeps a record of who put what on which table; it opens the tab.
+				const table = await manager.findOneOrFail(DiningTable, {
+					where: { id: session.tableId },
+					withDeleted: true,
+				});
+				const member = await manager.findOne(BusinessMember, {
+					where: { id: membership.memberId },
+				});
+				await this.notifications.emit(
+					manager,
+					session.businessId,
+					NotificationKind.TABLE_ROUND,
+					{
+						table: table.name,
+						items: lines.reduce((n, l) => n + l.quantity, 0),
+						round,
+						by: member?.displayName ?? "",
+					},
+					{ entityId: session.id, branchId: session.branchId }
+				);
 			});
 		} catch (error) {
 			// Two copies of the same retry raced past the check; the round went on once.
@@ -1002,7 +1025,7 @@ export class TablesService {
 		membership: ResolvedMembership,
 		session: TableSession,
 		lines: TableRequestLine[]
-	): Promise<void> {
+	): Promise<number> {
 		const business = await manager.findOneOrFail(Business, {
 			where: { id: session.businessId },
 		});
@@ -1100,6 +1123,7 @@ export class TablesService {
 			session,
 			cooks ? ["tables", "orders", "kitchen"] : ["tables", "orders"]
 		);
+		return round;
 	}
 
 	/** Closing or cancelling: the table is freed and guests' unanswered rounds are turned down. */

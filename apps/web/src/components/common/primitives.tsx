@@ -107,19 +107,23 @@ export function StatTrend({
 	change,
 	label,
 	softDecline = false,
+	inverse = false,
 	pill = false,
 	className,
 }: {
 	change: number;
 	label?: string;
 	softDecline?: boolean;
+	/** Up is bad news — costs: a rise is red, a fall is green. The arrow still points the true way. */
+	inverse?: boolean;
 	pill?: boolean;
 	className?: string;
 }) {
-	const up = change > 0;
+	const rising = change > 0;
+	const up = inverse ? change < 0 : rising;
 	const flat = change === 0;
 	const muted = flat || (!up && softDecline);
-	const Icon = up ? ArrowUpRight : ArrowDownRight;
+	const Icon = rising ? ArrowUpRight : ArrowDownRight;
 	return (
 		<span
 			className={cn(
@@ -216,6 +220,7 @@ export function MetricCard({
 	changeLabel,
 	previous,
 	softDecline = false,
+	inverse = false,
 	note,
 	tinted = false,
 	trend,
@@ -237,6 +242,8 @@ export function MetricCard({
 	previous?: ReactNode;
 	/** See StatTrend. */
 	softDecline?: boolean;
+	/** See StatTrend: for costs, where going up is the bad direction. */
+	inverse?: boolean;
 	/** Shown in place of the percentage when there is none, e.g. before the first sale. */
 	note?: ReactNode;
 	tinted?: boolean;
@@ -263,7 +270,7 @@ export function MetricCard({
 				// Two lines, in the order they are read: which way (the chip), then against what.
 				<div className="flex flex-col items-start gap-1.5">
 					{change !== undefined && change !== null ? (
-						<StatTrend change={change} softDecline={softDecline} pill />
+						<StatTrend change={change} softDecline={softDecline} inverse={inverse} pill />
 					) : note ? (
 						<span className="rounded-md bg-muted px-1.5 py-0.5 font-medium text-muted-foreground text-xs">
 							{note}
@@ -274,7 +281,7 @@ export function MetricCard({
 					</span>
 				</div>
 			) : change !== undefined && change !== null ? (
-				<StatTrend change={change} label={changeLabel} softDecline={softDecline} />
+				<StatTrend change={change} label={changeLabel} softDecline={softDecline} inverse={inverse} />
 			) : note ? (
 				<span className="text-muted-foreground text-xs">{note}</span>
 			) : null}

@@ -1,6 +1,7 @@
 import { FilterBarSkeleton, PagerSkeleton } from "@/components/catalog/inventory-skeletons";
-import { PageHeaderSkeleton, range } from "@/components/common/skeleton-text";
+import { PageHeaderSkeleton, TextSkeleton, range } from "@/components/common/skeleton-text";
 import { PageContainer } from "@/components/common/primitives";
+import { MetricCardSkeleton, SalesChartSkeleton } from "@/components/dashboard/dashboard-skeletons";
 import { Skeleton } from "@posly/ui/components/skeleton";
 
 /*
@@ -9,30 +10,58 @@ import { Skeleton } from "@posly/ui/components/skeleton";
  */
 
 
-/** The summary card's figure while it loads: the 36px `text-3xl` total, never a fake ฿0. */
-export function ExpenseTotalSkeleton() {
+/**
+ * "แยกตามหมวด": the title, the 160px donut centred above, then category rows — a 24px icon
+ * tile, name, share and amount on one line, the share bar under it. Stacked, not side by
+ * side: the card is a third of the row, too narrow for the dashboard's donut-beside-legend.
+ */
+function ExpenseSplitSkeleton() {
 	return (
-		<div className="flex h-9 items-center" aria-hidden>
-			<Skeleton className="h-8 w-40" />
+		<div className="surface rounded-2xl p-5" aria-hidden>
+			<div className="mb-4">
+				<TextSkeleton box="h-6" bar="h-4" className="w-28" />
+			</div>
+			<div className="flex flex-col items-center gap-5">
+				<div className="relative size-40 shrink-0">
+					<Skeleton className="size-full rounded-full" />
+					{/* The hole: the chart's inner radius is 68% of the outer. */}
+					<div className="absolute inset-[16%] rounded-full bg-card" />
+				</div>
+				<div className="grid w-full gap-3">
+					{range(3).map((i) => (
+						<div key={i} className="grid gap-1.5">
+							<div className="flex h-6 items-center gap-2.5">
+								<Skeleton className="size-6 shrink-0 rounded-md" />
+								<span className="min-w-0 flex-1">
+									<Skeleton className="h-3.5" style={{ width: [64, 56, 72][i] }} />
+								</span>
+								<Skeleton className="h-3.5 w-10 shrink-0" />
+								<Skeleton className="h-3.5 w-16 shrink-0" />
+							</div>
+							<Skeleton className="ml-8.5 h-1.5 rounded-full" />
+						</div>
+					))}
+				</div>
+			</div>
 		</div>
 	);
 }
 
-/** The split under the total: the category bar, then three legend rows (dot, name, amount). */
-export function ExpenseSplitSkeleton() {
+/** The four figure cards, then the spend chart beside the category donut. */
+export function ExpenseInsightsSkeleton() {
 	return (
-		<div className="space-y-4" aria-hidden>
-			<Skeleton className="h-2.5 w-full rounded-full" />
-			<div className="grid gap-x-6 gap-y-2 tablet:grid-cols-3">
-				{range(3).map((i) => (
-					<div key={i} className="flex h-5 items-center gap-2">
-						<Skeleton className="size-2 rounded-full" />
-						<Skeleton className="h-4" style={{ width: [56, 72, 48][i] }} />
-						<Skeleton className="ml-auto h-4 w-16" />
-					</div>
-				))}
+		<>
+			<div className="grid grid-cols-2 gap-3 desktop:grid-cols-4 desktop:gap-4" aria-hidden>
+				<MetricCardSkeleton tone="danger" />
+				<MetricCardSkeleton tone="primary" />
+				<MetricCardSkeleton tone="info" />
+				<MetricCardSkeleton tone="warning" />
 			</div>
-		</div>
+			<div className="grid gap-4 desktop:grid-cols-3">
+				<SalesChartSkeleton className="desktop:col-span-2" presets={false} />
+				<ExpenseSplitSkeleton />
+			</div>
+		</>
 	);
 }
 
@@ -108,18 +137,7 @@ export function ExpensesSkeleton() {
 	return (
 		<PageContainer>
 			<PageHeaderSkeleton title="w-32" actions={["w-40"]} />
-			<div className="surface space-y-4 rounded-2xl p-5" aria-hidden>
-				<div className="flex items-end justify-between gap-4">
-					<div>
-						<div className="flex h-5 items-center">
-							<Skeleton className="h-4 w-24" />
-						</div>
-						<ExpenseTotalSkeleton />
-					</div>
-					<Skeleton className="size-8 rounded-lg" />
-				</div>
-				<ExpenseSplitSkeleton />
-			</div>
+			<ExpenseInsightsSkeleton />
 			<div className="surface overflow-hidden rounded-2xl">
 				<FilterBarSkeleton chips={["w-28", "w-20"]} />
 				<ExpenseRowsSkeleton />
