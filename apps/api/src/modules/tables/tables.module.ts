@@ -1,3 +1,4 @@
+import { InventoryModule } from "@/modules/inventory/inventory.module";
 import { OrdersModule } from "@/modules/orders/orders.module";
 import { GuestTablesService } from "@/modules/tables/guest-tables.service";
 import {
@@ -8,7 +9,7 @@ import { TablesService } from "@/modules/tables/tables.service";
 import { Module } from "@nestjs/common";
 
 @Module({
-	imports: [OrdersModule],
+	imports: [OrdersModule, InventoryModule],
 	controllers: [TablesController, GuestTablesController],
 	providers: [TablesService, GuestTablesService],
 })

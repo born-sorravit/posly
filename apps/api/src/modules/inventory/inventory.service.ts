@@ -351,6 +351,51 @@ export class InventoryService {
 		businessId: string,
 		lines: ConsumedLine[]
 	): Promise<Record<string, number> | null> {
+		const planned = await this.planUsage(manager, lines);
+		if (!planned) return null;
+		const { usage, tracked } = planned;
+
+		const byId = new Map(tracked.map((r) => [r.ingredientId, r.ingredient]));
+		// A fixed order, so two tills selling the same things lock rows the same way round.
+		for (const id of [...usage.keys()].sort()) {
+			const amount = roundQuantity(usage.get(id) ?? 0);
+			usage.set(id, amount);
+			const rows = (await manager.query(
+				`UPDATE ingredient SET stock = stock - $2::numeric WHERE id = $1 RETURNING stock`,
+				[id, amount]
+			)) as [{ stock: string }[], number];
+			const after = Number(rows[0][0].stock);
+			const ingredient = byId.get(id);
+			if (ingredient) {
+				await this.notifyStock(
+					manager,
+					businessId,
+					ingredient,
+					roundQuantity(after + amount),
+					after
+				);
+			}
+		}
+		return Object.fromEntries(usage);
+	}
+
+	/**
+	 * What these lines take from tracked ingredients by today's recipes, without touching
+	 * stock: `consume` applies it, and splitting a table's bill uses it to say which part of
+	 * the tab's usage goes with the lines being paid.
+	 */
+	async usageOf(
+		manager: EntityManager,
+		lines: ConsumedLine[]
+	): Promise<Record<string, number> | null> {
+		const planned = await this.planUsage(manager, lines);
+		if (!planned) return null;
+		return Object.fromEntries(
+			[...planned.usage.entries()].map(([id, amount]) => [id, roundQuantity(amount)])
+		);
+	}
+
+	private async planUsage(manager: EntityManager, lines: ConsumedLine[]) {
 		const productIds = [...new Set(lines.map((l) => l.productId))];
 		const optionIds = [...new Set(lines.flatMap((l) => l.optionIds))];
 		if (!productIds.length) return null;
@@ -384,29 +429,7 @@ export class InventoryService {
 				}
 			}
 		}
-
-		const byId = new Map(tracked.map((r) => [r.ingredientId, r.ingredient]));
-		// A fixed order, so two tills selling the same things lock rows the same way round.
-		for (const id of [...usage.keys()].sort()) {
-			const amount = roundQuantity(usage.get(id) ?? 0);
-			usage.set(id, amount);
-			const rows = (await manager.query(
-				`UPDATE ingredient SET stock = stock - $2::numeric WHERE id = $1 RETURNING stock`,
-				[id, amount]
-			)) as [{ stock: string }[], number];
-			const after = Number(rows[0][0].stock);
-			const ingredient = byId.get(id);
-			if (ingredient) {
-				await this.notifyStock(
-					manager,
-					businessId,
-					ingredient,
-					roundQuantity(after + amount),
-					after
-				);
-			}
-		}
-		return Object.fromEntries(usage);
+		return { usage, tracked };
 	}
 
 	/** A refund or void puts back exactly what the sale took. */

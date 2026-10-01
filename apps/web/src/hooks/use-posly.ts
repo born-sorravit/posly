@@ -22,6 +22,7 @@ import {
 	type ProductInput,
 	type ReportQuery,
 	type CloseTabInput,
+	type SplitTabInput,
 	type RoundItem,
 	type TabDto,
 	type TableInput,
@@ -839,6 +840,25 @@ export function useTabMutations() {
 		}),
 		close: useMutation({
 			mutationFn: ({ sessionId, ...input }: CloseTabInput & { sessionId: string }) => api.tables.close(id, sessionId, input),
+			onSuccess: () => void sold(),
+		}),
+		move: useMutation({
+			mutationFn: ({ sessionId, tableId }: { sessionId: string; tableId: string }) => api.tables.move(id, sessionId, tableId),
+			onSuccess: (tab) => {
+				put(tab);
+				void sold();
+			},
+		}),
+		merge: useMutation({
+			mutationFn: ({ sessionId, otherSessionId }: { sessionId: string; otherSessionId: string }) =>
+				api.tables.merge(id, sessionId, otherSessionId),
+			onSuccess: (tab) => {
+				put(tab);
+				void sold();
+			},
+		}),
+		split: useMutation({
+			mutationFn: ({ sessionId, ...input }: SplitTabInput & { sessionId: string }) => api.tables.split(id, sessionId, input),
 			onSuccess: () => void sold(),
 		}),
 		cancel: useMutation({

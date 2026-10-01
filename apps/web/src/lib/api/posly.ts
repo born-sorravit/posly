@@ -480,6 +480,12 @@ export interface TabDto {
 
 export type RoundItem = CheckoutInput["items"][number];
 
+/** Paying part of a tab now: which lines (and how many of each), and the payment. */
+export interface SplitTabInput extends CloseTabInput {
+	clientOrderId: string;
+	items: { itemId: string; quantity: number }[];
+}
+
 /** Settling a table: the same money as a checkout, for a bill that already exists. */
 export interface CloseTabInput {
 	discount: Satang;
@@ -707,6 +713,12 @@ export const api = {
 			backend.get<TabDto>(`${b(id)}/table-sessions/${sessionId}`, undefined, signal),
 		addRound: (id: string, sessionId: string, clientRequestId: string, items: RoundItem[]) =>
 			backend.post<TabDto>(`${b(id)}/table-sessions/${sessionId}/items`, { clientRequestId, items }),
+		move: (id: string, sessionId: string, tableId: string) =>
+			backend.post<TabDto>(`${b(id)}/table-sessions/${sessionId}/move`, { tableId }),
+		merge: (id: string, sessionId: string, otherSessionId: string) =>
+			backend.post<TabDto>(`${b(id)}/table-sessions/${sessionId}/merge`, { sessionId: otherSessionId }),
+		split: (id: string, sessionId: string, input: SplitTabInput) =>
+			backend.post<OrderDto>(`${b(id)}/table-sessions/${sessionId}/split`, input),
 		close: (id: string, sessionId: string, input: CloseTabInput) =>
 			backend.post<OrderDto>(`${b(id)}/table-sessions/${sessionId}/close`, input),
 		cancel: (id: string, sessionId: string, reason?: string) =>

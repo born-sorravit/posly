@@ -5,6 +5,7 @@ import { EmptyState, PageContainer, PageHeader, toneStyle } from "@/components/c
 import { Segmented } from "@/components/common/controls";
 import { type CompletedPayment, CheckoutDialog } from "@/components/pos/checkout-dialog";
 import { DiscountControl } from "@/components/pos/discount-control";
+import { MergeTabDialog, MoveTabDialog, SplitTabDialog } from "@/components/tables/tab-actions";
 import { TableQrDialog } from "@/components/tables/table-qr";
 import { TableGridSkeleton } from "@/components/tables/tables-skeletons";
 import { useTab, useTabMutations, useTableBoard, useTableMutations } from "@/hooks/use-posly";
@@ -30,7 +31,7 @@ import { Input } from "@posly/ui/components/input";
 import { Skeleton } from "@posly/ui/components/skeleton";
 import { formatClock } from "@posly/utils/format";
 import { addedTax, formatBaht, includedTax, type Satang } from "@posly/utils/money";
-import { Ban, Check, Clock3, HandPlatter, Loader2, MoreHorizontal, Plus, QrCode, ReceiptText, Settings2, Users, TriangleAlert, UtensilsCrossed, Wallet, X } from "lucide-react";
+import { ArrowRightLeft, Ban, Check, Clock3, Combine, HandPlatter, Loader2, MoreHorizontal, Plus, QrCode, ReceiptText, Settings2, Split, Users, TriangleAlert, UtensilsCrossed, Wallet, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -437,6 +438,8 @@ function TabSheet({ sessionId, onClose }: { sessionId: string | null; onClose: (
 	const [payMethod, setPayMethod] = useState<PaymentMethod>("CASH");
 	const [cancelling, setCancelling] = useState(false);
 	const [showQr, setShowQr] = useState(false);
+	const [action, setAction] = useState<"move" | "merge" | "split" | null>(null);
+	const tActions = useTranslations("tables.actions");
 	const [replacingCart, setReplacingCart] = useState(false);
 	const data = tab.data;
 	const table = board.data?.find((b) => b.id === data?.tableId) ?? null;
@@ -599,6 +602,24 @@ function TabSheet({ sessionId, onClose }: { sessionId: string | null; onClose: (
 										</Button>
 									</DropdownMenuTrigger>
 									<DropdownMenuContent align="start" side="top">
+										{hasTables ? (
+											<>
+												<DropdownMenuItem onClick={() => setAction("move")}>
+													<ArrowRightLeft />
+													{tActions("move")}
+												</DropdownMenuItem>
+												<DropdownMenuItem onClick={() => setAction("merge")}>
+													<Combine />
+													{tActions("merge")}
+												</DropdownMenuItem>
+											</>
+										) : null}
+										{data.orderId && data.lines.length > 0 ? (
+											<DropdownMenuItem onClick={() => setAction("split")}>
+												<Split />
+												{tActions("split")}
+											</DropdownMenuItem>
+										) : null}
 										{table && hasQr ? (
 											<DropdownMenuItem onClick={() => setShowQr(true)}>
 												<QrCode />
@@ -657,6 +678,35 @@ function TabSheet({ sessionId, onClose }: { sessionId: string | null; onClose: (
 			) : null}
 
 			<TableQrDialog table={showQr ? table : null} onOpenChange={setShowQr} />
+
+			{data && table ? (
+				<>
+					<MoveTabDialog
+						key={`move:${action === "move"}`}
+						open={action === "move"}
+						onOpenChange={(next) => !next && setAction(null)}
+						tab={data}
+						tables={board.data ?? []}
+						branchId={table.branchId}
+					/>
+					<MergeTabDialog
+						key={`merge:${action === "merge"}`}
+						open={action === "merge"}
+						onOpenChange={(next) => !next && setAction(null)}
+						tab={data}
+						tables={board.data ?? []}
+						branchId={table.branchId}
+					/>
+				</>
+			) : null}
+			{data ? (
+				<SplitTabDialog
+					key={`split:${data.id}`}
+					open={action === "split"}
+					onOpenChange={(next) => !next && setAction(null)}
+					tab={data}
+				/>
+			) : null}
 
 			<ConfirmDialog
 				open={replacingCart}

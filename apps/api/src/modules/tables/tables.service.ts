@@ -3,6 +3,7 @@ import { BusinessMember } from "@/models/businesses/entities/business-member.ent
 import { Business } from "@/models/businesses/entities/business.entity";
 import { Product } from "@/models/catalog/entities/product.entity";
 import { OrderItem } from "@/models/orders/entities/order-item.entity";
+import { OrderItemModifier } from "@/models/orders/entities/order-item-modifier.entity";
 import { Order } from "@/models/orders/entities/order.entity";
 import { Payment } from "@/models/orders/entities/payment.entity";
 import { DiningTable } from "@/models/tables/entities/dining-table.entity";
@@ -12,12 +13,16 @@ import {
 } from "@/models/tables/entities/table-request.entity";
 import { TableSession } from "@/models/tables/entities/table-session.entity";
 import { OrderResponse } from "@/modules/orders/dto/order.dto";
+import { InventoryService } from "@/modules/inventory/inventory.service";
 import { OrdersService } from "@/modules/orders/orders.service";
 import { allocateDiscount, computeOrderTotals } from "@/modules/orders/pricing";
 import { RealtimeService } from "@/modules/realtime/realtime.service";
 import { EntitlementsService } from "@/modules/subscriptions/entitlements.service";
 import {
 	AddRoundDto,
+	MergeTabDto,
+	MoveTabDto,
+	SplitTabDto,
 	BoardTableResponse,
 	CancelTabDto,
 	CloseTabDto,
@@ -41,7 +46,11 @@ import {
 	ServiceType,
 } from "@/shared/enums/order.enum";
 import { Permission } from "@/shared/enums/permission.enum";
-import { TableRequestStatus, TableSessionStatus } from "@/shared/enums/table.enum";
+import {
+	CALL_RANK,
+	TableRequestStatus,
+	TableSessionStatus,
+} from "@/shared/enums/table.enum";
 import { Money } from "@/shared/utils/money.util";
 import {
 	BadRequestException,
@@ -74,7 +83,8 @@ export class TablesService {
 		private readonly orders: OrdersService,
 		private readonly realtime: RealtimeService,
 		private readonly cacheService: CacheService,
-		private readonly entitlements: EntitlementsService
+		private readonly entitlements: EntitlementsService,
+		private readonly inventory: InventoryService
 	) {}
 
 	// ------------------------------------------------------------ setup
@@ -530,6 +540,457 @@ export class TablesService {
 		} as DiningTable);
 	}
 
+	/**
+	 * Moves the whole tab to a free table in the same branch: its lines, waiting rounds and
+	 * any call the guests made. The ticket and receipt take the new table's name.
+	 */
+	async move(
+		membership: ResolvedMembership,
+		sessionId: string,
+		dto: MoveTabDto
+	): Promise<TabResponse> {
+		try {
+			await this.dataSource.transaction(async (manager) => {
+				const session = await this.lockOpenSession(manager, membership, sessionId);
+				if (session.tableId === dto.tableId)
+					throw new ConflictException("The tab is already at this table");
+				const target = await manager
+					.getRepository(DiningTable)
+					.createQueryBuilder("t")
+					.setLock("pessimistic_write")
+					.where("t.id = :id AND t.business_id = :businessId", {
+						id: dto.tableId,
+						businessId: session.businessId,
+					})
+					.getOne();
+				if (!target || target.branchId !== session.branchId)
+					throw new NotFoundException("Table not found");
+				if (!target.isActive)
+					throw new ConflictException("This table is turned off");
+				const source = await manager.findOneOrFail(DiningTable, {
+					where: { id: session.tableId },
+					withDeleted: true,
+				});
+
+				// The partial unique index refuses it if the target has a tab of its own.
+				await manager.update(
+					TableSession,
+					{ id: session.id },
+					{ tableId: target.id }
+				);
+				if (session.orderId)
+					await manager.update(
+						Order,
+						{ id: session.orderId },
+						{ label: target.name }
+					);
+				await this.carryCall(manager, source, target);
+				await this.announce(manager, session, ["tables", "orders", "kitchen"]);
+			});
+		} catch (error) {
+			if (isUniqueViolation(error))
+				throw new ConflictException("That table already has a tab open");
+			throw error;
+		}
+		return this.tab(membership, sessionId);
+	}
+
+	/**
+	 * Brings another open tab's lines onto this one, and frees that table. Nothing goes back
+	 * to stock — the lines only change bills — and the other tab's order, left empty, is
+	 * cancelled at nothing.
+	 */
+	async merge(
+		membership: ResolvedMembership,
+		sessionId: string,
+		dto: MergeTabDto
+	): Promise<TabResponse> {
+		if (sessionId === dto.sessionId)
+			throw new BadRequestException("Choose another table to merge");
+		await this.dataSource.transaction(async (manager) => {
+			// Both tabs, then both orders, always in id order: two staff merging each way at
+			// once must queue, not deadlock.
+			const locked = new Map<string, TableSession>();
+			for (const id of [sessionId, dto.sessionId].sort())
+				locked.set(id, await this.lockOpenSession(manager, membership, id));
+			const target = locked.get(sessionId) as TableSession;
+			const source = locked.get(dto.sessionId) as TableSession;
+			if (target.branchId !== source.branchId)
+				throw new ConflictException("Those tables are in different branches");
+
+			const orders = new Map<string, Order>();
+			for (const id of [target.orderId, source.orderId]
+				.filter((o): o is string => o !== null)
+				.sort()) {
+				orders.set(
+					id,
+					await manager
+						.getRepository(Order)
+						.createQueryBuilder("ord")
+						.setLock("pessimistic_write")
+						.where("ord.id = :id", { id })
+						.getOneOrFail()
+				);
+			}
+			const targetTable = await manager.findOneOrFail(DiningTable, {
+				where: { id: target.tableId },
+				withDeleted: true,
+			});
+			const sourceTable = await manager.findOneOrFail(DiningTable, {
+				where: { id: source.tableId },
+				withDeleted: true,
+			});
+
+			// Rounds still waiting for staff follow the guests to this tab.
+			await manager.update(
+				TableRequest,
+				{ sessionId: source.id, status: TableRequestStatus.PENDING },
+				{ sessionId: target.id }
+			);
+
+			const targetOrder = target.orderId ? orders.get(target.orderId) : undefined;
+			const sourceOrder = source.orderId ? orders.get(source.orderId) : undefined;
+			if (sourceOrder && !targetOrder) {
+				await manager.update(
+					Order,
+					{ id: sourceOrder.id },
+					{ tableSessionId: target.id, label: targetTable.name }
+				);
+				await manager.update(
+					TableSession,
+					{ id: target.id },
+					{ orderId: sourceOrder.id }
+				);
+				await manager.update(TableSession, { id: source.id }, { orderId: null });
+			} else if (sourceOrder && targetOrder) {
+				const last = (await manager
+					.getRepository(OrderItem)
+					.createQueryBuilder("item")
+					.select("COALESCE(MAX(item.round), 0)::int", "max")
+					.where("item.order_id = :id", { id: targetOrder.id })
+					.getRawOne()) as { max: number } | undefined;
+				// The other table's rounds follow this one's, in the order they came.
+				await manager.query(
+					`UPDATE order_item SET order_id = $1, round = round + $2 WHERE order_id = $3`,
+					[targetOrder.id, last?.max ?? 0, sourceOrder.id]
+				);
+				const items = await manager.find(OrderItem, {
+					where: { orderId: targetOrder.id },
+				});
+				await manager.update(
+					Order,
+					{ id: targetOrder.id },
+					{
+						...computeOrderTotals(
+							items,
+							0,
+							targetOrder.vatBasisPoints,
+							targetOrder.pricesIncludeVat
+						),
+						ingredientUsage: mergeUsage(
+							targetOrder.ingredientUsage,
+							sourceOrder.ingredientUsage
+						),
+						...mergedKitchen(targetOrder, sourceOrder),
+					}
+				);
+				await manager.update(
+					Order,
+					{ id: sourceOrder.id },
+					{
+						status: OrderStatus.CANCELLED,
+						subtotal: 0,
+						discount: 0,
+						vat: 0,
+						total: 0,
+						totalCost: 0,
+						ingredientUsage: null,
+						kitchenStatus: null,
+					}
+				);
+			}
+
+			const guests = (target.guests ?? 0) + (source.guests ?? 0);
+			await manager.update(
+				TableSession,
+				{ id: target.id },
+				{ guests: guests || null }
+			);
+			await this.carryCall(manager, sourceTable, targetTable);
+			await this.finish(manager, source, TableSessionStatus.CLOSED);
+			await this.announce(manager, target, ["tables", "orders", "kitchen"]);
+		});
+		await this.cacheService.bump(CacheKeys.dashboardVersion(membership.businessId));
+		return this.tab(membership, sessionId);
+	}
+
+	/**
+	 * Pays part of the tab now: the chosen lines (or part of a line's quantity) become their
+	 * own paid order, with their share of what the tab took from ingredient stock. What is
+	 * left stays on the tab. Idempotent on `clientOrderId`, like a checkout.
+	 */
+	async split(
+		membership: ResolvedMembership,
+		sessionId: string,
+		dto: SplitTabDto
+	): Promise<OrderResponse> {
+		if (
+			(dto.discount ?? 0) > 0 &&
+			!membership.permissions.includes(Permission.ORDERS_DISCOUNT)
+		) {
+			throw new ForbiddenException("You are not allowed to give discounts");
+		}
+		const existing = await this.dataSource.getRepository(Order).findOne({
+			where: { businessId: membership.businessId, clientOrderId: dto.clientOrderId },
+			select: { id: true },
+		});
+		if (existing) return this.orders.findOne(membership, existing.id);
+
+		let orderId: string;
+		try {
+			orderId = await this.dataSource.transaction((manager) =>
+				this.splitInTransaction(manager, membership, sessionId, dto)
+			);
+		} catch (error) {
+			if (isUniqueViolation(error)) {
+				const winner = await this.dataSource.getRepository(Order).findOne({
+					where: {
+						businessId: membership.businessId,
+						clientOrderId: dto.clientOrderId,
+					},
+					select: { id: true },
+				});
+				if (winner) return this.orders.findOne(membership, winner.id);
+			}
+			throw error;
+		}
+		await this.cacheService.bump(CacheKeys.dashboardVersion(membership.businessId));
+		return this.orders.findOne(membership, orderId);
+	}
+
+	private async splitInTransaction(
+		manager: EntityManager,
+		membership: ResolvedMembership,
+		sessionId: string,
+		dto: SplitTabDto
+	): Promise<string> {
+		const session = await this.lockOpenSession(manager, membership, sessionId);
+		if (!session.orderId) throw new ConflictException("Nothing on this tab yet");
+		const tab = await manager
+			.getRepository(Order)
+			.createQueryBuilder("ord")
+			.setLock("pessimistic_write")
+			.where("ord.id = :id", { id: session.orderId })
+			.getOneOrFail();
+		const items = await manager.find(OrderItem, {
+			where: { orderId: tab.id },
+			relations: { modifiers: true },
+		});
+		const byId = new Map(items.map((i) => [i.id, i]));
+
+		const wanted = new Map<string, number>();
+		for (const line of dto.items)
+			wanted.set(line.itemId, (wanted.get(line.itemId) ?? 0) + line.quantity);
+		const picked = [...wanted.entries()].map(([itemId, quantity]) => {
+			const item = byId.get(itemId);
+			if (!item) throw new NotFoundException("Line not found on this tab");
+			if (quantity > item.quantity)
+				throw new BadRequestException(
+					`Only ${item.quantity} of ${item.name} on the tab`
+				);
+			return { item, quantity };
+		});
+		const left =
+			items.reduce((n, i) => n + i.quantity, 0) -
+			picked.reduce((n, p) => n + p.quantity, 0);
+		if (left <= 0) throw new ConflictException("Use check-out to pay the whole tab");
+
+		const lines = picked.map(({ item, quantity }) => ({
+			unitPrice: item.unitPrice,
+			unitCost: item.unitCost,
+			quantity,
+		}));
+		// The tab's own VAT settings: the ones its lines were priced under.
+		const totals = computeOrderTotals(
+			lines,
+			dto.discount ?? 0,
+			tab.vatBasisPoints,
+			tab.pricesIncludeVat
+		);
+		const shares = allocateDiscount(
+			lines.map((l) => Money.multiply(l.unitPrice, l.quantity)),
+			totals.discount
+		);
+		const cash = dto.payment.method === PaymentMethod.CASH;
+		const received = cash ? (dto.payment.received ?? totals.total) : null;
+		if (received !== null && received < totals.total) {
+			throw new BadRequestException("Cash received is less than the total");
+		}
+
+		// What these lines took from ingredient stock, by today's recipes — never more than
+		// the tab holds, in case a recipe grew since the round was accepted.
+		const estimate =
+			(await this.inventory.usageOf(
+				manager,
+				picked
+					.filter((p) => p.item.productId)
+					.map(({ item, quantity }) => ({
+						productId: item.productId as string,
+						optionIds: (item.modifiers ?? [])
+							.map((m) => m.optionId)
+							.filter((o): o is string => Boolean(o)),
+						quantity,
+					}))
+			)) ?? {};
+		const tabUsage = tab.ingredientUsage ?? {};
+		const splitUsage: Record<string, number> = {};
+		const remainingUsage: Record<string, number> = { ...tabUsage };
+		for (const [id, amount] of Object.entries(estimate)) {
+			const taken = Math.min(amount, tabUsage[id] ?? 0);
+			if (taken <= 0) continue;
+			splitUsage[id] = taken;
+			const rest = Math.round(((tabUsage[id] ?? 0) - taken) * 1000) / 1000;
+			if (rest > 0) remainingUsage[id] = rest;
+			else delete remainingUsage[id];
+		}
+
+		// Lines still cooking stay on the kitchen screen after they are paid.
+		const kitchenLines = picked.filter((p) => p.item.toKitchen);
+		const kitchenStatus =
+			kitchenLines.length === 0
+				? null
+				: kitchenLines.some((p) => p.item.preparedAt === null)
+					? (tab.kitchenStatus ?? KitchenStatus.NEW)
+					: KitchenStatus.SERVED;
+
+		const business = await manager.findOneOrFail(Business, {
+			where: { id: tab.businessId },
+		});
+		const member = await manager.findOneOrFail(BusinessMember, {
+			where: { id: membership.memberId },
+		});
+		const number = await this.orders.allocateNumber(manager, business);
+		const now = new Date();
+		const paid = await manager.save(
+			manager.create(Order, {
+				businessId: tab.businessId,
+				branchId: tab.branchId,
+				memberId: member.id,
+				employeeName: member.displayName,
+				customerId: null,
+				customerName: null,
+				serviceType: tab.serviceType,
+				label: tab.label,
+				number,
+				clientOrderId: dto.clientOrderId,
+				status: OrderStatus.PAID,
+				kitchenStatus,
+				kitchenUpdatedAt: kitchenStatus ? (tab.kitchenUpdatedAt ?? now) : null,
+				...totals,
+				ingredientUsage: Object.keys(splitUsage).length ? splitUsage : null,
+				vatBasisPoints: tab.vatBasisPoints,
+				pricesIncludeVat: tab.pricesIncludeVat,
+				paidAt: now,
+				tableSessionId: session.id,
+				payments: [
+					manager.create(Payment, {
+						businessId: tab.businessId,
+						method: dto.payment.method,
+						status: PaymentStatus.SUCCESS,
+						amount: totals.total,
+						received,
+						change:
+							received === null ? null : Money.subtract(received, totals.total),
+						reference: null,
+					}),
+				],
+			})
+		);
+
+		for (const [index, { item, quantity }] of picked.entries()) {
+			if (quantity === item.quantity) {
+				await manager.update(
+					OrderItem,
+					{ id: item.id },
+					{ orderId: paid.id, discount: shares[index] }
+				);
+				continue;
+			}
+			// Part of a line: the tab keeps the rest, the paid order gets a copy of the snapshot.
+			await manager.update(
+				OrderItem,
+				{ id: item.id },
+				{
+					quantity: item.quantity - quantity,
+					lineTotal: Money.multiply(item.unitPrice, item.quantity - quantity),
+				}
+			);
+			await manager.save(
+				manager.create(OrderItem, {
+					orderId: paid.id,
+					productId: item.productId,
+					name: item.name,
+					art: item.art,
+					quantity,
+					unitPrice: item.unitPrice,
+					unitCost: item.unitCost,
+					costMissing: item.costMissing,
+					lineTotal: Money.multiply(item.unitPrice, quantity),
+					discount: shares[index],
+					note: item.note,
+					toKitchen: item.toKitchen,
+					preparedAt: item.preparedAt,
+					round: item.round,
+					modifiers: (item.modifiers ?? []).map((m) =>
+						manager.create(OrderItemModifier, {
+							optionId: m.optionId,
+							groupName: m.groupName,
+							optionName: m.optionName,
+							priceDelta: m.priceDelta,
+							costDelta: m.costDelta,
+						})
+					),
+				})
+			);
+		}
+
+		const remaining = await manager.find(OrderItem, { where: { orderId: tab.id } });
+		await manager.update(
+			Order,
+			{ id: tab.id },
+			{
+				...computeOrderTotals(
+					remaining,
+					0,
+					tab.vatBasisPoints,
+					tab.pricesIncludeVat
+				),
+				ingredientUsage: Object.keys(remainingUsage).length ? remainingUsage : null,
+			}
+		);
+		await this.announce(manager, session, ["tables", "orders", "kitchen"]);
+		return paid.id;
+	}
+
+	/** A call follows the guests to their new table; the one nearer to settling up wins. */
+	private async carryCall(
+		manager: EntityManager,
+		from: DiningTable,
+		to: DiningTable
+	): Promise<void> {
+		const pick =
+			from.callKind &&
+			(!to.callKind || CALL_RANK[from.callKind] > CALL_RANK[to.callKind])
+				? { callKind: from.callKind, calledAt: from.calledAt }
+				: { callKind: to.callKind, calledAt: to.calledAt };
+		await manager.update(DiningTable, { id: to.id }, pick);
+		await manager.update(
+			DiningTable,
+			{ id: from.id },
+			{ callKind: null, calledAt: null }
+		);
+	}
+
 	// ------------------------------------------------------------ internals
 
 	/**
@@ -867,3 +1328,30 @@ const toTableResponse = (table: DiningTable): TableResponse => ({
 			? { kind: table.callKind, at: table.calledAt.toISOString() }
 			: null,
 });
+
+const KITCHEN_ORDER: KitchenStatus[] = [
+	KitchenStatus.NEW,
+	KitchenStatus.PREPARING,
+	KitchenStatus.READY,
+	KitchenStatus.SERVED,
+];
+
+/** Two tickets become one: the less advanced status, the later of their times. */
+const mergedKitchen = (a: Order, b: Order) => {
+	const statuses = [a.kitchenStatus, b.kitchenStatus].filter(
+		(s): s is KitchenStatus => s !== null
+	);
+	if (!statuses.length) return {};
+	const kitchenStatus = statuses.sort(
+		(x, y) => KITCHEN_ORDER.indexOf(x) - KITCHEN_ORDER.indexOf(y)
+	)[0];
+	const times = [a.kitchenUpdatedAt, b.kitchenUpdatedAt].filter(
+		(t): t is Date => t !== null
+	);
+	return {
+		kitchenStatus,
+		kitchenUpdatedAt: times.length
+			? new Date(Math.max(...times.map((t) => t.getTime())))
+			: new Date(),
+	};
+};

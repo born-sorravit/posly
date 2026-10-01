@@ -9,7 +9,10 @@ import {
 	GuestMenuResponse,
 	GuestRequestDto,
 	GuestTabResponse,
+	MergeTabDto,
+	MoveTabDto,
 	OpenTableDto,
+	SplitTabDto,
 	TableCallResponse,
 	TabResponse,
 	TableResponse,
@@ -165,6 +168,50 @@ export class TablesController {
 		@Body() dto: AddRoundDto
 	): Promise<TabResponse> {
 		return this.tablesService.addRound(m, id, dto);
+	}
+
+	@Post("table-sessions/:sessionId/move")
+	@HttpCode(200)
+	@RequirePermission(Permission.POS_USE)
+	@RequireFeature(Feature.TABLES)
+	@ApiOperation({ summary: "Move the tab to a free table in the same branch" })
+	@ApiOkResponse({ type: TabResponse })
+	move(
+		@CurrentMembership() m: ResolvedMembership,
+		@Param("sessionId", ParseUUIDPipe) id: string,
+		@Body() dto: MoveTabDto
+	): Promise<TabResponse> {
+		return this.tablesService.move(m, id, dto);
+	}
+
+	@Post("table-sessions/:sessionId/merge")
+	@HttpCode(200)
+	@RequirePermission(Permission.POS_USE)
+	@RequireFeature(Feature.TABLES)
+	@ApiOperation({
+		summary: "Bring another open tab's lines onto this one and free its table",
+	})
+	@ApiOkResponse({ type: TabResponse })
+	merge(
+		@CurrentMembership() m: ResolvedMembership,
+		@Param("sessionId", ParseUUIDPipe) id: string,
+		@Body() dto: MergeTabDto
+	): Promise<TabResponse> {
+		return this.tablesService.merge(m, id, dto);
+	}
+
+	/** Not plan-gated, like check-out: a shop past its plan can still settle an open tab. */
+	@Post("table-sessions/:sessionId/split")
+	@HttpCode(200)
+	@RequirePermission(Permission.POS_USE)
+	@ApiOperation({ summary: "Pay part of the tab now, as its own order" })
+	@ApiOkResponse({ type: OrderResponse })
+	split(
+		@CurrentMembership() m: ResolvedMembership,
+		@Param("sessionId", ParseUUIDPipe) id: string,
+		@Body() dto: SplitTabDto
+	): Promise<OrderResponse> {
+		return this.tablesService.split(m, id, dto);
 	}
 
 	@Post("table-sessions/:sessionId/close")

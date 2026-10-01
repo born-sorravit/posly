@@ -132,6 +132,45 @@ export class CloseTabDto {
 	payment: CheckoutPaymentDto;
 }
 
+export class MoveTabDto {
+	@ApiProperty({ description: "A free table in the same branch" })
+	@IsUUID()
+	tableId: string;
+}
+
+export class MergeTabDto {
+	@ApiProperty({ description: "The other open tab, whose lines move into this one" })
+	@IsUUID()
+	sessionId: string;
+}
+
+export class SplitItemDto {
+	@ApiProperty() @IsUUID() itemId: string;
+
+	@ApiProperty({ minimum: 1 })
+	@IsInt()
+	@Min(1)
+	@Max(999)
+	quantity: number;
+}
+
+/** Pay part of a tab now: these lines (or part of their quantity) become their own paid order. */
+export class SplitTabDto extends CloseTabDto {
+	@ApiProperty({
+		description: "Client-generated UUID; a retry returns the same order",
+	})
+	@IsUUID()
+	clientOrderId: string;
+
+	@ApiProperty({ type: [SplitItemDto] })
+	@IsArray()
+	@ArrayMinSize(1)
+	@ArrayMaxSize(200)
+	@ValidateNested({ each: true })
+	@Type(() => SplitItemDto)
+	items: SplitItemDto[];
+}
+
 export class CancelTabDto {
 	@ApiPropertyOptional({ example: "ลูกค้ายกเลิก" })
 	@IsOptional()
