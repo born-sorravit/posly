@@ -17,12 +17,9 @@ import {
 	Briefcase,
 	Cake,
 	Check,
-	ChefHat,
 	Clock3,
 	Coffee,
 	CupSoda,
-	QrCode,
-	ReceiptText,
 	ShieldCheck,
 	ShoppingBag,
 	Store,
@@ -37,18 +34,15 @@ import type { ReactNode } from "react";
 const TYPE_ICONS: LucideIcon[] = [Coffee, UtensilsCrossed, CupSoda, Cake, ShoppingBag, Briefcase];
 
 const FEATURES: {
-	key: "pos" | "payment" | "stock" | "reports" | "staff" | "tables" | "qr" | "kitchen" | "receipt";
+	key: "pos" | "payment" | "stock" | "restaurant" | "reports" | "staff";
 	icon: LucideIcon;
 }[] = [
 	{ key: "pos", icon: Zap },
 	{ key: "payment", icon: Wallet },
 	{ key: "stock", icon: Boxes },
-	{ key: "tables", icon: UtensilsCrossed },
-	{ key: "qr", icon: QrCode },
-	{ key: "kitchen", icon: ChefHat },
+	{ key: "restaurant", icon: UtensilsCrossed },
 	{ key: "reports", icon: BarChart3 },
 	{ key: "staff", icon: ShieldCheck },
-	{ key: "receipt", icon: ReceiptText },
 ];
 
 function SectionHeading({ eyebrow, title, subtitle }: { eyebrow: string; title: string; subtitle?: string }) {
