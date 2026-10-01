@@ -473,17 +473,18 @@ export async function createShop(
 		)
 	);
 
-	const tables = (shop.tables ?? []).flatMap(({ zone, names }) =>
-		names.map((name) => ({ zone, name }))
+	const tables = (shop.tables ?? []).flatMap(({ zone, seats, names }) =>
+		names.map((name) => ({ zone, seats, name }))
 	);
 	if (tables.length > 0) {
 		await m.save(
-			tables.map(({ zone, name }, displayOrder) =>
+			tables.map(({ zone, seats, name }, displayOrder) =>
 				m.create(DiningTable, {
 					businessId: business.id,
 					branchId: branches[0].id,
 					name,
 					zone,
+					seats,
 					displayOrder,
 					isActive: true,
 					qrToken: newQrToken(),

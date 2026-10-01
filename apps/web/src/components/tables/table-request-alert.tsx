@@ -3,8 +3,8 @@
 import { useTableBoard } from "@/hooks/use-posly";
 import { useActiveBusiness } from "@/hooks/use-workspace";
 import { useRouter } from "@/i18n/navigation";
+import { TableRequestToast } from "@/components/tables/table-request-toast";
 import { play } from "@/lib/sounds";
-import { useTranslations } from "next-intl";
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 
@@ -14,7 +14,6 @@ import { toast } from "sonner";
  * load (and a round already announced) stays quiet.
  */
 export function TableRequestAlert() {
-	const t = useTranslations("tables.alert");
 	const { can } = useActiveBusiness();
 	const board = useTableBoard(can("pos:use"));
 	const router = useRouter();
@@ -33,10 +32,22 @@ export function TableRequestAlert() {
 			const tab = table.tab;
 			if (!tab || tab.pendingRequests <= (before.get(tab.id) ?? 0)) continue;
 			rang = true;
-			toast(t("new", { table: table.name }), {
-				id: `table-request-${tab.id}`,
-				action: { label: t("view"), onClick: () => router.push({ pathname: "/tables", query: { tab: tab.id } }) },
-			});
+			const id = `table-request-${tab.id}`;
+			toast.custom(
+				(toastId) => (
+					<TableRequestToast
+						table={table.name}
+						waiting={tab.pendingRequests}
+						onView={() => {
+							toast.dismiss(toastId);
+							router.push({ pathname: "/tables", query: { tab: tab.id } });
+						}}
+						onDismiss={() => toast.dismiss(toastId)}
+					/>
+				),
+				// Stays until seen: a waiting table must not slip by while staff look away.
+				{ id, duration: 15_000 }
+			);
 		}
 		if (rang) {
 			try {
@@ -46,7 +57,7 @@ export function TableRequestAlert() {
 				// No audio before the first tap on the page, or none at all: the toast still shows.
 			}
 		}
-	}, [board.data, router, t]);
+	}, [board.data, router]);
 
 	return null;
 }

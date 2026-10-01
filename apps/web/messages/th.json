@@ -98,7 +98,9 @@
 		"quotaFullBody": "รับออเดอร์ใหม่ได้อีกครั้งเมื่อขึ้นเดือนใหม่ หรืออัปเกรดแพ็กเกจ",
 		"paymentFailedTitle": "ตัดบัตรค่าแพ็กเกจไม่สำเร็จ",
 		"paymentFailedBody": "อัปเดตบัตรเพื่อใช้ {plan} ต่อ ระหว่างนี้ร้านใช้สิทธิ์ของ Free",
-		"announcementTitle": "ประกาศจาก Posly"
+		"announcementTitle": "ประกาศจาก Posly",
+		"tableRequestTitle": "{table} สั่งอาหาร",
+		"tableRequestBody": "{count} รายการ รอพนักงานยืนยัน"
 	},
 	"mobileNav": {
 		"label": "เมนูหลัก",
@@ -234,8 +236,9 @@
 			"labelPlaceholder": "โต๊ะ / คิว",
 			"labelPlaceholderShop": "ชื่อหรือคิว (ไม่บังคับ)",
 			"heading": "ป้ายออเดอร์",
-			"pickTable": "เพิ่มเข้าโต๊ะ",
-			"pickTableHint": "โต๊ะที่เปิดอยู่"
+			"labelPlaceholderTables": "ชื่อ / คิว",
+			"pickTable": "เพิ่มเข้าโต๊ะที่เปิดอยู่ · {count} โต๊ะ",
+			"pickTableHint": "รายการในตะกร้าจะเข้าบิลของโต๊ะที่เลือก"
 		},
 		"hasOptions": "มีตัวเลือก",
 		"closeCart": "ปิดตะกร้า",
@@ -1111,6 +1114,10 @@
 				"ANNOUNCEMENT": {
 					"title": "ประกาศจาก Posly",
 					"hint": "ข่าวสาร ฟีเจอร์ใหม่ และการปิดปรับปรุงระบบจากทีม Posly"
+				},
+				"TABLE_REQUEST": {
+					"title": "ลูกค้าสั่งจาก QR",
+					"hint": "เมื่อลูกค้าที่โต๊ะส่งคำสั่งเข้ามา รอพนักงานยืนยัน"
 				}
 			}
 		}
@@ -1980,14 +1987,30 @@
 		"occupied": "มีลูกค้า",
 		"inactive": "ปิดใช้งาน",
 		"guests": "{count} คน",
+		"guestsOfSeats": "{count}/{seats} คน",
+		"seats": "{count} ที่นั่ง",
 		"items": "{count} รายการ",
 		"newRequests": "สั่งใหม่ {count}",
 		"noZone": "ไม่ระบุโซน",
 		"summary": "ว่าง {free} · มีลูกค้า {occupied}",
+		"openAction": "เปิดโต๊ะ",
+		"zoneCount": "{count} โต๊ะ",
+		"filter": {
+			"all": "ทั้งหมด {count}",
+			"free": "ว่าง {count}",
+			"occupied": "มีลูกค้า {count}",
+			"waiting": "รอยืนยัน {count}"
+		},
 		"open": {
 			"title": "เปิด{table}",
 			"description": "เปิดแล้ว QR บนโต๊ะจะเริ่มรับคำสั่งจากลูกค้า",
 			"guests": "จำนวนลูกค้า (ไม่บังคับ)",
+			"many": "10+",
+			"manyLabel": "จำนวน",
+			"people": "คน",
+			"seatsHint": "โต๊ะนี้ {count} ที่นั่ง",
+			"overSeats": "เกินที่นั่ง {over} คน (โต๊ะนี้ {seats} ที่นั่ง) เตรียมเก้าอี้หรือต่อโต๊ะเพิ่ม",
+			"moreThan": "มากกว่า {count}",
 			"confirm": "เปิดโต๊ะ",
 			"cancel": "ยกเลิก",
 			"opened": "เปิด{table}แล้ว"
@@ -2032,7 +2055,9 @@
 		},
 		"alert": {
 			"new": "{table} สั่งอาหาร",
-			"view": "ดู"
+			"waiting": "รอยืนยัน {count} คำสั่ง",
+			"view": "ดูคำสั่ง",
+			"dismiss": "ปิดการแจ้งเตือน"
 		}
 	},
 	"tableSettings": {
@@ -2044,6 +2069,9 @@
 		"namePlaceholder": "เช่น โต๊ะ 1, A3",
 		"zone": "โซน",
 		"zonePlaceholder": "เช่น ในร้าน, ระเบียง",
+		"seats": "ที่นั่ง",
+		"seatsPlaceholder": "เช่น 4",
+		"seatsCount": "{count} ที่นั่ง",
 		"active": "เปิดใช้งาน",
 		"activeHint": "ปิดไว้เมื่อไม่ใช้โต๊ะนี้ชั่วคราว QR จะหยุดทำงาน",
 		"edit": "แก้ไขโต๊ะ",
@@ -2069,7 +2097,9 @@
 		"copied": "คัดลอกลิงก์แล้ว",
 		"print": "พิมพ์",
 		"scanToOrder": "สแกนเพื่อดูเมนูและสั่งอาหาร",
-		"inactive": "ปิดใช้งาน"
+		"inactive": "ปิดใช้งาน",
+		"selfOpen": "ให้ลูกค้าเปิดโต๊ะเองได้",
+		"selfOpenHint": "ลูกค้านั่งโต๊ะว่างแล้วสแกน QR สั่งได้เลย พนักงานยังต้องกดยืนยันก่อนเข้าครัว ถ้าปิดไว้ ต้องให้พนักงานเปิดโต๊ะก่อน"
 	},
 	"guest": {
 		"title": "สั่งอาหาร",

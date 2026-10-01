@@ -29,6 +29,7 @@ import { cn } from "@/lib/utils";
 import {
 	Ban,
 	Bell,
+	BellRing,
 	ChartNoAxesColumn,
 	Check,
 	Clock3,
@@ -871,6 +872,7 @@ const NOTIFICATION_ICON: Record<NotificationKind, typeof Bell> = {
 	ORDER_QUOTA: Gauge,
 	PAYMENT_FAILED: CreditCard,
 	ANNOUNCEMENT: Megaphone,
+	TABLE_REQUEST: BellRing,
 };
 
 /**

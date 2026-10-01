@@ -28,6 +28,8 @@ const AUDIENCE: Record<NotificationKind, Permission | null> = {
 	[NotificationKind.PAYMENT_FAILED]: Permission.SUBSCRIPTION_MANAGE,
 	// Posly speaking to the shop (maintenance, new features): everyone who works there.
 	[NotificationKind.ANNOUNCEMENT]: null,
+	// Whoever works the floor: the people who can accept the round.
+	[NotificationKind.TABLE_REQUEST]: Permission.POS_USE,
 };
 
 interface StockProduct {

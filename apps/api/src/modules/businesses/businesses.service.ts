@@ -195,6 +195,7 @@ export class BusinessesService {
 			receiptFooter: business.receiptFooter || null,
 			receiptShowLogo: business.receiptShowLogo,
 			receiptShowTaxId: business.receiptShowTaxId,
+			tableSelfOpen: business.tableSelfOpen,
 			permissions: [...membership.permissions],
 			subscription: {
 				plan: entitlements.plan,

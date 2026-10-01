@@ -1,7 +1,8 @@
 "use client";
 
 import { ConfirmDialog } from "@/components/common/controls";
-import { EmptyState, PageContainer, PageHeader, StatusBadge } from "@/components/common/primitives";
+import { EmptyState, PageContainer, PageHeader, toneStyle } from "@/components/common/primitives";
+import { Segmented } from "@/components/common/controls";
 import { type CompletedPayment, CheckoutDialog } from "@/components/pos/checkout-dialog";
 import { DiscountControl } from "@/components/pos/discount-control";
 import { TableQrDialog } from "@/components/tables/table-qr";
@@ -24,10 +25,11 @@ import {
 	DropdownMenuTrigger,
 } from "@posly/ui/components/dropdown-menu";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@posly/ui/components/sheet";
+import { Input } from "@posly/ui/components/input";
 import { Skeleton } from "@posly/ui/components/skeleton";
 import { formatClock } from "@posly/utils/format";
 import { addedTax, formatBaht, includedTax, type Satang } from "@posly/utils/money";
-import { Ban, Check, Minus, MoreHorizontal, Plus, QrCode, ReceiptText, Settings2, UtensilsCrossed, X } from "lucide-react";
+import { Ban, Check, Clock3, Loader2, MoreHorizontal, Plus, QrCode, ReceiptText, Settings2, Users, TriangleAlert, UtensilsCrossed, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -50,82 +52,197 @@ const tabTotals = (tab: TabDto, discount: Discount | null, vatBasisPoints: numbe
 	};
 };
 
+/**
+ * One table on the floor. Free tables are quiet outlines, seated ones are filled with their
+ * bill, and one with a guest's round waiting is the loudest thing on the screen.
+ */
 function TableCard({ table, now, onSelect }: { table: BoardTableDto; now: Date; onSelect: () => void }) {
 	const t = useTranslations("tables");
 	const tKitchen = useTranslations("kitchen");
 	const tab = table.tab;
 	const waiting = tab?.pendingRequests ?? 0;
+
+	if (!tab) {
+		return (
+			<button
+				type="button"
+				onClick={onSelect}
+				disabled={!table.isActive}
+				className={cn(
+					"group flex min-h-28 flex-col justify-between rounded-2xl border-2 border-dashed p-4 text-left transition-colors",
+					table.isActive
+						? "border-border hover:border-primary/50 hover:bg-primary/5"
+						: "cursor-not-allowed border-border/60 opacity-50"
+				)}
+			>
+				<span>
+					<span className="block font-semibold text-base text-muted-foreground group-hover:text-foreground">
+						{table.name}
+					</span>
+					{table.seats ? (
+						<span className="mt-0.5 flex items-center gap-1 text-muted-foreground text-xs">
+							<Users className="size-3.5" />
+							{t("seats", { count: table.seats })}
+						</span>
+					) : null}
+				</span>
+				<span className="flex items-center gap-1.5 font-medium text-muted-foreground text-xs group-hover:text-primary">
+					{table.isActive ? (
+						<>
+							<Plus className="size-3.5" />
+							{t("openAction")}
+						</>
+					) : (
+						t("inactive")
+					)}
+				</span>
+			</button>
+		);
+	}
+
 	return (
 		<button
 			type="button"
 			onClick={onSelect}
-			disabled={!table.isActive && !tab}
+			style={toneStyle(waiting > 0 ? "warning" : "info")}
 			className={cn(
-				"surface surface-hover flex min-h-32 flex-col gap-2 rounded-2xl p-4 text-left transition-shadow",
-				waiting > 0 && "ring-2 ring-warning",
-				!table.isActive && !tab && "opacity-60"
+				"tint-surface surface-hover relative flex min-h-28 flex-col gap-1 overflow-hidden rounded-2xl p-4 pl-5 text-left",
+				waiting > 0 && "ring-2 ring-warning"
 			)}
 		>
+			{/* Seated at a glance across the room, like a ticket's edge on the kitchen screen. */}
+			<span
+				aria-hidden
+				className={cn("absolute inset-y-0 left-0 w-1", waiting > 0 ? "bg-warning" : "bg-chart-4")}
+			/>
 			<span className="flex items-start justify-between gap-2">
-				<span className="font-semibold text-lg leading-tight">{table.name}</span>
+				<span className="font-semibold text-base leading-tight">{table.name}</span>
 				{waiting > 0 ? (
-					<span className="relative flex size-2.5 shrink-0">
-						<span className="absolute inline-flex size-full animate-ping rounded-full bg-warning opacity-70" />
-						<span className="relative inline-flex size-2.5 rounded-full bg-warning" />
+					<span className="flex shrink-0 items-center gap-1 rounded-full bg-warning px-2 py-0.5 font-semibold text-[11px] text-warning-foreground">
+						<span className="relative flex size-1.5">
+							<span className="absolute inline-flex size-full animate-ping rounded-full bg-warning-foreground opacity-60" />
+							<span className="relative inline-flex size-1.5 rounded-full bg-warning-foreground" />
+						</span>
+						{t("newRequests", { count: waiting })}
+					</span>
+				) : (
+					<span className="numeric flex shrink-0 items-center gap-1 text-muted-foreground text-xs" suppressHydrationWarning>
+						<Clock3 className="size-3.5" />
+						{tKitchen("minutes", { count: minutesSince(tab.openedAt, now) })}
+					</span>
+				)}
+			</span>
+			<span className="numeric mt-auto font-bold text-xl tracking-tight">{formatBaht(tab.total)}</span>
+			<span className="flex items-center gap-3 text-muted-foreground text-xs">
+				<span className="flex items-center gap-1">
+					<ReceiptText className="size-3.5" />
+					{t("items", { count: tab.itemCount })}
+				</span>
+				{tab.guests || table.seats ? (
+					<span className="flex items-center gap-1">
+						<Users className="size-3.5" />
+						{tab.guests && table.seats
+							? t("guestsOfSeats", { count: tab.guests, seats: table.seats })
+							: tab.guests
+								? t("guests", { count: tab.guests })
+								: t("seats", { count: table.seats ?? 0 })}
 					</span>
 				) : null}
 			</span>
-			{tab ? (
-				<>
-					<span className="numeric font-bold text-xl tracking-tight">{formatBaht(tab.total)}</span>
-					<span className="mt-auto flex flex-wrap items-center gap-1.5">
-						{waiting > 0 ? (
-							<StatusBadge tone="warning">{t("newRequests", { count: waiting })}</StatusBadge>
-						) : (
-							<StatusBadge tone="info" dot>
-								{t("occupied")}
-							</StatusBadge>
-						)}
-						<span className="numeric text-muted-foreground text-xs" suppressHydrationWarning>
-							{[tab.guests ? t("guests", { count: tab.guests }) : null, tKitchen("minutes", { count: minutesSince(tab.openedAt, now) })]
-								.filter(Boolean)
-								.join(" · ")}
-						</span>
-					</span>
-				</>
-			) : (
-				<span className="mt-auto">
-					<StatusBadge tone="neutral">{table.isActive ? t("free") : t("inactive")}</StatusBadge>
-				</span>
-			)}
 		</button>
 	);
 }
 
+/** Chips go up to the table's seats (at most 9); the last chip opens a field for more. */
+const MAX_CHIPS = 9;
+const MAX_GUESTS = 99;
+
 function OpenTableDialog({ table, onOpenChange, onOpened }: { table: BoardTableDto | null; onOpenChange: (open: boolean) => void; onOpened: (tab: TabDto) => void }) {
 	const t = useTranslations("tables.open");
-	const tPos = useTranslations("pos");
 	const { open } = useTabMutations();
 	const [guests, setGuests] = useState(0);
+	// What is typed for a big party; the count only takes it once it is a valid number.
+	const [manyText, setManyText] = useState("");
+	const seats = table?.seats ?? null;
+	const chips = Array.from({ length: Math.min(seats ?? MAX_CHIPS, MAX_CHIPS) }, (_, i) => i + 1);
+	// The chip after the last number: "more than the seats", or 10+ for a big or unset table.
+	const more = chips.length + 1;
 
 	return (
 		<Dialog open={table !== null} onOpenChange={onOpenChange}>
 			<DialogContent className="gap-6 p-6 sm:max-w-md">
 				<DialogHeader>
 					<DialogTitle>{table ? t("title", { table: table.name }) : null}</DialogTitle>
-					<DialogDescription>{t("description")}</DialogDescription>
+					<DialogDescription>
+						{table?.seats ? `${t("description")} · ${t("seatsHint", { count: table.seats })}` : t("description")}
+					</DialogDescription>
 				</DialogHeader>
 				<div className="space-y-2.5">
 					<p className="font-medium text-sm">{t("guests")}</p>
-					<div className="flex items-center gap-3">
-						<Button variant="outline" size="icon-lg" className="size-11 rounded-xl" aria-label={tPos("decrease")} disabled={guests === 0} onClick={() => setGuests((g) => Math.max(0, g - 1))}>
-							<Minus />
-						</Button>
-						<span className="numeric w-12 text-center font-semibold text-2xl">{guests || "—"}</span>
-						<Button variant="outline" size="icon-lg" className="size-11 rounded-xl" aria-label={tPos("increase")} disabled={guests >= 99} onClick={() => setGuests((g) => Math.min(99, g + 1))}>
-							<Plus />
-						</Button>
+					{/* One tap picks; tapping the picked one again leaves it unset — it is optional. */}
+					<div
+						role="radiogroup"
+						aria-label={t("guests")}
+						className="grid gap-2"
+						// A small table's chips fit one row; a big or unset one wraps in fives.
+						style={{ gridTemplateColumns: `repeat(${chips.length + 1 <= 6 ? chips.length + 1 : 5}, minmax(0, 1fr))` }}
+					>
+						{[...chips, more].map((n) => {
+							const isMore = n === more;
+							const on = isMore ? guests >= more : guests === n;
+							return (
+								<button
+									key={n}
+									type="button"
+									role="radio"
+									aria-checked={on}
+									onClick={() => {
+										setGuests(on ? 0 : n);
+										if (isMore) setManyText(on ? "" : String(more));
+									}}
+									className={cn(
+										"numeric h-11 whitespace-nowrap rounded-xl px-1 font-semibold text-sm transition-colors",
+										on
+											? "bg-primary text-primary-foreground"
+											: "bg-muted/70 text-foreground hover:bg-muted"
+									)}
+								>
+									{isMore ? (seats && seats <= MAX_CHIPS ? t("moreThan", { count: seats }) : t("many")) : n}
+								</button>
+							);
+						})}
 					</div>
+					{guests >= more ? (
+						<div className="flex items-center gap-3 pt-1">
+							<label htmlFor="open-guests" className="text-muted-foreground text-sm">
+								{t("manyLabel")}
+							</label>
+							<Input
+								id="open-guests"
+								// biome-ignore lint/a11y/noAutofocus: shown because they asked to type the number
+								autoFocus
+								inputMode="numeric"
+								maxLength={2}
+								value={manyText}
+								onChange={(e) => {
+									const text = e.target.value.replace(/\D/g, "");
+									setManyText(text);
+									const n = Number(text);
+									if (n >= more && n <= MAX_GUESTS) setGuests(n);
+								}}
+								onBlur={() => setManyText(String(guests))}
+								className="numeric h-11 w-24 rounded-xl text-center font-semibold"
+							/>
+							<span className="text-muted-foreground text-sm">{t("people")}</span>
+						</div>
+					) : null}
+					{/* Over the seats is allowed — a chair pulled up, two tables pushed together — but said. */}
+					{seats && guests > seats ? (
+						<p className="flex items-start gap-2 rounded-xl bg-warning/12 px-3 py-2.5 text-sm">
+							<TriangleAlert className="mt-0.5 size-4 shrink-0" />
+							<span>{t("overSeats", { over: guests - seats, seats })}</span>
+						</p>
+					) : null}
 				</div>
 				<DialogFooter className="-mx-6 -mb-6 mt-2 px-6 py-4">
 					<Button variant="outline" size="lg" onClick={() => onOpenChange(false)}>
@@ -149,6 +266,7 @@ function OpenTableDialog({ table, onOpenChange, onOpened }: { table: BoardTableD
 							)
 						}
 					>
+						{open.isPending ? <Loader2 className="animate-spin" /> : null}
 						{t("confirm")}
 					</Button>
 				</DialogFooter>
@@ -157,7 +275,7 @@ function OpenTableDialog({ table, onOpenChange, onOpened }: { table: BoardTableD
 	);
 }
 
-function RequestCard({ request }: { request: TableRequestDto }) {
+function RequestCard({ request, onTabClosed }: { request: TableRequestDto; onTabClosed: () => void }) {
 	const t = useTranslations("tables.tab");
 	const { accept, reject } = useTabMutations();
 	const busy = accept.isPending || reject.isPending;
@@ -187,9 +305,18 @@ function RequestCard({ request }: { request: TableRequestDto }) {
 					variant="outline"
 					className="h-11 flex-1 tablet:h-9"
 					disabled={busy}
-					onClick={() => reject.mutate(request.id, { onSuccess: () => toast(t("rejected")), onError })}
+					onClick={() =>
+						reject.mutate(request.id, {
+							onSuccess: (tab) => {
+								toast(t("rejected"));
+								// A guest-opened table whose only round was turned down is free again.
+								if (tab.status !== "OPEN") onTabClosed();
+							},
+							onError,
+						})
+					}
 				>
-					<X />
+					{reject.isPending ? <Loader2 className="animate-spin" /> : <X />}
 					{t("reject")}
 				</Button>
 				<Button
@@ -197,7 +324,7 @@ function RequestCard({ request }: { request: TableRequestDto }) {
 					disabled={busy}
 					onClick={() => accept.mutate(request.id, { onSuccess: () => toast.success(t("accepted")), onError })}
 				>
-					<Check />
+					{accept.isPending ? <Loader2 className="animate-spin" /> : <Check />}
 					{t("accept")} · {formatBaht(request.total)}
 				</Button>
 			</div>
@@ -294,7 +421,7 @@ function TabSheet({ sessionId, onClose }: { sessionId: string | null; onClose: (
 										</h3>
 										<ul className="space-y-2">
 											{pending.map((r) => (
-												<RequestCard key={r.id} request={r} />
+												<RequestCard key={r.id} request={r} onTabClosed={onClose} />
 											))}
 										</ul>
 									</section>
@@ -486,12 +613,19 @@ export function TablesView() {
 	}, [tables]);
 	const occupied = tables.filter((x) => x.tab).length;
 	const free = tables.filter((x) => !x.tab && x.isActive).length;
+	const waiting = tables.filter((x) => (x.tab?.pendingRequests ?? 0) > 0).length;
+	const [filter, setFilter] = useState<"all" | "free" | "occupied" | "waiting">("all");
+	const shown = (table: BoardTableDto) =>
+		filter === "all" ||
+		(filter === "free" && !table.tab && table.isActive) ||
+		(filter === "occupied" && Boolean(table.tab)) ||
+		(filter === "waiting" && (table.tab?.pendingRequests ?? 0) > 0);
 
 	return (
 		<PageContainer>
 			<PageHeader
 				title={t("title")}
-				description={tables.length ? t("summary", { free, occupied }) : t("description")}
+				description={t("description")}
 				actions={
 					can("settings:manage") ? (
 						<Button asChild variant="outline">
@@ -523,10 +657,30 @@ export function TablesView() {
 					}
 				/>
 			) : (
-				zones.map(([zone, list]) => (
+				<>
+					<Segmented
+						className="w-fit"
+						value={filter}
+						onChange={setFilter}
+						options={[
+							{ value: "all", label: t("filter.all", { count: tables.length }) },
+							{ value: "free", label: t("filter.free", { count: free }) },
+							{ value: "occupied", label: t("filter.occupied", { count: occupied }) },
+							...(waiting > 0 ? [{ value: "waiting" as const, label: t("filter.waiting", { count: waiting }) }] : []),
+						]}
+					/>
+					{zones.map(([zone, all]) => {
+						const list = all.filter(shown);
+						if (list.length === 0) return null;
+						return (
 					<section key={zone} className="space-y-3">
-						{zones.length > 1 ? <h2 className="font-semibold text-muted-foreground text-sm">{zone || t("noZone")}</h2> : null}
-						<div className="grid grid-cols-2 gap-3 tablet:grid-cols-3 desktop:grid-cols-5">
+						{zones.length > 1 ? (
+							<h2 className="flex items-baseline gap-2 font-semibold text-sm">
+								{zone || t("noZone")}
+								<span className="font-normal text-muted-foreground text-xs">{t("zoneCount", { count: all.length })}</span>
+							</h2>
+						) : null}
+						<div className="grid grid-cols-2 gap-3 tablet:grid-cols-4 desktop:grid-cols-6">
 							{list.map((table) => (
 								<TableCard
 									key={table.id}
@@ -537,7 +691,9 @@ export function TablesView() {
 							))}
 						</div>
 					</section>
-				))
+						);
+					})}
+				</>
 			)}
 
 			<OpenTableDialog

@@ -48,7 +48,7 @@ describe("tables and QR ordering", () => {
 			await api(app)
 				.post(`${base}/tables`)
 				.set(auth(owner.token))
-				.send({ name: "โต๊ะ 1", zone: "ในร้าน" })
+				.send({ name: "โต๊ะ 1", zone: "ในร้าน", seats: 4 })
 				.expect(201)
 		).body.data;
 		pie = (
@@ -70,6 +70,21 @@ describe("tables and QR ordering", () => {
 		await app.close();
 	});
 
+	it("keeps how many a table seats, and lets it be cleared", async () => {
+		expect(table).toMatchObject({ seats: 4 });
+		const cleared = await api(app)
+			.patch(`${base}/tables/${table.id}`)
+			.set(auth(owner.token))
+			.send({ seats: null })
+			.expect(200);
+		expect(cleared.body.data.seats).toBeNull();
+		await api(app)
+			.patch(`${base}/tables/${table.id}`)
+			.set(auth(owner.token))
+			.send({ seats: 0 })
+			.expect(400);
+	});
+
 	it("refuses a duplicate table name and an unknown QR", async () => {
 		await api(app)
 			.post(`${base}/tables`)
@@ -79,7 +94,16 @@ describe("tables and QR ordering", () => {
 		await api(app).get(guest("nope")).expect(404);
 	});
 
+	const selfOpen = (on: boolean) =>
+		api(app)
+			.patch(base)
+			.set(auth(owner.token))
+			.send({ tableSelfOpen: on })
+			.expect(200);
+
 	it("shows guests the menu without what the shop pays, and no ordering while closed", async () => {
+		// The shop wants staff to open every table first.
+		await selfOpen(false);
 		const menu = (await api(app).get(guest()).expect(200)).body.data;
 		expect(menu.tableName).toBe("โต๊ะ 1");
 		expect(menu.open).toBe(false);
@@ -96,6 +120,71 @@ describe("tables and QR ordering", () => {
 				items: [{ productId: pie.id, quantity: 1 }],
 			})
 			.expect(409);
+		await selfOpen(true);
+	});
+
+	it("lets a guest open a free table, and frees it again when the only round is turned down", async () => {
+		const second = (
+			await api(app)
+				.post(`${base}/tables`)
+				.set(auth(owner.token))
+				.send({ name: "โต๊ะ 2" })
+				.expect(201)
+		).body.data as { id: string; qrToken: string };
+		expect(
+			(await api(app).get(guest(second.qrToken)).expect(200)).body.data.open
+		).toBe(true);
+
+		await api(app)
+			.post(`${guest(second.qrToken)}/requests`)
+			.send({
+				clientRequestId: randomUUID(),
+				items: [{ productId: pie.id, quantity: 1 }],
+			})
+			.expect(201);
+		const board = (
+			await api(app).get(`${base}/tables/board`).set(auth(owner.token)).expect(200)
+		).body.data as {
+			id: string;
+			tab: { id: string; pendingRequests: number } | null;
+		}[];
+		const tab = board.find((t) => t.id === second.id)?.tab;
+		expect(tab).toMatchObject({ pendingRequests: 1 });
+
+		// The bell has it too, pointing at the tab.
+		const bell = (
+			await api(app).get(`${base}/notifications`).set(auth(owner.token)).expect(200)
+		).body.data.items as {
+			kind: string;
+			entityId: string;
+			data: Record<string, unknown>;
+		}[];
+		expect(bell.find((n) => n.kind === "TABLE_REQUEST")).toMatchObject({
+			entityId: tab?.id,
+			data: { table: "โต๊ะ 2", items: 1 },
+		});
+
+		const request = (await (async () => {
+			const t = (
+				await api(app)
+					.get(`${base}/table-sessions/${tab?.id}`)
+					.set(auth(owner.token))
+					.expect(200)
+			).body.data as Tab;
+			return t.requests[0];
+		})()) as { id: string };
+		await api(app)
+			.post(`${base}/table-requests/${request.id}/reject`)
+			.set(auth(owner.token))
+			.expect(200);
+		const after = (
+			await api(app).get(`${base}/tables/board`).set(auth(owner.token)).expect(200)
+		).body.data as { id: string; tab: unknown }[];
+		expect(after.find((t) => t.id === second.id)?.tab).toBeNull();
+		await api(app)
+			.delete(`${base}/tables/${second.id}`)
+			.set(auth(owner.token))
+			.expect(200);
 	});
 
 	it("runs a tab: guest rounds wait, accepted rounds cook and take stock, check-out pays once", async () => {

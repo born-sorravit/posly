@@ -3,7 +3,8 @@
 import { ConfirmDialog } from "@/components/common/controls";
 import { EmptyState, SectionTitle, Surface } from "@/components/common/primitives";
 import { TableQrDialog, usePrintQr } from "@/components/tables/table-qr";
-import { useTableMutations, useTables } from "@/hooks/use-posly";
+import { useTableMutations, useTables, useUpdateBusiness } from "@/hooks/use-posly";
+import { useActiveBusiness } from "@/hooks/use-workspace";
 import type { TableDto } from "@/lib/api/posly";
 import { Button } from "@posly/ui/components/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@posly/ui/components/dialog";
@@ -19,7 +20,7 @@ import { Label } from "@posly/ui/components/label";
 import { Skeleton } from "@posly/ui/components/skeleton";
 import { Switch } from "@posly/ui/components/switch";
 import { StatusBadge } from "@/components/common/primitives";
-import { MoreHorizontal, Pencil, Plus, Printer, QrCode, RefreshCw, Trash2, UtensilsCrossed } from "lucide-react";
+import { Loader2, MoreHorizontal, Pencil, Plus, Printer, QrCode, RefreshCw, Trash2, UtensilsCrossed } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -39,11 +40,13 @@ function TableDialog({
 	const { create, update } = useTableMutations();
 	const [name, setName] = useState(editing?.name ?? suggestedName);
 	const [zone, setZone] = useState(editing?.zone ?? "");
+	const [seats, setSeats] = useState(editing?.seats ? String(editing.seats) : "");
+	const seatCount = seats === "" ? null : Number(seats);
 	const pending = create.isPending || update.isPending;
-	const valid = name.trim().length > 0;
+	const valid = name.trim().length > 0 && (seatCount === null || (seatCount >= 1 && seatCount <= 99));
 
 	const save = () => {
-		const input = { name: name.trim(), zone: zone.trim() || null };
+		const input = { name: name.trim(), zone: zone.trim() || null, seats: seatCount };
 		const done = {
 			onSuccess: () => {
 				toast.success(t("saved"));
@@ -82,22 +85,37 @@ function TableDialog({
 							className="h-11 rounded-xl"
 						/>
 					</div>
-					<div className="space-y-2.5">
-						<Label htmlFor="table-zone">{t("zone")}</Label>
-						<Input
-							id="table-zone"
-							maxLength={40}
-							value={zone}
-							onChange={(e) => setZone(e.target.value)}
-							placeholder={t("zonePlaceholder")}
-							className="h-11 rounded-xl"
-						/>
+					<div className="grid grid-cols-[1fr_7rem] gap-3">
+						<div className="space-y-2.5">
+							<Label htmlFor="table-zone">{t("zone")}</Label>
+							<Input
+								id="table-zone"
+								maxLength={40}
+								value={zone}
+								onChange={(e) => setZone(e.target.value)}
+								placeholder={t("zonePlaceholder")}
+								className="h-11 rounded-xl"
+							/>
+						</div>
+						<div className="space-y-2.5">
+							<Label htmlFor="table-seats">{t("seats")}</Label>
+							<Input
+								id="table-seats"
+								inputMode="numeric"
+								maxLength={2}
+								value={seats}
+								onChange={(e) => setSeats(e.target.value.replace(/\D/g, "").replace(/^0+/, ""))}
+								placeholder={t("seatsPlaceholder")}
+								className="numeric h-11 rounded-xl text-center"
+							/>
+						</div>
 					</div>
 					<DialogFooter className="-mx-6 -mb-6 mt-2 px-6 py-4">
 						<Button type="button" variant="outline" size="lg" onClick={() => onOpenChange(false)}>
 							{t("cancel")}
 						</Button>
 						<Button type="submit" size="lg" className="brand-gradient" disabled={!valid || pending}>
+							{pending ? <Loader2 className="animate-spin" /> : null}
 							{t("save")}
 						</Button>
 					</DialogFooter>
@@ -130,6 +148,9 @@ export function TableSettings() {
 	const [confirm, setConfirm] = useState<{ kind: "delete" | "rotate"; table: TableDto } | null>(null);
 	const list = tables.data ?? [];
 	const onError = (e: Error) => toast.error(e.message);
+	const { business, can } = useActiveBusiness();
+	const updateBusiness = useUpdateBusiness();
+	const [selfOpen, setSelfOpen] = useState(business.tableSelfOpen);
 
 	return (
 		<>
@@ -153,6 +174,29 @@ export function TableSettings() {
 					{t("title")}
 				</SectionTitle>
 				<p className="-mt-2 mb-4 text-muted-foreground text-sm">{t("description")}</p>
+				<label className="mb-4 flex items-center justify-between gap-4 rounded-xl bg-muted/50 px-4 py-3">
+					<span>
+						<span className="block font-medium text-sm">{t("selfOpen")}</span>
+						<span className="block text-muted-foreground text-xs">{t("selfOpenHint")}</span>
+					</span>
+					<Switch
+						checked={selfOpen}
+						disabled={!can("business:manage")}
+						onCheckedChange={(on) => {
+							setSelfOpen(on);
+							updateBusiness.mutate(
+								{ tableSelfOpen: on },
+								{
+									onSuccess: () => toast.success(t("saved")),
+									onError: (e) => {
+										setSelfOpen(!on);
+										toast.error(e.message);
+									},
+								}
+							);
+						}}
+					/>
+				</label>
 
 				{tables.isPending ? (
 					<div className="grid gap-2">
@@ -183,7 +227,9 @@ export function TableSettings() {
 								</span>
 								<span className="min-w-0 flex-1">
 									<span className="block truncate font-medium text-sm">{table.name}</span>
-									<span className="block truncate text-muted-foreground text-xs">{table.zone ?? "—"}</span>
+									<span className="block truncate text-muted-foreground text-xs">
+										{[table.zone, table.seats ? t("seatsCount", { count: table.seats }) : null].filter(Boolean).join(" · ") || "—"}
+									</span>
 								</span>
 								{table.isActive ? null : <StatusBadge tone="neutral">{t("inactive")}</StatusBadge>}
 								<Switch

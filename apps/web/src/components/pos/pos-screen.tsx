@@ -152,9 +152,23 @@ export function PosScreen() {
 	const outOfOrders = limits.orders !== null && usage.ordersThisMonth >= limits.orders;
 
 	/** Adding to a table: the cart goes onto the tab as one round, and staff go back to the floor. */
+	// From the tap until the floor has opened: the request is only the first half of the wait.
+	const [sending, setSending] = useState(false);
+	const sent = useRef(false);
+	// The cart is emptied once the POS is gone, so it never flashes empty while the floor loads.
+	useEffect(
+		() => () => {
+			if (!sent.current) return;
+			useCartStore.getState().clear();
+			useCartStore.getState().setTable(null);
+		},
+		[]
+	);
+
 	const sendRound = useCallback(() => {
 		const { lines: cartLines, table } = useCartStore.getState();
-		if (!table || addRound.isPending) return;
+		if (!table || sending) return;
+		setSending(true);
 		addRound.mutate(
 			{
 				sessionId: table.sessionId,
@@ -169,13 +183,11 @@ export function PosScreen() {
 			{
 				onSuccess: () => {
 					toast.success(t("sentToTable", { table: table.name }));
-					clear();
-					useCartStore.getState().setTable(null);
-					setSessionKey(crypto.randomUUID());
-					setCartOpen(false);
+					sent.current = true;
 					router.push({ pathname: "/tables", query: { tab: table.sessionId } });
 				},
 				onError: (e) => {
+					setSending(false);
 					toast.error(e.message);
 					// The tab was paid or cancelled meanwhile: the cart stays, as an ordinary sale.
 					if (e instanceof BackendError && e.status === 409 && /tab is already closed/.test(e.raw ?? ""))
@@ -183,7 +195,7 @@ export function PosScreen() {
 				},
 			}
 		);
-	}, [addRound, sessionKey, clear, router, t]);
+	}, [addRound, sending, sessionKey, router, t]);
 
 	const openCheckout = useCallback(() => {
 		if (useCartStore.getState().lines.length === 0) return;
@@ -283,6 +295,7 @@ export function PosScreen() {
 			onCheckout={openCheckout}
 			canEdit={(line) => Boolean(productFor(line))}
 			onEditLine={editLine}
+			busy={sending}
 			className="h-full"
 		/>
 	);

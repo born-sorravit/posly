@@ -39,6 +39,8 @@ export interface Business {
 	receiptFooter: string | null;
 	receiptShowLogo: boolean;
 	receiptShowTaxId: boolean;
+	/** Guests at a free table may open it by ordering from its QR. */
+	tableSelfOpen: boolean;
 	branches: Branch[];
 }
 

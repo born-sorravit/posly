@@ -44,6 +44,7 @@ export interface BusinessDetailDto extends BusinessSummaryDto {
 	receiptFooter: string | null;
 	receiptShowLogo: boolean;
 	receiptShowTaxId: boolean;
+	tableSelfOpen: boolean;
 	permissions: string[];
 	subscription: SubscriptionDto;
 }
@@ -409,6 +410,8 @@ export interface TableDto {
 	branchId: string;
 	name: string;
 	zone: string | null;
+	/** How many it seats, if set: a guide for staff, not a limit. */
+	seats: number | null;
 	displayOrder: number;
 	isActive: boolean;
 	/** What the table's QR carries: `/t/<qrToken>`. */
@@ -418,6 +421,7 @@ export interface TableDto {
 export interface TableInput {
 	name: string;
 	zone?: string | null;
+	seats?: number | null;
 	displayOrder?: number;
 	isActive?: boolean;
 }
@@ -491,7 +495,8 @@ export type NotificationKind =
 	| "DAILY_SUMMARY"
 	| "ORDER_QUOTA"
 	| "PAYMENT_FAILED"
-	| "ANNOUNCEMENT";
+	| "ANNOUNCEMENT"
+	| "TABLE_REQUEST";
 
 /** An event, as facts; the words are written here from `kind` + `data`. */
 export interface NotificationDto {

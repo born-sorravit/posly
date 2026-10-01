@@ -165,7 +165,11 @@ Posly คือระบบ POS สำหรับร้านค้าไทย
 
 ## โต๊ะ (floor)
 
-- **การ์ดโต๊ะ:** `.surface surface-hover rounded-2xl p-4` ชื่อโต๊ะ `text-lg font-semibold` สถานะเป็น `StatusBadge` คู่คำเสมอ: ว่าง = `neutral`, มีลูกค้า = `info` + ยอดบิล, มีคำสั่งจาก QR รอ = `warning` + `ring-2 ring-warning` และจุดกะพริบ
+- **การ์ดโต๊ะ:** grid `grid-cols-2 tablet:grid-cols-4 desktop:grid-cols-6` สูงอย่างน้อย `min-h-28` มีสามแบบ
+  - ว่าง: กรอบเส้นประ `border-2 border-dashed` ไม่มีพื้น ชื่อโต๊ะสี `muted-foreground` และ "+ เปิดโต๊ะ" ที่ขอบล่าง ชี้แล้วเป็นสี `primary`
+  - มีลูกค้า: `.tint-surface` สี `info` แถบสีด้านซ้าย `w-1 bg-chart-4` ยอดบิล `text-xl font-bold` เวลาที่นั่ง จำนวนรายการ และจำนวนคน
+  - มีคำสั่งรอยืนยัน: เหมือนมีลูกค้าแต่ใช้สี `warning` ทั้งพื้น แถบ และ `ring-2 ring-warning` มี badge ทึบ `bg-warning text-warning-foreground` "สั่งใหม่ N" มุมขวาบน
+- **ตัวกรองบนหน้าโต๊ะ:** `Segmented` แบบ `w-fit` (ทั้งหมด / ว่าง / มีลูกค้า / รอยืนยัน พร้อมจำนวน) หัวโซนเป็นชื่อโซนตามด้วยจำนวนโต๊ะสีจาง
 - **คำสั่งที่รอยืนยัน:** กล่อง `bg-warning/10 ring-1 ring-warning/40` ปุ่ม "ปฏิเสธ" outline คู่ "ยืนยัน" primary
 - **แจ้งเตือนคำสั่งใหม่:** toast พร้อมปุ่ม "ดู" และเสียง chime (`lib/sounds.ts` ชุดเดียวกับจอครัว) ทุกหน้าของแอป
 

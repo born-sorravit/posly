@@ -37,6 +37,13 @@ export class CreateTableDto {
 	@MaxLength(40)
 	zone?: string | null;
 
+	@ApiPropertyOptional({ minimum: 1, maximum: 99, nullable: true })
+	@IsOptional()
+	@IsInt()
+	@Min(1)
+	@Max(99)
+	seats?: number | null;
+
 	@ApiPropertyOptional({ description: "Defaults to the business's default branch" })
 	@IsOptional()
 	@IsUUID()
@@ -62,6 +69,7 @@ export class TableResponse {
 	@ApiProperty() branchId: string;
 	@ApiProperty() name: string;
 	@ApiProperty({ nullable: true }) zone: string | null;
+	@ApiProperty({ nullable: true }) seats: number | null;
 	@ApiProperty() displayOrder: number;
 	@ApiProperty() isActive: boolean;
 	@ApiProperty({ description: "What the table's QR carries" }) qrToken: string;

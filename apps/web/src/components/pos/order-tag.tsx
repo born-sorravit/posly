@@ -13,7 +13,8 @@ import { useActiveBusiness } from "@/hooks/use-workspace";
 import { cn } from "@/lib/utils";
 import { useCartStore } from "@/stores/cart-store";
 import type { ServiceType } from "@posly/types/domain";
-import { Armchair, Bike, ShoppingBag, UtensilsCrossed } from "lucide-react";
+import { Bike, ChevronDown, ShoppingBag, UtensilsCrossed } from "lucide-react";
+import { formatBaht } from "@posly/utils/money";
 import { useTranslations } from "next-intl";
 
 export const SERVICE_ICON: Record<ServiceType, typeof Bike> = {
@@ -35,67 +36,74 @@ export function OrderTag() {
 	const label = useCartStore((s) => s.label);
 	const setLabel = useCartStore((s) => s.setLabel);
 	const kinds = business.businessType !== "RETAIL" && business.businessType !== "SERVICE";
-	// Open tables this cart can go onto instead of being paid now.
-	const openTabs = (useTableBoard(kinds).data ?? []).filter((table) => table.tab);
+	// With real tables the label is for a name or a queue number; a table is picked below.
+	const tables = useTableBoard(kinds).data ?? [];
+	const openTabs = tables.filter((table) => table.tab);
 	const setTable = useCartStore((s) => s.setTable);
 
 	return (
-		<div className="flex items-center gap-1.5 px-4 pb-2">
-			{kinds
-				? (Object.keys(SERVICE_ICON) as ServiceType[]).map((kind) => {
-						const Icon = SERVICE_ICON[kind];
-						const on = serviceType === kind;
-						return (
-							<button
-								key={kind}
-								type="button"
-								aria-pressed={on}
-								onClick={() => setServiceType(on ? null : kind)}
-								className={cn(
-									"flex h-8 items-center gap-1 rounded-full px-2.5 font-medium text-xs transition-colors",
-									on ? "bg-primary text-primary-foreground" : "bg-muted/70 text-muted-foreground hover:bg-muted"
-								)}
-							>
-								<Icon className="size-3.5" />
-								{t(kind)}
-							</button>
-						);
-					})
-				: null}
+		<div className="space-y-2 px-4 pb-2">
+			<div className="flex items-center gap-1.5">
+				{kinds
+					? (Object.keys(SERVICE_ICON) as ServiceType[]).map((kind) => {
+							const Icon = SERVICE_ICON[kind];
+							const on = serviceType === kind;
+							return (
+								<button
+									key={kind}
+									type="button"
+									aria-pressed={on}
+									onClick={() => setServiceType(on ? null : kind)}
+									className={cn(
+										"flex h-8 items-center gap-1 rounded-full px-2.5 font-medium text-xs transition-colors",
+										on ? "bg-primary text-primary-foreground" : "bg-muted/70 text-muted-foreground hover:bg-muted"
+									)}
+								>
+									<Icon className="size-3.5" />
+									{t(kind)}
+								</button>
+							);
+						})
+					: null}
+				<Input
+					value={label}
+					maxLength={40}
+					onChange={(e) => setLabel(e.target.value)}
+					placeholder={
+						!kinds ? t("labelPlaceholderShop") : tables.length > 0 ? t("labelPlaceholderTables") : t("labelPlaceholder")
+					}
+					aria-label={t("label")}
+					className="h-8 min-w-0 flex-1 rounded-full px-3 text-xs"
+				/>
+			</div>
 			{openTabs.length > 0 ? (
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
 						<button
 							type="button"
-							aria-label={t("pickTable")}
-							title={t("pickTable")}
-							className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted/70 text-muted-foreground transition-colors hover:bg-muted"
+							className="flex h-9 w-full items-center gap-2 rounded-xl border border-primary/40 border-dashed px-3 font-medium text-primary text-sm transition-colors hover:border-primary hover:bg-primary/10"
 						>
-							<Armchair className="size-3.5" />
+							<UtensilsCrossed className="size-4" />
+							<span className="flex-1 text-left">{t("pickTable", { count: openTabs.length })}</span>
+							<ChevronDown className="size-4" />
 						</button>
 					</DropdownMenuTrigger>
-					<DropdownMenuContent align="start" className="max-h-72 w-52 overflow-y-auto">
+					<DropdownMenuContent align="start" className="max-h-72 w-(--radix-dropdown-menu-trigger-width) overflow-y-auto">
 						<DropdownMenuLabel className="text-muted-foreground text-xs">{t("pickTableHint")}</DropdownMenuLabel>
 						{openTabs.map((table) => (
 							<DropdownMenuItem
 								key={table.id}
+								className="h-10"
 								onClick={() => table.tab && setTable({ sessionId: table.tab.id, name: table.name })}
 							>
 								<UtensilsCrossed />
-								{table.name}
+								<span className="flex-1 font-medium">{table.name}</span>
+								<span className="numeric text-muted-foreground text-xs">{formatBaht(table.tab?.total ?? 0)}</span>
 							</DropdownMenuItem>
 						))}
 					</DropdownMenuContent>
 				</DropdownMenu>
 			) : null}
-			<Input
-				value={label}
-				maxLength={40}
-				onChange={(e) => setLabel(e.target.value)}
-				placeholder={kinds ? t("labelPlaceholder") : t("labelPlaceholderShop")}
-				aria-label={t("label")}
-				className="h-8 min-w-0 flex-1 rounded-full px-3 text-xs"
-			/>
 		</div>
 	);
 }

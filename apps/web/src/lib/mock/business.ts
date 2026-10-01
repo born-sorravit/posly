@@ -20,6 +20,7 @@ export const BUSINESSES: Business[] = [
 		receiptFooter: null,
 		receiptShowLogo: true,
 		receiptShowTaxId: true,
+	tableSelfOpen: true,
 		branches: [
 			{ id: "br-siam", name: "สาขาสยามสแควร์", isDefault: true },
 			{ id: "br-phuket", name: "สาขาภูเก็ต", isDefault: false },
@@ -42,6 +43,7 @@ export const BUSINESSES: Business[] = [
 		receiptFooter: null,
 		receiptShowLogo: true,
 		receiptShowTaxId: true,
+	tableSelfOpen: true,
 		branches: [{ id: "br-bake-1", name: "สาขาหลัก", isDefault: true }],
 	},
 ];

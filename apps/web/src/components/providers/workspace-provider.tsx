@@ -6,6 +6,12 @@ import type { Branch, Business, FeatureKey } from "@posly/types/domain";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from "react";
 
+/**
+ * Every tick and status change on the kitchen screen carries this mutation key, so whatever
+ * is about to re-read the board (the live stream, the poll) can tell a change is in flight.
+ */
+export const KITCHEN_CHANGE = ["kitchen-change"] as const;
+
 export const queryKeys = {
 	businesses: ["businesses"] as const,
 	business: (id: string) => ["business", id] as const,
@@ -63,6 +69,7 @@ const toBusiness = (detail: BusinessDetailDto, branches: Branch[]): Business => 
 	receiptFooter: detail.receiptFooter,
 	receiptShowLogo: detail.receiptShowLogo,
 	receiptShowTaxId: detail.receiptShowTaxId,
+	tableSelfOpen: detail.tableSelfOpen,
 	branches,
 });
 

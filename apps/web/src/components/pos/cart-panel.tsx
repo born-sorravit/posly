@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 import { type CartLine, type CartTotals, remainingStock, useCartStore } from "@/stores/cart-store";
 import {
 	ArrowRight,
+	Loader2,
 	MoreHorizontal,
 	UtensilsCrossed,
 	X,
@@ -233,6 +234,7 @@ export function CartPanel({
 	onCheckout,
 	canEdit,
 	onEditLine,
+	busy = false,
 	className,
 }: {
 	totals: CartTotals;
@@ -241,6 +243,8 @@ export function CartPanel({
 	/** Whether a line's options can be re-picked (its product is on the menu with options). */
 	canEdit?: (line: CartLine) => boolean;
 	onEditLine?: (line: CartLine) => void;
+	/** The main button's action is in flight (a round being sent onto a table). */
+	busy?: boolean;
 	className?: string;
 }) {
 	const t = useTranslations("pos");
@@ -355,7 +359,7 @@ export function CartPanel({
 					<TooltipTrigger asChild>
 						<Button
 							data-tour="pos-checkout"
-							disabled={empty || outOfOrders}
+							disabled={empty || outOfOrders || busy}
 							onClick={onCheckout}
 							className="brand-gradient touch-target h-14 w-full rounded-2xl font-semibold text-base shadow-md transition-transform active:scale-[0.98]"
 						>
@@ -363,7 +367,7 @@ export function CartPanel({
 								{table ? t("sendToTable", { table: table.name }) : t("checkout")}
 							</span>
 							<span className="numeric">{formatBaht(totals.total)}</span>
-							<ArrowRight className="size-5" />
+							{busy ? <Loader2 className="size-5 animate-spin" /> : <ArrowRight className="size-5" />}
 						</Button>
 					</TooltipTrigger>
 					<TooltipContent>

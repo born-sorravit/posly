@@ -1,6 +1,6 @@
 "use client";
 
-import { queryKeys, useWorkspace } from "@/components/providers/workspace-provider";
+import { KITCHEN_CHANGE, queryKeys, useWorkspace } from "@/components/providers/workspace-provider";
 import { BackendError } from "@/lib/api/backend";
 import { useRealtime } from "@/components/realtime/realtime";
 import {
@@ -566,13 +566,16 @@ export function useKitchenBoard(enabled = true) {
 	const id = useBusinessId();
 	const live = useRealtime((s) => s.connected);
 	const branchId = useWorkspace().branch?.id ?? null;
+	const queryClient = useQueryClient();
 	return useQuery({
 		queryKey: ["business", id, "kitchen", branchId],
 		queryFn: ({ signal }) => api.kitchen.board(id, branchId, signal),
 		// Live events redraw the board, so while the stream is up the poll is only a rare safety
 		// net (events are in-process: a second API instance would not relay its own). Without
-		// the stream, a fast poll keeps new orders coming.
-		refetchInterval: live ? 5 * 60_000 : 4000,
+		// the stream, a fast poll keeps new orders coming. Never mid-change: a read from before
+		// the change commits would undo it on screen for a moment.
+		refetchInterval: () =>
+			queryClient.isMutating({ mutationKey: KITCHEN_CHANGE }) > 0 ? false : live ? 5 * 60_000 : 4000,
 		refetchIntervalInBackground: true,
 		enabled,
 	});
@@ -593,15 +596,17 @@ export function useKitchenMutations() {
 					}
 				: board
 		);
-	// A successful change is announced on the live stream too (after it commits), which
-	// refetches the board; refetching here as well raced it, and React Query cancelled one of
-	// the two. So re-read here only on failure (to undo the optimistic change) or when the
-	// stream is down and nothing else will.
-	const settle = (_data: unknown, error: Error | null) => {
-		if (error || !useRealtime.getState().connected) void queryClient.invalidateQueries({ queryKey: key });
+	// While any change is in flight, nothing re-reads the board (the live stream and the poll
+	// both hold off): a read taken before a change commits would put the ticket back where it
+	// was for a moment, then the next read would move it again. The last change to settle
+	// re-reads once, and that read includes all of them.
+	const settle = () => {
+		if (queryClient.isMutating({ mutationKey: KITCHEN_CHANGE }) <= 1)
+			void queryClient.invalidateQueries({ queryKey: key });
 	};
 	return {
 		setStatus: useMutation({
+			mutationKey: KITCHEN_CHANGE,
 			mutationFn: ({ orderId, status }: { orderId: string; status: KitchenStatus }) =>
 				api.kitchen.setStatus(id, orderId, status),
 			onMutate: async ({ orderId, status }) => {
@@ -611,6 +616,7 @@ export function useKitchenMutations() {
 			onSettled: settle,
 		}),
 		setPrepared: useMutation({
+			mutationKey: KITCHEN_CHANGE,
 			mutationFn: ({ orderId, itemId, prepared }: { orderId: string; itemId: string; prepared: boolean }) =>
 				api.kitchen.setPrepared(id, orderId, itemId, prepared),
 			onMutate: async ({ orderId, itemId, prepared }) => {
@@ -752,10 +758,24 @@ export function useTableMutations() {
 			mutationFn: (input: TableInput) => api.tables.create(id, input),
 			onSuccess: () => void refresh(),
 		}),
+		// Optimistic, like the category switches: a switch that waits for the round trip feels
+		// broken. The list flips at once, rolls back if the API refuses, and is re-read either way.
 		update: useMutation({
 			mutationFn: ({ tableId, ...input }: Partial<TableInput> & { tableId: string }) =>
 				api.tables.update(id, tableId, input),
-			onSuccess: () => void refresh(),
+			onMutate: async ({ tableId, ...input }) => {
+				const key = queryKeys.tables(id);
+				await queryClient.cancelQueries({ queryKey: key, exact: true });
+				const previous = queryClient.getQueryData<Awaited<ReturnType<typeof api.tables.list>>>(key);
+				queryClient.setQueryData<typeof previous>(key, (list) =>
+					list?.map((table) => (table.id === tableId ? { ...table, ...input } : table))
+				);
+				return { previous };
+			},
+			onError: (_error, _input, context) => {
+				if (context?.previous) queryClient.setQueryData(queryKeys.tables(id), context.previous);
+			},
+			onSettled: () => void refresh(),
 		}),
 		remove: useMutation({
 			mutationFn: (tableId: string) => api.tables.remove(id, tableId),

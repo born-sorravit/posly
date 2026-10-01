@@ -14,7 +14,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Skeleton } from "@posly/ui/components/skeleton";
 import { formatBaht, multiply, sum } from "@posly/utils/money";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Minus, Plus, ReceiptText, RotateCcw, SearchX, ShoppingBasket, TriangleAlert } from "lucide-react";
+import { Loader2, Minus, Plus, ReceiptText, RotateCcw, SearchX, ShoppingBasket, TriangleAlert } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useMemo, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
@@ -445,6 +445,7 @@ export function GuestOrder({ token }: { token: string }) {
 							disabled={lines.length === 0 || send.isPending || !data?.open}
 							onClick={() => send.mutate()}
 						>
+							{send.isPending ? <Loader2 className="animate-spin" /> : null}
 							{t("send", { total: formatBaht(total) })}
 						</Button>
 					</div>

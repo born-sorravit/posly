@@ -110,6 +110,13 @@ export class UpdateBusinessDto extends PartialType(CreateBusinessDto) {
 	@IsOptional()
 	@IsBoolean()
 	receiptShowTaxId?: boolean;
+
+	@ApiPropertyOptional({
+		description: "Guests may open a free table by ordering from its QR",
+	})
+	@IsOptional()
+	@IsBoolean()
+	tableSelfOpen?: boolean;
 }
 
 export class BusinessSummaryResponse {
@@ -176,6 +183,7 @@ export class BusinessDetailResponse extends BusinessSummaryResponse {
 	@ApiProperty({ nullable: true }) receiptFooter: string | null;
 	@ApiProperty() receiptShowLogo: boolean;
 	@ApiProperty() receiptShowTaxId: boolean;
+	@ApiProperty() tableSelfOpen: boolean;
 	@ApiProperty({ type: [String], description: "The caller's effective permissions" })
 	permissions: string[];
 	@ApiProperty({ type: SubscriptionSummaryResponse })

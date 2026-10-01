@@ -1,6 +1,6 @@
 "use client";
 
-import { queryKeys, useWorkspace } from "@/components/providers/workspace-provider";
+import { KITCHEN_CHANGE, queryKeys, useWorkspace } from "@/components/providers/workspace-provider";
 import { backend } from "@/lib/api/backend";
 import { env } from "@/lib/env";
 import { useQueryClient } from "@tanstack/react-query";
@@ -35,6 +35,9 @@ export function RealtimeBridge() {
 
 		// A burst of events (a rush of sales) becomes one refetch per topic.
 		const refresh = (topic: string, keys: readonly (readonly unknown[])[]) => {
+			// A tap on the kitchen screen is still on its way: its own settle re-reads the board
+			// once it lands, and a read now could briefly undo it.
+			if (topic === "kitchen" && queryClient.isMutating({ mutationKey: KITCHEN_CHANGE }) > 0) return;
 			if (pending.has(topic)) return;
 			pending.set(
 				topic,

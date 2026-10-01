@@ -10,4 +10,6 @@ export enum NotificationKind {
 	PAYMENT_FAILED = "PAYMENT_FAILED",
 	/** A message from Posly to shops, sent from the admin monitor: `{ title, body }`. */
 	ANNOUNCEMENT = "ANNOUNCEMENT",
+	/** A guest sent a round from a table's QR: `{ table, items }`, entityId = the tab. */
+	TABLE_REQUEST = "TABLE_REQUEST",
 }

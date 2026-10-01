@@ -99,6 +99,7 @@ export class TablesService {
 			branchId: branch.id,
 			name: dto.name,
 			zone: dto.zone || null,
+			seats: dto.seats ?? null,
 			displayOrder:
 				dto.displayOrder ?? (await repo.count({ where: { branchId: branch.id } })),
 			isActive: dto.isActive ?? true,
@@ -120,6 +121,7 @@ export class TablesService {
 		}
 		if (dto.name !== undefined) table.name = dto.name;
 		if (dto.zone !== undefined) table.zone = dto.zone || null;
+		if (dto.seats !== undefined) table.seats = dto.seats;
 		if (dto.displayOrder !== undefined) table.displayOrder = dto.displayOrder;
 		if (dto.isActive !== undefined) table.isActive = dto.isActive;
 		return toTableResponse(await this.saveTable(table));
@@ -356,7 +358,23 @@ export class TablesService {
 					handledAt: new Date(),
 				}
 			);
-			const session = await this.loadSession(manager, membership, request.sessionId);
+			// Locked: a guest's next round cannot slip in while the table is being freed.
+			const session = await this.lockOpenSession(
+				manager,
+				membership,
+				request.sessionId
+			);
+			// A guest opened the table and its only round was turned down: free the table again,
+			// so a photographed QR cannot leave tables looking taken.
+			const pending = await manager.count(TableRequest, {
+				where: { sessionId: session.id, status: TableRequestStatus.PENDING },
+			});
+			if (
+				session.openedByMemberId === null &&
+				session.orderId === null &&
+				pending === 0
+			)
+				await this.finish(manager, session, TableSessionStatus.CANCELLED);
 			await this.announce(manager, session, ["tables"]);
 			return session.id;
 		});
@@ -803,6 +821,7 @@ const toTableResponse = (table: DiningTable): TableResponse => ({
 	branchId: table.branchId,
 	name: table.name,
 	zone: table.zone,
+	seats: table.seats,
 	displayOrder: table.displayOrder,
 	isActive: table.isActive,
 	qrToken: table.qrToken,

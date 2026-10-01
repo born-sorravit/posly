@@ -7,6 +7,7 @@ import { TableRequest } from "@/models/tables/entities/table-request.entity";
 import { TableSession } from "@/models/tables/entities/table-session.entity";
 import { toModifierGroupResponse } from "@/modules/catalog/catalog.mapper";
 import { OrdersService } from "@/modules/orders/orders.service";
+import { NotificationsService } from "@/modules/notifications/notifications.service";
 import { RealtimeService } from "@/modules/realtime/realtime.service";
 import { StorageService } from "@/modules/storage/storage.service";
 import {
@@ -19,6 +20,7 @@ import {
 	sortedItems,
 	toRequestLine,
 } from "@/modules/tables/tables.service";
+import { NotificationKind } from "@/shared/enums/notification.enum";
 import { TableRequestStatus, TableSessionStatus } from "@/shared/enums/table.enum";
 import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { DataSource, EntityManager, In } from "typeorm";
@@ -38,6 +40,7 @@ export class GuestTablesService {
 		private readonly orders: OrdersService,
 		private readonly tables: TablesService,
 		private readonly realtime: RealtimeService,
+		private readonly notifications: NotificationsService,
 		private readonly storage: StorageService
 	) {}
 
@@ -63,7 +66,8 @@ export class GuestTablesService {
 			shopName: business.name,
 			logoUrl: business.logoPath ? this.storage.publicUrl(business.logoPath) : null,
 			tableName: table.name,
-			open: Boolean(session),
+			// Open for ordering: a tab is running, or the shop lets the first order open one.
+			open: Boolean(session) || business.tableSelfOpen,
 			categories: categories.map((c) => ({ id: c.id, name: c.name, icon: c.icon })),
 			products: products
 				.filter((p) => !p.categoryId || shown.has(p.categoryId))
@@ -98,7 +102,9 @@ export class GuestTablesService {
 		const lines = dto.items.map(toRequestLine);
 		await this.dataSource.transaction(async (manager) => {
 			const table = await this.loadTable(manager, token);
-			const session = await this.openSession(manager, table, true);
+			const session =
+				(await this.openSession(manager, table, true)) ??
+				(await this.openForGuest(manager, table));
 			if (!session)
 				throw new ConflictException("This table is not open for ordering");
 
@@ -141,6 +147,14 @@ export class GuestTablesService {
 				businessId: table.businessId,
 				branchId: table.branchId,
 			});
+			// The bell keeps it after the toast is gone; it opens the table's tab.
+			await this.notifications.emit(
+				manager,
+				table.businessId,
+				NotificationKind.TABLE_REQUEST,
+				{ table: table.name, items: lines.reduce((n, l) => n + l.quantity, 0) },
+				{ entityId: session.id, branchId: table.branchId }
+			);
 		});
 		return this.tab(token);
 	}
@@ -178,6 +192,29 @@ export class GuestTablesService {
 			total: order?.total ?? 0,
 			requests: await this.tables.describeRequests(table.businessId, requests),
 		};
+	}
+
+	/**
+	 * A guest at a free table opens it with their first order, when the shop allows it. The
+	 * tab has no member behind it until staff accept a round; if they turn the only round
+	 * down, the table frees itself again (see `TablesService.reject`).
+	 */
+	private async openForGuest(
+		manager: EntityManager,
+		table: DiningTable
+	): Promise<TableSession | null> {
+		const business = await manager.findOneOrFail(Business, {
+			where: { id: table.businessId },
+		});
+		if (!business.tableSelfOpen) return null;
+		// Two phones at one table ordering at once: one insert wins, both use its tab.
+		await manager.query(
+			`INSERT INTO "table_session" (business_id, branch_id, table_id, status, opened_by_member_id, opened_at)
+			 VALUES ($1, $2, $3, $4, NULL, now())
+			 ON CONFLICT (table_id) WHERE status = 'OPEN' DO NOTHING`,
+			[table.businessId, table.branchId, table.id, TableSessionStatus.OPEN]
+		);
+		return this.openSession(manager, table, true);
 	}
 
 	private async loadTable(

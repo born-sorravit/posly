@@ -34,8 +34,9 @@ export class TableSession extends BaseEntity {
 	@Column({ type: "int", nullable: true })
 	guests: number | null;
 
-	@Column({ name: "opened_by_member_id", type: "uuid" })
-	openedByMemberId: string;
+	/** Null when a guest opened the table by ordering from its QR. */
+	@Column({ name: "opened_by_member_id", type: "uuid", nullable: true })
+	openedByMemberId: string | null;
 
 	@Column({ name: "opened_at", type: "timestamptz" })
 	openedAt: Date;

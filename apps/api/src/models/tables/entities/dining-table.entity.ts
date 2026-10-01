@@ -24,6 +24,10 @@ export class DiningTable extends BaseEntity {
 	@Column({ type: "varchar", length: 40, nullable: true })
 	zone: string | null;
 
+	/** How many it seats, if the shop says; a guide for staff, never a limit. */
+	@Column({ type: "int", nullable: true })
+	seats: number | null;
+
 	@Column({ name: "display_order", type: "int", default: 0 })
 	displayOrder: number;
 

@@ -68,6 +68,10 @@ export class Business extends BaseEntity {
 	@Column({ name: "receipt_show_tax_id", type: "boolean", default: true })
 	receiptShowTaxId: boolean;
 
+	/** A guest at a free table may open it by ordering from its QR; staff still accept each round. */
+	@Column({ name: "table_self_open", type: "boolean", default: true })
+	tableSelfOpen: boolean;
+
 	@Column({ name: "onboarded_at", type: "timestamptz", nullable: true })
 	onboardedAt: Date | null;
 }

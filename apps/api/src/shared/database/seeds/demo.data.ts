@@ -40,7 +40,7 @@ export interface DemoShop {
 	/** Relative weight per hour of the day — a cafe's morning rush, a minimart's evening. */
 	peak: (hour: number) => number;
 	/** Tables in the main branch, by zone, for dine-in and QR ordering. */
-	tables?: { zone: string; names: string[] }[];
+	tables?: { zone: string; seats: number; names: string[] }[];
 	/** What the kitchen buys, so recipes can cost the menu (Inventory feature). */
 	ingredients?: DemoIngredient[];
 	/**
@@ -152,9 +152,10 @@ export const DEMO_SHOPS: DemoShop[] = [
 		tables: [
 			{
 				zone: "ในร้าน",
+				seats: 4,
 				names: ["โต๊ะ 1", "โต๊ะ 2", "โต๊ะ 3", "โต๊ะ 4", "โต๊ะ 5", "โต๊ะ 6"],
 			},
-			{ zone: "ระเบียง", names: ["โต๊ะ 7", "โต๊ะ 8"] },
+			{ zone: "ระเบียง", seats: 2, names: ["โต๊ะ 7", "โต๊ะ 8"] },
 		],
 		members: [
 			{ account: "nan", role: MemberRole.OWNER, displayName: "คุณแนน" },
